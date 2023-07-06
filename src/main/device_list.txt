@@ -1,2 +1,4 @@
-8037;Arduino Micro;ATmega32U4;avr109;Arduino Micro (bootloader);0037.
-0043;Arduino Micro;ATmega328P;avr109;;.
+2341,2a03
+8037;Arduino Micro;ATmega32U4;avr109;Arduino Micro (bootloader);0037
+0043;Arduino Uno;ATmega328P;arduino;;.
+end

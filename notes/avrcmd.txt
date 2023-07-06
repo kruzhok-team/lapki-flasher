@@ -29,3 +29,10 @@ goto :flash
 :flash
 AVRDUDE -p ATmega32u4 -c avr109 -P %port% -b57600 -U flash:w:board.hex:i
 
+"/home/roundabout/.arduino15/packages/arduino/tools/avrdude/6.3.0-arduino17/bin/avrdude" "-C/home/roundabout/.arduino15/packages/arduino/tools/avrdude/6.3.0-arduino17/etc/avrdude.conf" -v -V -patmega32u4 -cavr109 "-P/dev/ttyACM0" -b57600 -D "-Uflash:w:/tmp/arduino/sketches/8006DC3CB7EF632C640B01A1E6B4CEE8/Blink.ino.hex:i"
+avrdude -v -V -patmega32u4 -cavr109 "-P/dev/ttyACM0" -b57600 -D "-Uflash:w:/tmp/arduino/sketches/8006DC3CB7EF632C640B01A1E6B4CEE8/Blink.ino.hex:i"
+avrdude "-C/home/roundabout/.arduino15/packages/arduino/tools/avrdude/6.3.0-arduino17/etc/avrdude.conf" -v -V -patmega32u4 -cavr109 "-P/dev/ttyACM0" -b57600 -D "-Uflash:w:/tmp/arduino/sketches/8006DC3CB7EF632C640B01A1E6B4CEE8/Blink.ino.hex:i"
+avrdude "-Cavrdude.conf" -v -V -patmega32u4 -cavr109 "-P/dev/ttyACM0" -b57600 -D "-Uflash:w:/tmp/arduino/sketches/8006DC3CB7EF632C640B01A1E6B4CEE8/Blink.ino.hex:i"
+
+avrdude -v -V -patmega328p -carduino "-P/dev/ttyACM0" -b115200 -D "-Uflash:w:/tmp/arduino/sketches/8006DC3CB7EF632C640B01A1E6B4CEE8/Blink.ino.hex:i"
+
