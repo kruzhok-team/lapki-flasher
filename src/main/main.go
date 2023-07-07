@@ -2,6 +2,8 @@ package main
 
 import (
 	_ "embed"
+	"os"
+	"strconv"
 
 	"encoding/json"
 	"fmt"
@@ -14,6 +16,15 @@ import (
 
 	"github.com/google/gousb"
 	//"github.com/xela07ax/XelaGoDoc/encodingStdout"
+)
+
+type OS string
+
+var OS_CUR OS
+
+const (
+	LINUX   OS = "LINUX"
+	WINDOWS OS = "WINDOWS"
 )
 
 type BoardType struct {
@@ -33,6 +44,7 @@ type BoardToFlash struct {
 	Type     BoardType
 	VendorID string
 	Port     int
+	PortName string
 }
 
 type UploadInfo struct {
@@ -41,6 +53,18 @@ type UploadInfo struct {
 	PortReset  string `json:"PortReset"`
 	PortUpload string `json:"PortUpload"`
 	FilePath   string `json:"FilePath"`
+}
+
+// exists returns whether the given file or directory exists
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func execString(name string, arg ...string) string {
@@ -64,7 +88,12 @@ func getAbolutePath(path string) string {
 }
 
 func reset(port string) {
-	execString(getAbolutePath("src/OS/Windows/reset.bat"), port)
+	switch OS_CUR {
+	case WINDOWS:
+		execString(getAbolutePath("src/OS/Windows/reset.bat"), port)
+	default:
+		panic("Current OS isn't supported! Can't reset the device!\n")
+	}
 }
 
 func transfer(controller, programmer, portUpload, filePath string) {
@@ -101,18 +130,9 @@ func findDevice(ctx *gousb.Context, VID, PID string, port int) *gousb.Device {
 }
 
 func flash(board BoardToFlash, file string) {
-	ctx := gousb.NewContext()
-	defer ctx.Close()
-	dev := findDevice(ctx, board.VendorID, board.Type.ProductID, board.Port)
-	defer dev.Close()
-	fmt.Println(dev.Desc.Configs)
-	for i, v := range dev.Desc.Configs {
-		fmt.Println(i, v)
-		for _, j := range v.Interfaces {
-			fmt.Println(j.String())
-		}
-	}
 	if board.Type.hasBootloader() {
+		ctx := gousb.NewContext()
+		dev := findDevice(ctx, board.VendorID, board.Type.ProductID, board.Port)
 		err := dev.Reset()
 		if err != nil {
 			log.Fatalf("Coudln't reset the device: %v\n", err)
@@ -121,12 +141,14 @@ func flash(board BoardToFlash, file string) {
 		ctxNew := gousb.NewContext()
 		bootloader := findDevice(ctxNew, board.VendorID, board.Type.BootloaderID, -1)
 		fmt.Println(bootloader)
+		dev.Close()
+		ctx.Close()
 		bootloader.Close()
 		ctxNew.Close()
 	}
-	//flash := "flash:w:" + getAbolutePath(file) + ":a"
+	flash := "flash:w:" + getAbolutePath(file) + ":a"
 	//fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", controller, "-c", programmer, "-P", portUpload, "-U", flash))
-	//fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", strconv.Itoa(board.Port), "-U", flash))
+	fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +159,49 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upload(data)
+}
+
+func find_port_name(desc *gousb.DeviceDesc) string {
+	switch OS_CUR {
+	case LINUX:
+		return find_port_name_linux(desc)
+	default:
+		panic("Current OS isn't supported! Can't find device path!\n")
+	}
+}
+
+func find_port_name_linux(desc *gousb.DeviceDesc) string {
+	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
+
+	// в каком порядке идут порты? Надо проверить
+	ports := strconv.Itoa(desc.Path[0])
+	num_ports := len(desc.Path)
+	for i := 1; i < num_ports; i++ {
+		ports += ".[" + strconv.Itoa(desc.Path[i])
+	}
+	for i := 1; i < num_ports; i++ {
+		ports += "]"
+	}
+
+	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
+
+	//
+	dir_prefix := "/sys/bus/usb/devices"
+	tty := "tty"
+	for _, conf := range desc.Configs {
+		for _, inter := range conf.Interfaces {
+			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
+			existance, _ := exists(dir)
+			if existance {
+				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
+				dirs, _ := os.ReadDir(dir)
+				return fmt.Sprintf("/dev/%s", dirs[0].Name())
+				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
+			}
+		}
+
+	}
+	return ""
 }
 
 //go:embed device_list.txt
@@ -164,6 +229,7 @@ func detect_boards() []BoardToFlash {
 					if board.ProductID == desc.Product.String() {
 						detectedBoard.VendorID = v
 						detectedBoard.Port = desc.Port
+						detectedBoard.PortName = find_port_name(desc)
 						detectedBoard.Type = board
 						boards = append(boards, detectedBoard)
 						break
@@ -220,6 +286,7 @@ func setupRoutes() {
 }
 
 func main() {
+	OS_CUR = LINUX
 	vendorGroups := board_list()
 	for i, v := range vendorGroups {
 		fmt.Printf("i: %s v: %v\n", i, v)
@@ -229,5 +296,5 @@ func main() {
 	for _, board := range boards {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}
-	//flash(boards[0], "firmwares/blink.hex")
+	flash(boards[0], "firmwares/blinkUNO.hex")
 }
