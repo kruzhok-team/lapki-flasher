@@ -2,10 +2,12 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
+	"io/ioutil"
 	"os"
 	"strconv"
 
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/google/gousb"
+	"github.com/gorilla/websocket"
 	//"github.com/xela07ax/XelaGoDoc/encodingStdout"
 )
 
@@ -54,6 +57,8 @@ type UploadInfo struct {
 	PortUpload string `json:"PortUpload"`
 	FilePath   string `json:"FilePath"`
 }
+
+var boards []BoardToFlash
 
 // exists returns whether the given file or directory exists
 func exists(path string) (bool, error) {
@@ -151,14 +156,143 @@ func flash(board BoardToFlash, file string) {
 	fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
 }
 
+// https://gist.github.com/tsilvers/5f827fb11aee027e22c6b3102ebcc497
+
+const HandshakeTimeoutSecs = 10
+
+type UploadHeader struct {
+	Filename string
+	Size     int
+	BoardID  int
+}
+
+type UploadStatus struct {
+	Code   int    `json:"code,omitempty"`
+	Status string `json:"status,omitempty"`
+	Pct    *int   `json:"pct,omitempty"` // File processing AFTER upload is done.
+	pct    int
+}
+
+type wsConn struct {
+	conn *websocket.Conn
+}
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	var data UploadInfo
-	err := json.NewDecoder(r.Body).Decode(&data)
+	wsc := wsConn{}
+	var err error
+
+	// Open websocket connection.
+	upgrader := websocket.Upgrader{HandshakeTimeout: time.Second * HandshakeTimeoutSecs}
+	wsc.conn, err = upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fmt.Println("Error on open of websocket connection:", err)
 		return
 	}
-	upload(data)
+	defer wsc.conn.Close()
+	// Get upload file name and length.
+	header := new(UploadHeader)
+	mt, message, err := wsc.conn.ReadMessage()
+	if err != nil {
+		fmt.Println("Error receiving websocket message:", err)
+		return
+	}
+	if mt != websocket.TextMessage {
+		wsc.sendStatus(400, "Invalid message received, expecting file name and length")
+		return
+	}
+	err = json.Unmarshal(message, header)
+	if err != nil {
+		wsc.sendStatus(400, "Error receiving file name, length and board ID: "+err.Error())
+		return
+	}
+	if len(header.Filename) == 0 {
+		wsc.sendStatus(400, "Filename cannot be empty")
+		return
+	}
+	if header.Size == 0 {
+		wsc.sendStatus(400, "Upload file is empty")
+		return
+	}
+	if header.BoardID < 0 || header.BoardID > len(boards) {
+		wsc.sendStatus(400, "Wrong id")
+		return
+	}
+	// Create temp file to save file.
+	var tempFile *os.File
+	if tempFile, err = ioutil.TempFile("tmp", "upload-*.hex"); err != nil {
+		wsc.sendStatus(400, "Could not create temp file: "+err.Error())
+		return
+	}
+	defer func() {
+		tempFile.Close()
+		// *** IN PRODUCTION FILE SHOULD BE REMOVED AFTER PROCESSING ***
+		// _ = os.Remove(tempFile.Name())
+	}()
+	// Read file blocks until all bytes are received.
+	bytesRead := 0
+	for {
+		mt, message, err := wsc.conn.ReadMessage()
+		if err != nil {
+			wsc.sendStatus(400, "Error receiving file block: "+err.Error())
+			return
+		}
+		if mt != websocket.BinaryMessage {
+			if mt == websocket.TextMessage {
+				if string(message) == "CANCEL" {
+					wsc.sendStatus(400, "Upload canceled")
+					return
+				}
+			}
+			wsc.sendStatus(400, "Invalid file block received")
+			return
+		}
+
+		tempFile.Write(message)
+
+		bytesRead += len(message)
+		if bytesRead == header.Size {
+			tempFile.Close()
+			break
+		}
+
+		wsc.requestNextBlock()
+
+	}
+
+	// *****************************
+	// *** Process uploaded file ***
+	// *****************************
+	for i := 0; i <= 10; i++ {
+		wsc.sendPct(i * 10)
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	flash(boards[header.BoardID], tempFile.Name())
+	//flash(boards[0], tempFile.Name())
+	wsc.sendStatus(200, "Upload successful: "+fmt.Sprintf("%s (%d bytes)", tempFile.Name(), bytesRead))
+
+}
+
+func (wsc wsConn) requestNextBlock() {
+	wsc.conn.WriteMessage(websocket.TextMessage, []byte("NEXT"))
+}
+
+func (wsc wsConn) sendStatus(code int, status string) {
+	if msg, err := json.Marshal(UploadStatus{Code: code, Status: status}); err == nil {
+		wsc.conn.WriteMessage(websocket.TextMessage, msg)
+	}
+}
+
+func (wsc wsConn) sendPct(pct int) {
+	stat := UploadStatus{pct: pct}
+	stat.Pct = &stat.pct
+	if msg, err := json.Marshal(stat); err == nil {
+		wsc.conn.WriteMessage(websocket.TextMessage, msg)
+	}
+}
+
+func showJS(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "webpage.html")
 }
 
 func find_port_name(desc *gousb.DeviceDesc) string {
@@ -280,8 +414,50 @@ func board_list() map[string][]BoardType {
 	return vendorGroups
 }
 
+type boardView struct {
+	ID         int    `json:"ID"`
+	Name       string `json:"name"`
+	Controller string `json:"controller"`
+	Programmer string `json:"programmer"`
+	PortName   string `json:"portName"`
+}
+
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	boards = detect_boards()
+
+	wsc := wsConn{}
+	var err error
+
+	// Open websocket connection.
+	upgrader := websocket.Upgrader{HandshakeTimeout: time.Second * HandshakeTimeoutSecs}
+	wsc.conn, err = upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Error on open of websocket connection:", err)
+		return
+	}
+	defer wsc.conn.Close()
+
+	for i, v := range boards {
+		board := boardView{
+			i,
+			v.Type.Name,
+			v.Type.Controller,
+			v.Type.Programmer,
+			v.PortName,
+		}
+		msg, err := json.Marshal(board)
+		if err != nil {
+			wsc.sendStatus(400, err.Error())
+			return
+		}
+		wsc.conn.WriteMessage(websocket.TextMessage, msg)
+	}
+}
+
 func setupRoutes() {
-	http.HandleFunc("/upload/", uploadHandler)
+	http.HandleFunc("/", showJS)
+	http.HandleFunc("/list", listHandler)
+	http.HandleFunc("/upload", uploadHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -292,9 +468,9 @@ func main() {
 		fmt.Printf("i: %s v: %v\n", i, v)
 	}
 	fmt.Println()
-	boards := detect_boards()
+	boards = detect_boards()
 	for _, board := range boards {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}
-	flash(boards[0], "firmwares/blinkUNO.hex")
+	setupRoutes()
 }
