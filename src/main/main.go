@@ -38,11 +38,6 @@ type BoardType struct {
 	Bootloader   string
 	BootloaderID string
 }
-
-func (board BoardType) hasBootloader() bool {
-	return board.BootloaderID != ""
-}
-
 type BoardToFlash struct {
 	Type     BoardType
 	VendorID string
@@ -50,14 +45,11 @@ type BoardToFlash struct {
 	PortName string
 }
 
-type UploadInfo struct {
-	Controller string `json:"Controller"`
-	Programmer string `json:"Programmer"`
-	PortReset  string `json:"PortReset"`
-	PortUpload string `json:"PortUpload"`
-	FilePath   string `json:"FilePath"`
+func (board BoardType) hasBootloader() bool {
+	return board.BootloaderID != ""
 }
 
+// список доступных для прошивки устройств
 var boards []BoardToFlash
 
 // exists returns whether the given file or directory exists
@@ -72,6 +64,7 @@ func exists(path string) (bool, error) {
 	return false, err
 }
 
+// выполнение консольной команды с обработкой ошибок и возвращением stdout
 func execString(name string, arg ...string) string {
 	fmt.Println(name, arg)
 	cmd := exec.Command(name, arg...)
@@ -101,18 +94,7 @@ func reset(port string) {
 	}
 }
 
-func transfer(controller, programmer, portUpload, filePath string) {
-	flash := "flash:w:" + getAbolutePath(filePath) + ":a"
-	fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", controller, "-c", programmer, "-P", portUpload, "-U", flash))
-}
-
-func upload(data UploadInfo) {
-	reset(data.PortReset)
-	time.Sleep(time.Second)
-	transfer(data.Controller, data.Programmer, data.PortUpload, data.FilePath)
-}
-
-// todo: error handling
+// TODO: error handling
 func findDevice(ctx *gousb.Context, VID, PID string, port int) *gousb.Device {
 	devs, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		return VID == desc.Vendor.String() && PID == desc.Product.String() && (port == -1 || desc.Port == port)
@@ -134,7 +116,16 @@ func findDevice(ctx *gousb.Context, VID, PID string, port int) *gousb.Device {
 	return devs[0]
 }
 
+/*
+прошивка
+TODO: Обработка ошибок Avrdude и разобраться с bootloader
+*/
 func flash(board BoardToFlash, file string) {
+	/*
+		на случай если плата прошивается через bootloader,
+		не работает, так как не находит bootloader,
+		требуются дополнительные разрешения на Linux и возможно на других ОС для перезагрузки
+	*/
 	if board.Type.hasBootloader() {
 		ctx := gousb.NewContext()
 		dev := findDevice(ctx, board.VendorID, board.Type.ProductID, board.Port)
@@ -154,6 +145,7 @@ func flash(board BoardToFlash, file string) {
 	}
 	flash := "flash:w:" + getAbolutePath(file) + ":a"
 	//fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", controller, "-c", programmer, "-P", portUpload, "-U", flash))
+	// TODO: нужно добавить avrdude.exe для каждой ОС и сюда указывать путь к нему
 	fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
 }
 
@@ -170,8 +162,6 @@ type UploadHeader struct {
 type UploadStatus struct {
 	Code   int    `json:"code,omitempty"`
 	Status string `json:"status,omitempty"`
-	Pct    *int   `json:"pct,omitempty"` // File processing AFTER upload is done.
-	pct    int
 }
 
 type wsConn struct {
@@ -218,6 +208,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		wsc.sendStatus(400, "Wrong id")
 		return
 	}
+
 	// Create temp file to save file.
 	var tempFile *os.File
 	if tempFile, err = ioutil.TempFile("tmp", "upload-*.hex"); err != nil {
@@ -274,14 +265,6 @@ func (wsc wsConn) requestNextBlock() {
 
 func (wsc wsConn) sendStatus(code int, status string) {
 	if msg, err := json.Marshal(UploadStatus{Code: code, Status: status}); err == nil {
-		wsc.conn.WriteMessage(websocket.TextMessage, msg)
-	}
-}
-
-func (wsc wsConn) sendPct(pct int) {
-	stat := UploadStatus{pct: pct}
-	stat.Pct = &stat.pct
-	if msg, err := json.Marshal(stat); err == nil {
 		wsc.conn.WriteMessage(websocket.TextMessage, msg)
 	}
 }
