@@ -226,8 +226,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		tempFile.Close()
-		// *** IN PRODUCTION FILE SHOULD BE REMOVED AFTER PROCESSING ***
-		// _ = os.Remove(tempFile.Name())
+		fmt.Println(tempFile.Name())
+		err = os.Remove(tempFile.Name())
+		if err != nil {
+			fmt.Println("Can't delete temporary file: ", err.Error())
+		}
 	}()
 	// Read file blocks until all bytes are received.
 	bytesRead := 0
