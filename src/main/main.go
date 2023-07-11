@@ -140,7 +140,8 @@ func flash(board BoardToFlash, file string) {
 		dev := findDevice(ctx, board.VendorID, board.Type.ProductID, board.Port)
 		err := dev.Reset()
 		if err != nil {
-			log.Fatalf("Coudln't reset the device: %v\n", err)
+			fmt.Printf("Coudln't reset the device: %v\n", err)
+			return
 		}
 		time.Sleep(time.Second)
 		ctxNew := gousb.NewContext()
@@ -259,18 +260,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	// *****************************
-	// *** Process uploaded file ***
-	// *****************************
-	for i := 0; i <= 10; i++ {
-		wsc.sendPct(i * 10)
-		time.Sleep(time.Millisecond * 100)
-	}
-
 	flash(boards[header.BoardID], tempFile.Name())
 	//flash(boards[0], tempFile.Name())
 	wsc.sendStatus(200, "Upload successful: "+fmt.Sprintf("%s (%d bytes)", tempFile.Name(), bytesRead))
-
 }
 
 func (wsc wsConn) requestNextBlock() {
