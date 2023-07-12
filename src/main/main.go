@@ -316,29 +316,23 @@ func find_port_name_linux(desc *gousb.DeviceDesc) string {
 	return ""
 }
 
-//go:embed device_list.txt
-var boards_list_str string
-
-//go:embed vendors.txt
-var vendors_list_str string
-
 func detect_boards() []BoardToFlash {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 	// list of supported vendors (should contain lower case only!)
-	vid := strings.Split(strings.ToLower(vendors_list_str), "\n")
+	vid := vendor_list()
 	var boards []BoardToFlash
 	groups := board_list()
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
 		for _, v := range vid {
-			if strings.ToLower(desc.Vendor.String()) == v {
+			if strings.ToLower(desc.Vendor.String()) == strings.ToLower(v) {
 				//fmt.Println(v, desc.Product)
 				cur_group := groups[v]
 				var detectedBoard BoardToFlash
 				//fmt.Println(len(cur_group), v)
 				for _, board := range cur_group {
-					if board.ProductID == desc.Product.String() {
+					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
 						detectedBoard.VendorID = v
 						detectedBoard.Port = desc.Port
 						detectedBoard.PortName = find_port_name(desc)
@@ -357,35 +351,37 @@ func detect_boards() []BoardToFlash {
 	return boards
 }
 
+func vendor_list() []string {
+	// lower-case only
+	vendors := []string{
+		"2a03",
+		"2341",
+	}
+	return vendors
+}
+
 func board_list() map[string][]BoardType {
+	boardGroups := make(map[string][]string)
+	boardGroups["2341,2a03"] = []string{
+		"8037;Arduino Micro;ATmega32U4;avr109;Arduino Micro (bootloader);0037",
+		"0043;Arduino Uno;ATmega328P;arduino;;",
+	}
 	vendorGroups := make(map[string][]BoardType)
-	splitGroups := strings.Split(boards_list_str, ".\n")
-	//fmt.Println(splitGroups, len(splitGroups))
-	n := len(splitGroups) - 1
-	for i, v := range splitGroups {
-		if i == n {
-			break
+	for vendorsStr, boardsStr := range boardGroups {
+		var boards []BoardType
+		for _, boardParams := range boardsStr {
+			params := strings.Split(boardParams, ";")
+			var board BoardType
+			board.ProductID = params[0]
+			board.Name = params[1]
+			board.Controller = params[2]
+			board.Programmer = params[3]
+			board.Bootloader = params[4]
+			board.BootloaderID = params[5]
+			boards = append(boards, board)
 		}
-		//fmt.Println(v, len(v))
-		strs := strings.Split(v, "\n")
-		var cur_vendors []string
-		boards := make([]BoardType, len(strs)-1)
-		for j, s := range strs {
-			//fmt.Println(j, s)
-			if j == 0 {
-				cur_vendors = strings.Split(s, ",")
-			} else {
-				params := strings.Split(s, ";")
-				index := j - 1
-				boards[index].ProductID = params[0]
-				boards[index].Name = params[1]
-				boards[index].Controller = params[2]
-				boards[index].Programmer = params[3]
-				boards[index].Bootloader = params[4]
-				boards[index].BootloaderID = params[5]
-			}
-		}
-		for _, vendor := range cur_vendors {
+		vendorSep := strings.Split(vendorsStr, ",")
+		for _, vendor := range vendorSep {
 			vendorGroups[vendor] = boards
 		}
 	}
@@ -450,5 +446,5 @@ func main() {
 	for _, board := range boards {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}
-	setupRoutes()
+	//setupRoutes()
 }
