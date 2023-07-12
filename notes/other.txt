@@ -6,3 +6,7 @@
 ---
 ID 
 ll /dev/serial/by-id/
+
+---
+Расположение драйвера для Arduino Uno?
+C:\Windows\INF\oem60.inf

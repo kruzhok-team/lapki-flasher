@@ -18,7 +18,8 @@ import (
 
 	"github.com/google/gousb"
 	"github.com/gorilla/websocket"
-	//"github.com/xela07ax/XelaGoDoc/encodingStdout"
+	"github.com/xela07ax/XelaGoDoc/encodingStdout"
+	"golang.org/x/sys/windows/registry"
 )
 
 type OS string
@@ -70,10 +71,11 @@ func execString(name string, arg ...string) string {
 	cmd := exec.Command(name, arg...)
 	stdout, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + string(stdout))
+		//fmt.Println(fmt.Sprint(err) + ": " + string(stdout))
+		fmt.Println("CMD ERROR")
 		return ""
 	}
-	return string(stdout)
+	return string(encodingStdout.Convert(41, stdout))
 }
 
 func getAbolutePath(path string) string {
@@ -277,6 +279,8 @@ func find_port_name(desc *gousb.DeviceDesc) string {
 	switch OS_CUR {
 	case LINUX:
 		return find_port_name_linux(desc)
+	case WINDOWS:
+		return find_port_name_windows(desc)
 	default:
 		panic("Current OS isn't supported! Can't find device path!\n")
 	}
@@ -316,6 +320,45 @@ func find_port_name_linux(desc *gousb.DeviceDesc) string {
 	return ""
 }
 
+func find_port_name_windows(desc *gousb.DeviceDesc) string {
+	cmdPathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s*", desc.Vendor.String(), desc.Product.String())
+	cmdPattern := fmt.Sprintf("Get-PnpDevice -status 'ok' -InstanceId '%s' | Select-Object -Property InstanceId", cmdPathPattern)
+	fmt.Println(cmdPattern)
+	cmdResult := execString("powershell", cmdPattern)
+	var possiblePathes []string
+	curStr := ""
+	for _, v := range cmdResult {
+		if v == '\n' {
+			if len(curStr) > 0 && curStr[0] == 'U' {
+				possiblePathes = append(possiblePathes, curStr)
+			}
+			curStr = ""
+			continue
+		}
+		if v == 13 {
+			continue
+		}
+		curStr += string(v)
+	}
+	for _, path := range possiblePathes {
+		keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", path)
+		key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+		if err != nil {
+			log.Fatal("Registry error:", err)
+		}
+		s, _, err := key.GetStringValue("PortName")
+		if err == registry.ErrNotExist || s[0] != 'C' {
+			fmt.Println("not exists")
+			continue
+		}
+		if err != nil {
+			log.Fatal("Get port name error:", err.Error())
+		}
+		return s
+	}
+	return "NOT FOUND"
+}
+
 func detect_boards() []BoardToFlash {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
@@ -333,11 +376,13 @@ func detect_boards() []BoardToFlash {
 				//fmt.Println(len(cur_group), v)
 				for _, board := range cur_group {
 					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
+						fmt.Println(desc.Spec.Major())
 						detectedBoard.VendorID = v
 						detectedBoard.Port = desc.Port
 						detectedBoard.PortName = find_port_name(desc)
 						detectedBoard.Type = board
 						boards = append(boards, detectedBoard)
+						//return true
 						break
 					}
 				}
@@ -348,6 +393,7 @@ func detect_boards() []BoardToFlash {
 	if err != nil {
 		log.Fatalf("OpenDevices(): %v", err)
 	}
+	//fmt.Println(d)
 	return boards
 }
 
@@ -436,7 +482,7 @@ func setupRoutes() {
 }
 
 func main() {
-	OS_CUR = LINUX
+	OS_CUR = WINDOWS
 	vendorGroups := board_list()
 	for i, v := range vendorGroups {
 		fmt.Printf("i: %s v: %v\n", i, v)
@@ -446,5 +492,5 @@ func main() {
 	for _, board := range boards {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}
-	//setupRoutes()
+	setupRoutes()
 }
