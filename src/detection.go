@@ -17,6 +17,15 @@ import (
 
 const NOT_FOUND = "NOT FOUND"
 
+type BoardType struct {
+	ProductID    string
+	Name         string
+	Controller   string
+	Programmer   string
+	Bootloader   string
+	BootloaderID string
+}
+
 type boardView struct {
 	ID         int    `json:"ID"`
 	Name       string `json:"name"`

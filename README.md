@@ -1,1 +1,2 @@
-enter "go run src/main/main.go" command to run the project.
+Avrdude location: src/avrdude
+Build project: "go build ." in src directory

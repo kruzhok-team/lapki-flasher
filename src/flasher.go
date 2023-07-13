@@ -12,6 +12,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type BoardToFlash struct {
+	Type     BoardType
+	VendorID string
+	Port     int
+	PortName string
+}
+
 // https://gist.github.com/tsilvers/5f827fb11aee027e22c6b3102ebcc497
 
 type UploadHeader struct {
@@ -141,7 +148,7 @@ func flash(board BoardToFlash, file string) {
 	flash := "flash:w:" + getAbolutePath(file) + ":a"
 	//fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", controller, "-c", programmer, "-P", portUpload, "-U", flash))
 	// TODO: нужно добавить avrdude.exe для каждой ОС и сюда указывать путь к нему
-	fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
+	fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
 }
 
 func reset(port string) {

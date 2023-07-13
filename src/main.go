@@ -16,21 +16,6 @@ const (
 	WINDOWS OS = "WINDOWS"
 )
 
-type BoardType struct {
-	ProductID    string
-	Name         string
-	Controller   string
-	Programmer   string
-	Bootloader   string
-	BootloaderID string
-}
-type BoardToFlash struct {
-	Type     BoardType
-	VendorID string
-	Port     int
-	PortName string
-}
-
 func (board BoardType) hasBootloader() bool {
 	return board.BootloaderID != ""
 }
