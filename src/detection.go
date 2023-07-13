@@ -136,25 +136,3 @@ func boardList() map[string][]BoardType {
 	}
 	return vendorGroups
 }
-
-// TODO: error handling
-func findDevice(ctx *gousb.Context, VID, PID string, port int) *gousb.Device {
-	devs, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
-		return VID == desc.Vendor.String() && PID == desc.Product.String() && (port == -1 || desc.Port == port)
-	})
-	fmt.Printf("devs: %v\n", devs)
-	if err != nil {
-		log.Fatalf("OpenDevices(): %v", err)
-	}
-	numberOfDevices := len(devs)
-	if numberOfDevices == 0 {
-		log.Fatalln("The device hasn't been found")
-	}
-	if numberOfDevices > 1 {
-		for _, d := range devs {
-			defer d.Close()
-		}
-		log.Fatalln("More than one device has been found")
-	}
-	return devs[0]
-}

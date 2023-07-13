@@ -1,1 +1,0 @@
-mode %1: BAUD=1200 parity=N data=8 stop=1

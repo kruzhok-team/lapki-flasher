@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/gousb"
 	"github.com/gorilla/websocket"
 )
 
@@ -107,47 +106,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flash(boards[header.BoardID], tempFile.Name())
-	//flash(boards[0], tempFile.Name())
 	wsc.sendStatus(200, "Upload successful: "+fmt.Sprintf("%s (%d bytes)", tempFile.Name(), bytesRead))
 }
 
-/*
-прошивка
-TODO: Обработка ошибок Avrdude и разобраться с bootloader
-*/
+// прошивка
 func flash(board BoardToFlash, file string) {
-	/*
-		на случай если плата прошивается через bootloader,
-		не работает, так как не находит bootloader,
-		требуются дополнительные разрешения на Linux и возможно на других ОС для перезагрузки
-	*/
-	if board.Type.hasBootloader() {
-		ctx := gousb.NewContext()
-		dev := findDevice(ctx, board.VendorID, board.Type.ProductID, board.Port)
-		err := dev.Reset()
-		if err != nil {
-			fmt.Printf("Coudln't reset the device: %v\n", err)
-			return
-		}
-		time.Sleep(time.Second)
-		ctxNew := gousb.NewContext()
-		bootloader := findDevice(ctxNew, board.VendorID, board.Type.BootloaderID, -1)
-		fmt.Println(bootloader)
-		dev.Close()
-		ctx.Close()
-		bootloader.Close()
-		ctxNew.Close()
-	}
 	flash := "flash:w:" + getAbolutePath(file) + ":a"
-	//fmt.Println(execString(getAbolutePath("avrdude/avrdude.exe"), "-p", controller, "-c", programmer, "-P", portUpload, "-U", flash))
 	fmt.Println(execString("avrdude", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash))
 }
-
-/*func reset(port string) {
-	switch OS_CUR {
-	case WINDOWS:
-		execString(getAbolutePath("src/OS/Windows/reset.bat"), port)
-	default:
-		panic("Current OS isn't supported! Can't reset the device!\n")
-	}
-}*/

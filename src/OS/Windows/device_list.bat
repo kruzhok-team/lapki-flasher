@@ -1,1 +1,0 @@
-powershell -Command  "& {Get-CimInstance -ClassName Win32_PNPEntity | Select-Object -Property DeviceID, name}"
