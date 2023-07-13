@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/gousb"
 	"github.com/gorilla/websocket"
-	"golang.org/x/sys/windows/registry"
 )
 
 const NOT_FOUND = "NOT FOUND"
@@ -35,7 +32,7 @@ type boardView struct {
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
-	boards = detect_boards()
+	boards = DetectBoards()
 
 	wsc := wsConn{}
 	var err error
@@ -66,98 +63,13 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func find_port_name(desc *gousb.DeviceDesc) string {
-	switch OS_CUR {
-	case LINUX:
-		return find_port_name_linux(desc)
-	case WINDOWS:
-		return find_port_name_windows(desc)
-	default:
-		panic("Current OS isn't supported! Can't find device path!\n")
-	}
-}
-
-func find_port_name_linux(desc *gousb.DeviceDesc) string {
-	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
-
-	// в каком порядке идут порты? Надо проверить
-	ports := strconv.Itoa(desc.Path[0])
-	num_ports := len(desc.Path)
-	for i := 1; i < num_ports; i++ {
-		ports += ".[" + strconv.Itoa(desc.Path[i])
-	}
-	for i := 1; i < num_ports; i++ {
-		ports += "]"
-	}
-
-	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
-
-	//
-	dir_prefix := "/sys/bus/usb/devices"
-	tty := "tty"
-	for _, conf := range desc.Configs {
-		for _, inter := range conf.Interfaces {
-			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
-			existance, _ := exists(dir)
-			if existance {
-				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
-				dirs, _ := os.ReadDir(dir)
-				return fmt.Sprintf("/dev/%s", dirs[0].Name())
-				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
-			}
-		}
-
-	}
-	return NOT_FOUND
-}
-
-func find_port_name_windows(desc *gousb.DeviceDesc) string {
-	cmdPathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s*", desc.Vendor.String(), desc.Product.String())
-	cmdPattern := fmt.Sprintf("Get-PnpDevice -status 'ok' -InstanceId '%s' | Select-Object -Property InstanceId", cmdPathPattern)
-	//fmt.Println(cmdPattern)
-	cmdResult := execString("powershell", cmdPattern)
-	var possiblePathes []string
-	curStr := ""
-	for _, v := range cmdResult {
-		if v == '\n' {
-			if len(curStr) > 0 && curStr[0] == 'U' {
-				possiblePathes = append(possiblePathes, curStr)
-			}
-			curStr = ""
-			continue
-		}
-		if v == 13 {
-			continue
-		}
-		curStr += string(v)
-	}
-	for _, path := range possiblePathes {
-		keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", path)
-		key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-		if err != nil {
-			log.Fatal("Registry error:", err)
-		}
-		s, _, err := key.GetStringValue("PortName")
-		fmt.Println("PORT NAME", s)
-		if err == registry.ErrNotExist {
-			fmt.Println("not exists")
-			continue
-		}
-		if err != nil {
-			log.Fatal("Get port name error:", err.Error())
-		}
-		return s
-	}
-	return NOT_FOUND
-}
-
-func detect_boards() []BoardToFlash {
+func DetectBoards() []BoardToFlash {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 	// list of supported vendors (should contain lower case only!)
-	vid := vendor_list()
+	vid := vendorList()
 	var boards []BoardToFlash
-	groups := board_list()
+	groups := boardList()
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
 		for _, v := range vid {
@@ -170,7 +82,7 @@ func detect_boards() []BoardToFlash {
 					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
 						detectedBoard.VendorID = v
 						detectedBoard.Port = desc.Port
-						detectedBoard.PortName = find_port_name(desc)
+						detectedBoard.PortName = findPortName(desc)
 						detectedBoard.Type = board
 						boards = append(boards, detectedBoard)
 						//return true
@@ -188,7 +100,7 @@ func detect_boards() []BoardToFlash {
 	return boards
 }
 
-func vendor_list() []string {
+func vendorList() []string {
 	// lower-case only
 	vendors := []string{
 		"2a03",
@@ -197,7 +109,7 @@ func vendor_list() []string {
 	return vendors
 }
 
-func board_list() map[string][]BoardType {
+func boardList() map[string][]BoardType {
 	boardGroups := make(map[string][]string)
 	boardGroups["2341,2a03"] = []string{
 		"8037;Arduino Micro;ATmega32U4;avr109;Arduino Micro (bootloader);0037",

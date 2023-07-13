@@ -37,7 +37,6 @@ Boards: <output id="boards"></output>
     var blob;
     var cancel = false;
     function readBlob() {
-		//alert( "is blob!" );
         var first = filePos;
         var last = first + blockSize
         if (last > file.size) {
@@ -68,7 +67,7 @@ Boards: <output id="boards"></output>
             // Send filename and size to the server when the connection is opened.
             ws.onopen = function(evt) {
                 //header = '{"filename":"' + file.name + '","size":' + file.size +'}';
-                header = '{"filename":"' + file.name + '","size":' + file.size + ',"boardID":0' +'}';
+                header = '{"size":' + file.size + ',"boardID":0' +'}';
                 //alert(header)
                 ws.send(header);
 				// Initiate the file transfer by reading the first block from disk.

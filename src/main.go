@@ -7,15 +7,6 @@ import (
 	"net/http"
 )
 
-type OS string
-
-var OS_CUR OS
-
-const (
-	LINUX   OS = "LINUX"
-	WINDOWS OS = "WINDOWS"
-)
-
 func (board BoardType) hasBootloader() bool {
 	return board.BootloaderID != ""
 }
@@ -31,13 +22,12 @@ func setupRoutes() {
 }
 
 func main() {
-	OS_CUR = WINDOWS
-	vendorGroups := board_list()
+	vendorGroups := boardList()
 	for i, v := range vendorGroups {
 		fmt.Printf("i: %s v: %v\n", i, v)
 	}
 	fmt.Println()
-	boards = detect_boards()
+	boards = DetectBoards()
 	for _, board := range boards {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}
