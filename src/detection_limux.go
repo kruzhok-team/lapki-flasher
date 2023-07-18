@@ -18,10 +18,7 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	ports := strconv.Itoa(desc.Path[0])
 	num_ports := len(desc.Path)
 	for i := 1; i < num_ports; i++ {
-		ports += ".[" + strconv.Itoa(desc.Path[i])
-	}
-	for i := 1; i < num_ports; i++ {
-		ports += "]"
+		ports += "." + strconv.Itoa(desc.Path[i])
 	}
 
 	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
@@ -32,6 +29,7 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	for _, conf := range desc.Configs {
 		for _, inter := range conf.Interfaces {
 			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
+			fmt.Println("DIR", dir)
 			existance, _ := exists(dir)
 			if existance {
 				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз

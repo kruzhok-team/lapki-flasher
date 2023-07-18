@@ -4,11 +4,15 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	_ "embed"
 
 	"github.com/gorilla/websocket"
 )
 
 const HandshakeTimeoutSecs = 10
+
+//go:embed webpage.html
+var staticPage []byte
 
 type UploadStatus struct {
 	Code   int    `json:"code,omitempty"`
@@ -30,5 +34,6 @@ func (wsc wsConn) sendStatus(code int, status string) {
 }
 
 func showJS(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "webpage.html")
+	w.Write(staticPage)
+	// http.ServeFile(w, r, "webpage.html")
 }

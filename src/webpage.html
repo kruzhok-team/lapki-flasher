@@ -132,13 +132,13 @@ Boards: <output id="boards"></output>
                 boardsArr.push(e.data)
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
             }
+            ws.close()
         };
         /*ws.onclose = function(evt) {
             ws = null;
             //document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
         };*/
-        ws = null
-        ws.close()
+        // ws = null
     }, false);
 </script>
 </html>
