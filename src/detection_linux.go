@@ -11,7 +11,7 @@ import (
 	"github.com/google/gousb"
 )
 
-func findPortName(desc *gousb.DeviceDesc) string {
+func findPortName(desc gousb.DeviceDesc) string {
 	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
 
 	// в каком порядке идут порты? Надо проверить
@@ -43,4 +43,8 @@ func findPortName(desc *gousb.DeviceDesc) string {
 
 	}
 	return NOT_FOUND
+}
+
+func findID(desc gousb.DeviceDesc) string {
+	return ""
 }
