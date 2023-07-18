@@ -2,6 +2,7 @@ package main
 
 // https://gist.github.com/tsilvers/5f827fb11aee027e22c6b3102ebcc497
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 
@@ -29,6 +30,9 @@ func (wsc wsConn) sendStatus(code int, status string) {
 	}
 }
 
+//go:embed webpage.html
+var staticPage []byte
+
 func showJS(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "webpage.html")
+	w.Write(staticPage)
 }
