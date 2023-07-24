@@ -2,10 +2,8 @@ package main
 
 import (
 	_ "embed"
-	"fmt"
 	"log"
 	"net/http"
-	"time"
 )
 
 const webPort = ":8080"
@@ -27,33 +25,5 @@ func main() {
 		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
 	}*/
 	//setupRoutes()
-	d := New()
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	fmt.Println("PAUSE")
-	time.Sleep(8 * time.Second)
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.DeleteUnused()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	fmt.Println("PAUSE")
-	time.Sleep(8 * time.Second)
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
+
 }

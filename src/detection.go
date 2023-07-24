@@ -22,9 +22,6 @@ func (board BoardType) hasBootloader() bool {
 type BoardToFlash struct {
 	Type     BoardType
 	PortName string
-	// true - устройство добавилсоь при последнем вызове функции update(), иначе если оно добавилось раньше false,
-	// то есть устройства со значением true меняют своё значение на false при следующем вызове update()
-	Status bool
 }
 
 // подключено ли устройство
@@ -48,22 +45,6 @@ func New() Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
 	return d
-}
-
-func (d *Detector) IsNew(ID string) bool {
-	value, exists := d.boards[ID]
-	if !exists {
-		return false
-	}
-	return value.Status
-}
-
-func (d *Detector) setNew(ID string, status bool) {
-	value, exists := d.boards[ID]
-	if !exists {
-		return
-	}
-	value.Status = status
 }
 
 func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {
@@ -97,26 +78,12 @@ func (d *Detector) GetBoards() ([]string, []*BoardToFlash) {
 	return IDs, boards
 }
 
-func (d *Detector) GetNewBoards() ([]string, []*BoardToFlash) {
-	var IDs []string
-	var boards []*BoardToFlash
-	for ID, board := range d.boards {
-		if board.Status {
-			IDs = append(IDs, ID)
-			boards = append(boards, board)
-		}
-	}
-	return IDs, boards
-}
-
 func (d *Detector) Update() {
 	if d.boards == nil {
 		d.boards = detectBoards()
-		d.setNewStatusForAll(true)
 		return
 	}
 
-	d.setNewStatusForAll(false)
 	for ID, board := range d.boards {
 		board.updatePortName(ID)
 	}
@@ -127,14 +94,7 @@ func (d *Detector) Update() {
 		_, exists := d.boards[ID]
 		if !exists {
 			d.boards[ID] = value
-			d.setNew(ID, true)
 		}
-	}
-}
-
-func (d *Detector) setNewStatusForAll(isNew bool) {
-	for i := range d.boards {
-		d.setNew(i, isNew)
 	}
 }
 

@@ -25,7 +25,7 @@ type deviceMessage struct {
 	Controller  string      `json:"controller,omitempty"`
 	Programmer  string      `json:"programmer,omitempty"`
 	PortName    string      `json:"portName,omitempty"`
-	Status      bool        `json:"status,omitempty"`
+	IsConnected bool        `json:"isConnected,omitempty"`
 	//IsAvailable bool   `json:"isAvailable"`
 }
 
@@ -98,45 +98,9 @@ func (wsc *wsConn) getList() {
 	}
 	IDs, boards := wsc.detector.GetBoards()
 	for i := range IDs {
-		if wsc.detector.IsNew(IDs[i]) {
-			err := wsc.device(IDs[i], boards[i])
-			if err != nil {
-				fmt.Println("getList() error")
-			}
-		}
-	}
-}
-
-func (wsc *wsConn) list(update bool) {
-	wsc.detector.Update()
-	IDs := wsc.detector.DeleteUnused()
-	for _, ID := range IDs {
-		wsc.deviceUpdateDelete(ID)
-	}
-	IDs, boards := wsc.detector.GetBoards()
-	for i := range IDs {
-		if boards[i].Status == true || !update {
-			err := wsc.device(IDs[i], boards[i])
-			if err != nil {
-				fmt.Println("getList() error")
-			}
-		}
-	}
-}
-
-func (wsc *wsConn) updateList() {
-	wsc.detector.Update()
-	IDs := wsc.detector.DeleteUnused()
-	for _, ID := range IDs {
-		wsc.deviceUpdateDelete(ID)
-	}
-	IDs, boards := wsc.detector.GetBoards()
-	for i := range IDs {
-		if wsc.detector.IsNew(IDs[i]) {
-			err := wsc.device(IDs[i], boards[i])
-			if err != nil {
-				fmt.Println("getList() error")
-			}
+		err := wsc.device(IDs[i], boards[i])
+		if err != nil {
+			fmt.Println("getList() error")
 		}
 	}
 }
@@ -163,7 +127,7 @@ func (wsc *wsConn) device(deviceID string, board *BoardToFlash) error {
 		board.Type.Controller,
 		board.Type.Programmer,
 		board.PortName,
-		board.Status,
+		board.IsConnected(),
 	}
 	err := wsc.conn.WriteJSON(boardMessage)
 	if err != nil {

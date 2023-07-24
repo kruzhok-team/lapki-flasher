@@ -62,7 +62,6 @@ func detectBoards() map[string]*BoardToFlash {
 				detectedBoard := BoardToFlash{
 					boardType,
 					portName,
-					true,
 				}
 				boards[path] = &detectedBoard
 			}
