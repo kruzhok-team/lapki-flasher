@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/xela07ax/XelaGoDoc/encodingStdout"
 )
 
 // exists returns whether the given file or directory exists
@@ -40,5 +38,5 @@ func execString(name string, arg ...string) string {
 		fmt.Println("CMD ERROR")
 		return ""
 	}
-	return string(encodingStdout.Convert(41, stdout))
+	return string(stdout)
 }

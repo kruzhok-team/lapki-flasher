@@ -4,24 +4,58 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-const HandshakeTimeoutSecs = 10
-
-//go:embed webpage.html
-var staticPage []byte
+type messageType string
 
 type UploadStatus struct {
 	Code   int    `json:"code,omitempty"`
 	Status string `json:"status,omitempty"`
 }
 
-type wsConn struct {
-	conn *websocket.Conn
+type deviceMessage struct {
+	MessageType messageType `json:"messageType"`
+	ID          string      `json:"ID,omitempty"`
+	Name        string      `json:"name,omitempty"`
+	Controller  string      `json:"controller,omitempty"`
+	Programmer  string      `json:"programmer,omitempty"`
+	PortName    string      `json:"portName,omitempty"`
+	Status      bool        `json:"status,omitempty"`
+	//IsAvailable bool   `json:"isAvailable"`
 }
+
+type wsConn struct {
+	conn     *websocket.Conn
+	w        http.ResponseWriter
+	r        *http.Request
+	flashing bool
+	detector Detector
+}
+
+const (
+	getList            messageType = "get-list"
+	updateList         messageType = "update-list"
+	flashStart         messageType = "flash-start"
+	flashBlock         messageType = "flash-block"
+	flashCancel        messageType = "flash-cancel"
+	device             messageType = "device"
+	endList            messageType = "end-list"
+	deviceUpdateDelete messageType = "device-update-delete"
+	flashWrondID       messageType = "flash-wrong-id"
+	flashDisconnected  messageType = "flash-disconnected"
+	flashAvrdudeError  messageType = "flash-avrdude-error"
+	flashDone          messageType = "flash-done"
+)
+
+const HandshakeTimeoutSecs = 10
+
+//go:embed webpage.html
+var staticPage []byte
 
 func (wsc wsConn) requestNextBlock() {
 	wsc.conn.WriteMessage(websocket.TextMessage, []byte("NEXT"))
@@ -35,4 +69,135 @@ func (wsc wsConn) sendStatus(code int, status string) {
 
 func showJS(w http.ResponseWriter, r *http.Request) {
 	w.Write(staticPage)
+}
+
+func flasherHandler(w http.ResponseWriter, r *http.Request) {
+	wsc := wsConn{}
+	wsc.w = w
+	wsc.r = r
+	wsc.flashing = false
+	wsc.detector = New()
+	var err error
+	// Open websocket connection.
+	upgrader := websocket.Upgrader{HandshakeTimeout: time.Second * HandshakeTimeoutSecs}
+	wsc.conn, err = upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Error on open of websocket connection:", err)
+		return
+	}
+	defer wsc.conn.Close()
+}
+
+// Обработка сообщений от клиента
+
+func (wsc *wsConn) getList() {
+	wsc.detector.Update()
+	IDs := wsc.detector.DeleteUnused()
+	for _, ID := range IDs {
+		wsc.deviceUpdateDelete(ID)
+	}
+	IDs, boards := wsc.detector.GetBoards()
+	for i := range IDs {
+		if wsc.detector.IsNew(IDs[i]) {
+			err := wsc.device(IDs[i], boards[i])
+			if err != nil {
+				fmt.Println("getList() error")
+			}
+		}
+	}
+}
+
+func (wsc *wsConn) list(update bool) {
+	wsc.detector.Update()
+	IDs := wsc.detector.DeleteUnused()
+	for _, ID := range IDs {
+		wsc.deviceUpdateDelete(ID)
+	}
+	IDs, boards := wsc.detector.GetBoards()
+	for i := range IDs {
+		if boards[i].Status == true || !update {
+			err := wsc.device(IDs[i], boards[i])
+			if err != nil {
+				fmt.Println("getList() error")
+			}
+		}
+	}
+}
+
+func (wsc *wsConn) updateList() {
+	wsc.detector.Update()
+	IDs := wsc.detector.DeleteUnused()
+	for _, ID := range IDs {
+		wsc.deviceUpdateDelete(ID)
+	}
+	IDs, boards := wsc.detector.GetBoards()
+	for i := range IDs {
+		if wsc.detector.IsNew(IDs[i]) {
+			err := wsc.device(IDs[i], boards[i])
+			if err != nil {
+				fmt.Println("getList() error")
+			}
+		}
+	}
+}
+
+func (wsc *wsConn) flashStart() {
+
+}
+
+func (wsc *wsConn) flashBlock() {
+
+}
+
+func (wsc *wsConn) flashCancel() {
+
+}
+
+// Отправка сообщений клиенту
+
+func (wsc *wsConn) device(deviceID string, board *BoardToFlash) error {
+	boardMessage := deviceMessage{
+		device,
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.Status,
+	}
+	err := wsc.conn.WriteJSON(boardMessage)
+	if err != nil {
+		fmt.Println("device() error", err.Error())
+	}
+	return err
+}
+
+func (wsc *wsConn) endList() {
+
+}
+
+func (wsc *wsConn) deviceUpdateDelete(deviceID string) error {
+	var boardMessage deviceMessage
+	boardMessage.MessageType = deviceUpdateDelete
+	boardMessage.ID = deviceID
+	err := wsc.conn.WriteJSON(boardMessage)
+	if err != nil {
+		fmt.Println("deviceUpdateDelete() error", err.Error())
+	}
+	return err
+}
+
+func (wsc *wsConn) flashWrongID() {
+
+}
+
+func (wsc *wsConn) flashDisconnected() {
+
+}
+
+func (wsc *wsConn) flashAvrdudeError() {
+
+}
+func (wsc *wsConn) flashDone() {
+
 }

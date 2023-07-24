@@ -1,18 +1,10 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
 	"strings"
-	"time"
-
-	"github.com/google/gousb"
-	"github.com/gorilla/websocket"
 )
 
-const NOT_FOUND = "NOT FOUND"
+const NOT_FOUND = ""
 
 type BoardType struct {
 	ProductID    string
@@ -23,81 +15,127 @@ type BoardType struct {
 	BootloaderID string
 }
 
-type boardView struct {
-	ID         int    `json:"ID"`
-	Name       string `json:"name"`
-	Controller string `json:"controller"`
-	Programmer string `json:"programmer"`
-	PortName   string `json:"portName"`
+func (board BoardType) hasBootloader() bool {
+	return board.BootloaderID != ""
 }
 
-func listHandler(w http.ResponseWriter, r *http.Request) {
-	boards = DetectBoards()
+type BoardToFlash struct {
+	Type     BoardType
+	PortName string
+	// true - устройство добавилсоь при последнем вызове функции update(), иначе если оно добавилось раньше false,
+	// то есть устройства со значением true меняют своё значение на false при следующем вызове update()
+	Status bool
+}
 
-	wsc := wsConn{}
-	var err error
+// подключено ли устройство
+func (board BoardToFlash) IsConnected() bool {
+	return board.PortName != NOT_FOUND
+}
 
-	// Open websocket connection.
-	upgrader := websocket.Upgrader{HandshakeTimeout: time.Second * HandshakeTimeoutSecs}
-	wsc.conn, err = upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		fmt.Println("Error on open of websocket connection:", err)
+type DetectedBoard struct {
+	FlashBoard BoardToFlash
+	// true - устройство добавилсоь при последнем вызове функции update(), иначе если оно добавилось раньше false,
+	// то есть устройства со значением true меняют своё значение на false при следующем вызове update()
+	Status bool
+}
+
+type Detector struct {
+	// список доступных для прошивки устройств
+	boards map[string]*BoardToFlash
+}
+
+func New() Detector {
+	var d Detector
+	d.boards = make(map[string]*BoardToFlash)
+	return d
+}
+
+func (d *Detector) IsNew(ID string) bool {
+	value, exists := d.boards[ID]
+	if !exists {
+		return false
+	}
+	return value.Status
+}
+
+func (d *Detector) setNew(ID string, status bool) {
+	value, exists := d.boards[ID]
+	if !exists {
 		return
 	}
-	defer wsc.conn.Close()
+	value.Status = status
+}
 
-	for i, v := range boards {
-		board := boardView{
-			i,
-			v.Type.Name,
-			v.Type.Controller,
-			v.Type.Programmer,
-			v.PortName,
+func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {
+	value, exists := d.boards[ID]
+	portUpdated := false
+	if exists {
+		portUpdated = value.updatePortName(ID)
+	}
+	return value, exists, portUpdated
+}
+
+// удаляет все платы, которые не подключены в данный момент, возвращает ID устройств, которые были удалены
+func (d *Detector) DeleteUnused() []string {
+	var deletedID []string
+	for ID, board := range d.boards {
+		if !board.IsConnected() {
+			deletedID = append(deletedID, ID)
+			delete(d.boards, ID)
 		}
-		msg, err := json.Marshal(board)
-		if err != nil {
-			wsc.sendStatus(400, err.Error())
-			return
+	}
+	return deletedID
+}
+
+func (d *Detector) GetBoards() ([]string, []*BoardToFlash) {
+	var IDs []string
+	var boards []*BoardToFlash
+	for ID, board := range d.boards {
+		IDs = append(IDs, ID)
+		boards = append(boards, board)
+	}
+	return IDs, boards
+}
+
+func (d *Detector) GetNewBoards() ([]string, []*BoardToFlash) {
+	var IDs []string
+	var boards []*BoardToFlash
+	for ID, board := range d.boards {
+		if board.Status {
+			IDs = append(IDs, ID)
+			boards = append(boards, board)
 		}
-		wsc.conn.WriteMessage(websocket.TextMessage, msg)
+	}
+	return IDs, boards
+}
+
+func (d *Detector) Update() {
+	if d.boards == nil {
+		d.boards = detectBoards()
+		d.setNewStatusForAll(true)
+		return
+	}
+
+	d.setNewStatusForAll(false)
+	for ID, board := range d.boards {
+		board.updatePortName(ID)
+	}
+	// сравниваем старый список с новым, чтобы найти новые устройства
+	curBoards := detectBoards()
+	for ID, value := range curBoards {
+		// обращаемся напрямую к map, а не к функции GetBoard(), чтобы не обновлять состояние портов во второй раз
+		_, exists := d.boards[ID]
+		if !exists {
+			d.boards[ID] = value
+			d.setNew(ID, true)
+		}
 	}
 }
 
-func DetectBoards() []BoardToFlash {
-	ctx := gousb.NewContext()
-	defer ctx.Close()
-	// list of supported vendors (should contain lower case only!)
-	vid := vendorList()
-	var boards []BoardToFlash
-	groups := boardList()
-	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
-		// this function is called for every device present.
-		for _, v := range vid {
-			if strings.ToLower(desc.Vendor.String()) == strings.ToLower(v) {
-				//fmt.Println(v, desc.Product)
-				cur_group := groups[v]
-				var detectedBoard BoardToFlash
-				//fmt.Println(len(cur_group), v)
-				for _, board := range cur_group {
-					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
-						detectedBoard.VendorID = v
-						detectedBoard.Port = desc.Port
-						detectedBoard.PortName = findPortName(desc)
-						detectedBoard.Type = board
-						boards = append(boards, detectedBoard)
-						//return true
-						break
-					}
-				}
-			}
-		}
-		return false
-	})
-	if err != nil {
-		log.Fatalf("OpenDevices(): %v", err)
+func (d *Detector) setNewStatusForAll(isNew bool) {
+	for i := range d.boards {
+		d.setNew(i, isNew)
 	}
-	//fmt.Println(d)
-	return boards
 }
 
 func vendorList() []string {

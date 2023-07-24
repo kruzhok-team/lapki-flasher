@@ -11,6 +11,46 @@ import (
 	"github.com/google/gousb"
 )
 
+func detectBoards() map[string]BoardToFlash {
+	ctx := gousb.NewContext()
+	defer ctx.Close()
+	// list of supported vendors (should contain lower case only!)
+	vid := vendorList()
+	boards := make(map[string]BoardToFlash)
+	groups := boardList()
+
+	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+		// this function is called for every device present.
+		for _, v := range vid {
+			if strings.ToLower(desc.Vendor.String()) == strings.ToLower(v) {
+				//fmt.Println(v, desc.Product)
+				cur_group := groups[v]
+				var detectedBoard BoardToFlash
+				//fmt.Println(len(cur_group), v)
+				for _, board := range cur_group {
+					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
+						detectedBoard.PortName = findPortName(desc)
+						if detectedBoard.PortName == NOT_FOUND {
+							continue
+						}
+						detectedBoard.Type = board
+						detectedBoard.IsConnected = true
+						boardID := findID(desc)
+						boards[boardID] = detectedBoard
+						break
+					}
+				}
+			}
+		}
+		return false
+	})
+	if err != nil {
+		log.Fatalf("OpenDevices(): %v", err)
+	}
+	//fmt.Println(d)
+	return boards
+}
+
 func findPortName(desc gousb.DeviceDesc) string {
 	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
 
@@ -45,4 +85,8 @@ func findPortName(desc gousb.DeviceDesc) string {
 
 func findID(desc gousb.DeviceDesc) string {
 	return ""
+}
+
+func (board *BoardToFlash) updatePortName(ID string) bool {
+	return false
 }
