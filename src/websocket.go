@@ -38,18 +38,15 @@ type wsConn struct {
 }
 
 const (
-	getList            messageType = "get-list"
-	updateList         messageType = "update-list"
-	flashStart         messageType = "flash-start"
-	flashBlock         messageType = "flash-block"
-	flashCancel        messageType = "flash-cancel"
-	device             messageType = "device"
-	endList            messageType = "end-list"
-	deviceUpdateDelete messageType = "device-update-delete"
-	flashWrondID       messageType = "flash-wrong-id"
-	flashDisconnected  messageType = "flash-disconnected"
-	flashAvrdudeError  messageType = "flash-avrdude-error"
-	flashDone          messageType = "flash-done"
+	getList           messageType = "get-list"
+	flashStart        messageType = "flash-start"
+	flashBlock        messageType = "flash-block"
+	flashCancel       messageType = "flash-cancel"
+	device            messageType = "device"
+	flashWrondID      messageType = "flash-wrong-id"
+	flashDisconnected messageType = "flash-disconnected"
+	flashAvrdudeError messageType = "flash-avrdude-error"
+	flashDone         messageType = "flash-done"
 )
 
 const HandshakeTimeoutSecs = 10
@@ -92,10 +89,6 @@ func flasherHandler(w http.ResponseWriter, r *http.Request) {
 
 func (wsc *wsConn) getList() {
 	wsc.detector.Update()
-	IDs := wsc.detector.DeleteUnused()
-	for _, ID := range IDs {
-		wsc.deviceUpdateDelete(ID)
-	}
 	IDs, boards := wsc.detector.GetBoards()
 	for i := range IDs {
 		err := wsc.device(IDs[i], boards[i])
@@ -136,21 +129,6 @@ func (wsc *wsConn) device(deviceID string, board *BoardToFlash) error {
 	return err
 }
 
-func (wsc *wsConn) endList() {
-
-}
-
-func (wsc *wsConn) deviceUpdateDelete(deviceID string) error {
-	var boardMessage deviceMessage
-	boardMessage.MessageType = deviceUpdateDelete
-	boardMessage.ID = deviceID
-	err := wsc.conn.WriteJSON(boardMessage)
-	if err != nil {
-		fmt.Println("deviceUpdateDelete() error", err.Error())
-	}
-	return err
-}
-
 func (wsc *wsConn) flashWrongID() {
 
 }
@@ -162,6 +140,7 @@ func (wsc *wsConn) flashDisconnected() {
 func (wsc *wsConn) flashAvrdudeError() {
 
 }
+
 func (wsc *wsConn) flashDone() {
 
 }
