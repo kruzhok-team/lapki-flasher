@@ -11,6 +11,9 @@ import (
 
 const HandshakeTimeoutSecs = 10
 
+//go:embed webpage.html
+var staticPage []byte
+
 type UploadStatus struct {
 	Code   int    `json:"code,omitempty"`
 	Status string `json:"status,omitempty"`
@@ -29,9 +32,6 @@ func (wsc wsConn) sendStatus(code int, status string) {
 		wsc.conn.WriteMessage(websocket.TextMessage, msg)
 	}
 }
-
-//go:embed webpage.html
-var staticPage []byte
 
 func showJS(w http.ResponseWriter, r *http.Request) {
 	w.Write(staticPage)
