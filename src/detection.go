@@ -41,10 +41,10 @@ type Detector struct {
 	boards map[string]*BoardToFlash
 }
 
-func New() Detector {
+func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
-	return d
+	return &d
 }
 
 func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {

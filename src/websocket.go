@@ -1,7 +1,7 @@
 package main
 
 // https://gist.github.com/tsilvers/5f827fb11aee027e22c6b3102ebcc497
-import (
+/*import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -18,34 +18,51 @@ type UploadStatus struct {
 	Status string `json:"status,omitempty"`
 }
 
-type deviceMessage struct {
+type FlashMessage struct {
 	MessageType messageType `json:"messageType"`
-	ID          string      `json:"ID,omitempty"`
-	Name        string      `json:"name,omitempty"`
-	Controller  string      `json:"controller,omitempty"`
-	Programmer  string      `json:"programmer,omitempty"`
-	PortName    string      `json:"portName,omitempty"`
-	IsConnected bool        `json:"isConnected,omitempty"`
-	//IsAvailable bool   `json:"isAvailable"`
+	FileSize    int         `json:"fileSize,omitempty"`
+	DeviceID    string      `json:"deviceID,omitempty"`
+	BlockID     string      `json:"blockID,omitempty"`
+	Data        []byte      `json:"data,omitempty"`
+}
+
+type FlashError struct {
+	MessageType messageType `json:"messageType"`
+	AvrMsg      string      `json:"avrMsg,omitempty"`
+}
+
+type FileFlash struct {
+	size       int
+	fileBlocks []FileBlock
+}
+
+func (file FileFlash) flashing() bool {
+	return file.size > 0
+}
+
+type FileBlock struct {
+	blockID int
+	data    []byte
 }
 
 type wsConn struct {
 	conn     *websocket.Conn
 	w        http.ResponseWriter
 	r        *http.Request
-	flashing bool
-	detector Detector
+	detector *Detector
+	file     FileFlash
 }
 
 const (
-	getList           messageType = "get-list"
+	//getList           messageType = "get-list"
 	flashStart        messageType = "flash-start"
 	flashBlock        messageType = "flash-block"
 	flashCancel       messageType = "flash-cancel"
-	device            messageType = "device"
-	flashWrondID      messageType = "flash-wrong-id"
+	deviceDelete      messageType = "device-delete"
+	flashWrongID      messageType = "flash-wrong-id"
 	flashDisconnected messageType = "flash-disconnected"
 	flashAvrdudeError messageType = "flash-avrdude-error"
+	flashNotFinish    messageType = "flash-not-finish"
 	flashDone         messageType = "flash-done"
 )
 
@@ -72,8 +89,7 @@ func flasherHandler(w http.ResponseWriter, r *http.Request) {
 	wsc := wsConn{}
 	wsc.w = w
 	wsc.r = r
-	wsc.flashing = false
-	wsc.detector = New()
+	wsc.detector = &detector
 	var err error
 	// Open websocket connection.
 	upgrader := websocket.Upgrader{HandshakeTimeout: time.Second * HandshakeTimeoutSecs}
@@ -87,8 +103,10 @@ func flasherHandler(w http.ResponseWriter, r *http.Request) {
 
 // Обработка сообщений от клиента
 
+// отправка клиенту списка всех устройств
 func (wsc *wsConn) getList() {
 	wsc.detector.Update()
+	wsc.detector.DeleteUnused()
 	IDs, boards := wsc.detector.GetBoards()
 	for i := range IDs {
 		err := wsc.device(IDs[i], boards[i])
@@ -98,7 +116,12 @@ func (wsc *wsConn) getList() {
 	}
 }
 
+// начало процедуры прошивки
 func (wsc *wsConn) flashStart() {
+	if wsc.file.flashing() {
+		wsc.flashNotFinish()
+		return
+	}
 
 }
 
@@ -110,23 +133,14 @@ func (wsc *wsConn) flashCancel() {
 
 }
 
-// Отправка сообщений клиенту
-
-func (wsc *wsConn) device(deviceID string, board *BoardToFlash) error {
-	boardMessage := deviceMessage{
-		device,
-		deviceID,
-		board.Type.Name,
-		board.Type.Controller,
-		board.Type.Programmer,
-		board.PortName,
-		board.IsConnected(),
-	}
+func (wsc *wsConn) deviceDelete(deviceID string) {
+	var boardMessage DeviceMessage
+	boardMessage.MessageType = deviceDelete
+	boardMessage.ID = deviceID
 	err := wsc.conn.WriteJSON(boardMessage)
 	if err != nil {
-		fmt.Println("device() error", err.Error())
+		fmt.Println("deviceDelete() error", err.Error())
 	}
-	return err
 }
 
 func (wsc *wsConn) flashWrongID() {
@@ -144,3 +158,13 @@ func (wsc *wsConn) flashAvrdudeError() {
 func (wsc *wsConn) flashDone() {
 
 }
+
+// клиент пытается начать новую прошиввку, хотя старая ещё не завершилась
+func (wsc *wsConn) flashNotFinish() {
+	msg := FlashError{
+		flashNotFinish,
+		"",
+	}
+	wsc.conn.WriteJSON(msg)
+}
+*/

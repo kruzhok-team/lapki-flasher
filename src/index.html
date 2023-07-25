@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body>
+<br>
+<input type="file" id="uploadFile" name="file" />
+<br><br>
+<span id="uploadButton">
+  <button id="upload">Upload</button>
+</span>
+<br><br>
+<span id="boardListButton">
+    <button id="boardList">Board list</button>
+</span>
+<span id="cancelButton" style="display: none;">
+  <button id="cancel" style="color: red">CANCEL</button>
+</span>
+
+<br>
+<br>
+Upload %: <output id="pct"></output>
+<br>
+<br>
+Status Messages: <output id="list"></output>
+<br>
+<br>
+Boards: <output id="boards"></output>
+</body>
+<script>
+    var blockSize = 1024 * 1024;
+    var ws;
+    var filePos;
+    var file;
+    var reader;
+    var blob;
+    var cancel = false;
+    var boardsArr = [];
+    //Event is used to wrap all messages Send and Recieved
+    //on the Websocket
+        //The type is used as a RPC
+    class Event {
+        // Each Event needs a Type
+        // The payload is not required
+        constructor(type, payload) {
+            this.type = type;
+            this.payload = payload;
+        }
+    }
+    class Device {
+        constructor(id, name, controller, programmer, port){
+            this.id = id;
+            this.name = name;
+            this.controller = controller;
+            this.programmer = programmer;
+            this.port = port; 
+        }
+    }
+    function routeEvent(event) {
+        if (event.type === undefined) {
+            alert("no 'type' field in event");
+        }
+        switch (event.type) {
+            case "device":
+                // Format payload
+                const deviceEvent = Object.assign(new Device, event.payload);
+                document.getElementById('boards').innerHTML = '';
+                boardsArr.push(event.payload);
+                document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
+                break;
+            default:
+                alert("unsupported message type");
+                break;
+        }
+    }
+    function sendEvent(eventName, payload) {
+        // Create a event Object with a event named send_message
+        const event = new Event(eventName, payload);
+        // Format as JSON and send
+        conn.send(JSON.stringify(event));
+    }
+    window.onload = function (){
+        // Check if the browser supports WebSocket
+        if (window["WebSocket"]) {
+            console.log("supports websockets");
+            // Connect to websocket
+            conn = new WebSocket("ws://" + document.location.host + "/flasher");
+
+            // Add a listener to the onmessage event
+            conn.onmessage = function (evt) {
+                console.log(evt);
+                // parse websocket message as JSON
+                const eventData = JSON.parse(evt.data);
+                // Assign JSON data to new Event Object
+                const event = Object.assign(new Event, eventData);
+                // Let router manage message
+                routeEvent(event);
+            }
+            document.querySelector('#boardList').addEventListener('click', function(evt){
+                boardsArr = [];
+                sendEvent('get-list', '');
+            }, false);
+            
+        } else {
+            alert("Not supporting websockets");
+        }
+
+    };
+</script>
+</html>

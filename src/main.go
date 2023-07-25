@@ -6,7 +6,12 @@ import (
 	"net/http"
 )
 
+//go:embed index.html
+var staticPage []byte
+
 const webPort = ":8080"
+
+var detector *Detector
 
 func setupRoutes() {
 	//http.HandleFunc("/", showJS)
@@ -14,16 +19,16 @@ func setupRoutes() {
 	log.Fatal(http.ListenAndServe(webPort, nil))
 }
 
-func main() {
-	/*vendorGroups := boardList()
-	for i, v := range vendorGroups {
-		fmt.Printf("i: %s v: %v\n", i, v)
-	}
-	fmt.Println()
-	boards = DetectBoards()
-	for _, board := range boards {
-		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
-	}*/
-	//setupRoutes()
+func showJS(w http.ResponseWriter, r *http.Request) {
+	w.Write(staticPage)
+}
 
+func main() {
+	detector = NewDetector()
+	manager := NewWebSocketManager()
+
+	http.HandleFunc("/", showJS)
+	http.HandleFunc("/flasher", manager.serveWS)
+
+	log.Fatal(http.ListenAndServe(webPort, nil))
 }
