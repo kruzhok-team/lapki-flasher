@@ -7,9 +7,11 @@
 <br>
 <input type="file" id="uploadFile" name="file" />
 <br><br>
+<label for="deviceID">Device ID:</label><br>
+<input type="text" id="deviceID" name="deviceID" value=""><br>
 <span id="uploadButton">
-  <button id="upload">Upload</button>
-</span>
+    <button id="upload">Upload</button>
+</span>  
 <br><br>
 <span id="boardListButton">
     <button id="boardList">Board list</button>
@@ -29,8 +31,8 @@ Status Messages: <output id="list"></output>
 Boards: <output id="boards"></output>
 </body>
 <script>
+    var curDeviceID;
     var blockSize = 1024 * 1024;
-    var ws;
     var filePos;
     var file;
     var reader;
@@ -57,6 +59,18 @@ Boards: <output id="boards"></output>
             this.port = port; 
         }
     }
+    class FlashStart {
+        constructor(id, fileSize){
+            this.deviceID = id;
+            this.fileSize = fileSize;
+        }
+    }
+    class FlashBlock{
+        constructor(blockID, data){
+            this.blockID = blockID;
+            this.data = data;
+        }
+    }
     function routeEvent(event) {
         if (event.type === undefined) {
             alert("no 'type' field in event");
@@ -66,8 +80,14 @@ Boards: <output id="boards"></output>
                 // Format payload
                 const deviceEvent = Object.assign(new Device, event.payload);
                 document.getElementById('boards').innerHTML = '';
-                boardsArr.push(event.payload);
+                boardsArr.push(JSON.stringify(event.payload));
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
+                break;
+            case "flash-go":
+                uploadFile();
+                break;
+            case "flash-done":
+                alert("flash-done!")
                 break;
             default:
                 alert("unsupported message type");
@@ -79,6 +99,59 @@ Boards: <output id="boards"></output>
         const event = new Event(eventName, payload);
         // Format as JSON and send
         conn.send(JSON.stringify(event));
+        alert(JSON.stringify(event));
+    }
+    function readBlob() {
+        var first = filePos;
+        var last = first + blockSize;
+        if (last > file.size) {
+            last == file.size;
+        }
+        console.log(last)
+        blob = file.slice(first, last);
+        reader.readAsArrayBuffer(blob);
+    }
+    function startUploadFile(){
+        var files = document.getElementById('uploadFile').files;
+        if (!files.length) {
+            alert('Please select a file!');
+            return;
+        }
+
+        file = files[0];
+        curDeviceID = document.getElementById('deviceID').value;
+        msgData = new FlashStart(curDeviceID, file.size);
+        sendEvent("flash-start", msgData);
+        filePos = 0;
+        reader = new FileReader();
+    }
+    function uploadFile(){
+        var files = document.getElementById('uploadFile').files;
+        if (!files.length) {
+            alert('Please select a file!');
+            return;
+        }
+        file = files[0];
+        filePos = 0;
+        reader = new FileReader();
+        reader.onloadend = function(evt) {
+            if (evt.target.readyState == FileReader.DONE) {
+                msgBlock = new FlashBlock(filePos, blob);
+                sendEvent("flash-block", msgBlock)
+                filePos += blob.size
+                console.log(blob)
+            }
+        };
+        for (let i = 0; i < file.size; i+=blockSize){
+            var first = filePos;
+            var last = first + blockSize;
+            if (last > file.size) {
+                last == file.size;
+            }
+            blob = file.slice(first, last);
+            reader.readAsArrayBuffer(blob); 
+            console.log(file.slice(first, last))
+        }
     }
     window.onload = function (){
         // Check if the browser supports WebSocket
@@ -97,15 +170,16 @@ Boards: <output id="boards"></output>
                 // Let router manage message
                 routeEvent(event);
             }
+            //document.getElementById('deviceID').onsubmit = uploadFile();
             document.querySelector('#boardList').addEventListener('click', function(evt){
                 boardsArr = [];
                 sendEvent('get-list', '');
             }, false);
-            
+            document.querySelector('#upload').addEventListener('click', startUploadFile, false);
         } else {
             alert("Not supporting websockets");
         }
-
+        
     };
 </script>
 </html>

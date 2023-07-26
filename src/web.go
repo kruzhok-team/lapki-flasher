@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const MAX_SIZE = 512 * 1024
+const MAX_FILE_SIZE = 512 * 1024
 
 var (
 	websocketUpgrader = websocket.Upgrader{
@@ -19,11 +19,11 @@ var (
 )
 
 // список соединений с клиентами
-type ConnectionList map[*websocket.Conn]bool
+type ConnectionList map[*WebSocketConnection]bool
 
 // Менеджер используется для контроля и хранения соединений с клиентами
 type WebSocketManager struct {
-	// обработчики сообщений (событий) от клиента
+	// обработчики сообщений (событий)
 	handlers    map[string]EventHandler
 	connections ConnectionList
 }
@@ -41,10 +41,12 @@ func NewWebSocketManager() *WebSocketManager {
 // инициализация обработчиков событий
 func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetListMsg] = GetList
+	m.handlers[FlashStartMsg] = FlashStart
+	m.handlers[FLashBlockMsg] = FlashBlock
 }
 
 // отправляет событие в соответствующий обработчик, если для события не существует обработчика возвращает ошибку ErrEventNotSupported
-func (m *WebSocketManager) routeEvent(event Event, c *websocket.Conn) error {
+func (m *WebSocketManager) routeEvent(event Event, c *WebSocketConnection) error {
 	if handler, ok := m.handlers[event.Type]; ok {
 		if err := handler(event, c); err != nil {
 			return err
@@ -64,33 +66,38 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	m.addClient(conn)
+	c := NewWebSocket(conn)
+	m.addClient(c)
 	//
-	go m.connectionHandler(conn)
+	go m.connectionHandler(c)
 }
 
 // добавление нового клиента
-func (m *WebSocketManager) addClient(connection *websocket.Conn) {
-	m.connections[connection] = true
+func (m *WebSocketManager) addClient(c *WebSocketConnection) {
+	m.connections[c] = true
 }
 
 // удаление клиента
-func (m *WebSocketManager) removeClient(connection *websocket.Conn) {
-	if _, ok := m.connections[connection]; ok {
-		connection.Close()
-		delete(m.connections, connection)
+func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
+	if _, ok := m.connections[c]; ok {
+		// нужно разблокировать устройство, если прошивка ещё не завершилась
+		if c.IsFlashing() {
+			c.StopFlashing()
+		}
+		c.wsc.Close()
+		delete(m.connections, c)
 	}
 }
 
 // обработчик соединения
-func (m *WebSocketManager) connectionHandler(c *websocket.Conn) {
+func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 	defer func() {
 		m.removeClient(c)
 	}()
-	c.SetReadLimit(MAX_SIZE)
+	c.wsc.SetReadLimit(MAX_FILE_SIZE)
 
 	for {
-		_, payload, err := c.ReadMessage()
+		_, payload, err := c.wsc.ReadMessage()
 
 		if err != nil {
 			// Если соединения разорвано, то получится ошибка

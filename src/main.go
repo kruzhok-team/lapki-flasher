@@ -2,8 +2,10 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 //go:embed index.html
@@ -23,8 +25,20 @@ func showJS(w http.ResponseWriter, r *http.Request) {
 	w.Write(staticPage)
 }
 
+func test() {
+	/*start := time.Now()
+	detector.Update()
+	end := time.Now()
+	fmt.Println(end.Sub(start))*/
+	start := time.Now()
+	detectBoards()
+	end := time.Now()
+	fmt.Println(end.Sub(start))
+}
+
 func main() {
 	detector = NewDetector()
+	//test()
 	manager := NewWebSocketManager()
 
 	http.HandleFunc("/", showJS)

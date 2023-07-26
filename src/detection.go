@@ -2,6 +2,7 @@ package main
 
 import (
 	"strings"
+	"sync"
 )
 
 const NOT_FOUND = ""
@@ -22,10 +23,21 @@ func (board BoardType) hasBootloader() bool {
 type BoardToFlash struct {
 	Type     BoardType
 	PortName string
+	mu       sync.Mutex
+	// устройство прошивается
+	flashing bool
+}
+
+func NewBoardToFlash(Type BoardType, PortName string) *BoardToFlash {
+	var board BoardToFlash
+	board.Type = Type
+	board.PortName = PortName
+	board.flashing = false
+	return &board
 }
 
 // подключено ли устройство
-func (board BoardToFlash) IsConnected() bool {
+func (board *BoardToFlash) IsConnected() bool {
 	return board.PortName != NOT_FOUND
 }
 
@@ -47,6 +59,7 @@ func NewDetector() *Detector {
 	return &d
 }
 
+// возвращает устройство, соответствующее ID, существует ли устройство в списке и обновился ли порт
 func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {
 	value, exists := d.boards[ID]
 	portUpdated := false
@@ -54,6 +67,11 @@ func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {
 		portUpdated = value.updatePortName(ID)
 	}
 	return value, exists, portUpdated
+}
+
+// удаляет устройство из списка
+func (d *Detector) DeleteBoard(ID string) {
+	delete(d.boards, ID)
 }
 
 // удаляет все платы, которые не подключены в данный момент, возвращает ID устройств, которые были удалены
@@ -96,6 +114,20 @@ func (d *Detector) Update() {
 			d.boards[ID] = value
 		}
 	}
+}
+
+// true = устройство заблокировано для прошивки
+func (board *BoardToFlash) IsFlashBlocked() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.flashing
+}
+
+// true = заблокировать устройство, false = разблокировать устройство
+func (board *BoardToFlash) SetLock(lock bool) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.flashing = lock
 }
 
 func vendorList() []string {
