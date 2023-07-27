@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const MAX_FILE_SIZE = 512 * 1024
+const MAX_MSG_SIZE = 512 * 1024
 
 var (
 	websocketUpgrader = websocket.Upgrader{
@@ -94,7 +94,7 @@ func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 	defer func() {
 		m.removeClient(c)
 	}()
-	c.wsc.SetReadLimit(MAX_FILE_SIZE)
+	c.wsc.SetReadLimit(MAX_MSG_SIZE)
 
 	for {
 		_, payload, err := c.wsc.ReadMessage()
@@ -110,12 +110,12 @@ func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 		var request Event
 		if err := json.Unmarshal(payload, &request); err != nil {
 			log.Printf("error marshalling message: %v", err)
-			// TODO: здесь нужно отправить сообщению клиенту о том, что не удалось прочитать сообщение
+			errorHandler(ErrUnmarshal, c)
 			continue
 		}
 		// обработка сообщений
 		if err := m.routeEvent(request, c); err != nil {
-			log.Println("Error handeling Message: ", err)
+			errorHandler(err, c)
 			continue
 		}
 	}

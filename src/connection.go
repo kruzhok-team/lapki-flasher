@@ -13,6 +13,8 @@ type WebSocketConnection struct {
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *BoardToFlash
+	// сообщение от avrdude
+	avrMsg string
 }
 
 func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
@@ -20,6 +22,7 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.wsc = wsc
 	c.FlashingBoard = nil
 	c.FileWriter = newFlashFileWriter()
+	c.avrMsg = ""
 	return &c
 }
 

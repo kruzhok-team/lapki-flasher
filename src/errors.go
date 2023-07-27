@@ -7,7 +7,7 @@ var (
 	// неизвестный тип сообщения
 	ErrEventNotSupported = errors.New("event-not-supported")
 	// предыдущая операция прошивки ещё не завершена
-	ErrFlashNotFinished = errors.New("flash-not-finish")
+	ErrFlashNotFinished = errors.New("flash-not-finished")
 	// прошивка не началась (не была отправлена команда flash-start от клиента)
 	ErrFlashNotStarted = errors.New("flash-not-started")
 	// устройство с таким ID отсутствует в списке
@@ -19,9 +19,23 @@ var (
 	// не получилось добавить блок данных (flash-block), так как его размер слишком большой
 	// либо отправлен неправильный блок, либо был указан неправильный размер файла
 	ErrFlashLargeBlock = errors.New("flash-large-block")
+	// указанный размер файла превышает максимально допустимый размер файла, установленный сервером (MAX_FILE_SIZE)
+	ErrFlashLargeFile = errors.New("flash-large-block")
+	// ошибка от avrdude
+	ErrAvrdude = errors.New("flash-avrdude-error")
+	// ошибка при чтение JSON-объекта
+	ErrUnmarshal = errors.New("unmarshal-err")
 )
 
-// TODO
-func errorHandler(err error) {
-
+func errorHandler(err error, c *WebSocketConnection) {
+	msgType := err.Error()
+	var payload any
+	switch err {
+	case ErrFlashWrongID, ErrFlashDisconnected, ErrFlashBlocked, ErrFlashLargeFile, ErrFlashLargeBlock:
+		c.StopFlashing()
+	case ErrAvrdude:
+		c.StopFlashing()
+		payload = c.avrMsg
+	}
+	c.sentOutgoingEventMessage(msgType, payload)
 }

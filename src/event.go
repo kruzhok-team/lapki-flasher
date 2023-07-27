@@ -10,11 +10,11 @@ import (
 // обработчик события
 type EventHandler func(event Event, c *WebSocketConnection) error
 
-// Событие это сообщение, переданное через вебсокеты
+// Общий вид для всех сообщений, как от клиента так и от сервера
 type Event struct {
-	// Тип сообщения
+	// Тип сообщения (flash-start, get-list и т.д.)
 	Type string `json:"type"`
-	// Данные сообщения
+	// Параметры сообщения, не все сообщения обязаны иметь параметры
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -165,6 +165,7 @@ func FlashBlock(event Event, c *WebSocketConnection) error {
 	if !c.IsFlashing() {
 		return ErrFlashNotStarted
 	}
+
 	var msgStr FlashBlockMessageString
 	//fmt.Println(event.Payload)
 	err := json.Unmarshal(event.Payload, &msgStr)
@@ -184,7 +185,8 @@ func FlashBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		_, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		c.avrMsg = avrMsg
 		if err != nil {
 			return err
 		}
