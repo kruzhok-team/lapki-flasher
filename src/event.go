@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 )
@@ -33,6 +34,11 @@ type FlashStartMessage struct {
 type FlashBlockMessage struct {
 	BlockID int    `json:"blockID"`
 	Data    []byte `json:"data"`
+}
+
+type FlashBlockMessageString struct {
+	BlockID int    `json:"blockID"`
+	Data    string `json:"data"`
 }
 
 type DeviceUpdateDeleteMessage struct {
@@ -159,19 +165,26 @@ func FlashBlock(event Event, c *WebSocketConnection) error {
 	if !c.IsFlashing() {
 		return ErrFlashNotStarted
 	}
-	var msg *FlashBlockMessage
-	fmt.Println(event.Payload)
-
-	err := json.Unmarshal(event.Payload, msg)
+	var msgStr FlashBlockMessageString
+	//fmt.Println(event.Payload)
+	err := json.Unmarshal(event.Payload, &msgStr)
 	if err != nil {
 		return err
 	}
-	fileCreated, err := c.FileWriter.AddBlock(msg)
+	var msg FlashBlockMessage
+	msg.BlockID = msgStr.BlockID
+	msg.Data, err = base64.StdEncoding.DecodeString(msgStr.Data)
+	//fmt.Println("LEN", len(msg.Data), c.FileWriter.maxSize, c.FileWriter.curSize)
+	//fmt.Println(msgStr.Data)
+	if err != nil {
+		return err
+	}
+	fileCreated, err := c.FileWriter.AddBlock(&msg)
 	if err != nil {
 		return err
 	}
 	if fileCreated {
-		err := flash(c.FlashingBoard, c.FileWriter.filePath)
+		_, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
 		if err != nil {
 			return err
 		}

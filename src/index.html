@@ -32,10 +32,8 @@ Boards: <output id="boards"></output>
 </body>
 <script>
     var curDeviceID;
-    var blockSize = 1024 * 1024;
     var filePos;
     var file;
-    var reader;
     var blob;
     var cancel = false;
     var boardsArr = [];
@@ -99,17 +97,7 @@ Boards: <output id="boards"></output>
         const event = new Event(eventName, payload);
         // Format as JSON and send
         conn.send(JSON.stringify(event));
-        alert(JSON.stringify(event));
-    }
-    function readBlob() {
-        var first = filePos;
-        var last = first + blockSize;
-        if (last > file.size) {
-            last == file.size;
-        }
-        console.log(last)
-        blob = file.slice(first, last);
-        reader.readAsArrayBuffer(blob);
+        console.log(JSON.stringify(event));
     }
     function startUploadFile(){
         var files = document.getElementById('uploadFile').files;
@@ -133,24 +121,33 @@ Boards: <output id="boards"></output>
         }
         file = files[0];
         filePos = 0;
-        reader = new FileReader();
-        reader.onloadend = function(evt) {
-            if (evt.target.readyState == FileReader.DONE) {
-                msgBlock = new FlashBlock(filePos, blob);
-                sendEvent("flash-block", msgBlock)
-                filePos += blob.size
-                console.log(blob)
-            }
-        };
+        var blockSize = 1024*1024;
+        //var readerText = new FileReader();
+        var msgBlock = new FlashBlock(0, "");
+        var blob;
+        /*readerText.addEventListener('loadend', (e) => {
+            const text = e.srcElement.result;
+            msgBlock.data = text;
+            sendEvent("flash-block", msgBlock);
+        });*/
         for (let i = 0; i < file.size; i+=blockSize){
-            var first = filePos;
+            var first = i;
             var last = first + blockSize;
             if (last > file.size) {
-                last == file.size;
+                last = file.size;
             }
+            console.log(first, last, file.size);
             blob = file.slice(first, last);
-            reader.readAsArrayBuffer(blob); 
-            console.log(file.slice(first, last))
+            msgBlock.blockID = i;
+            var reader = new FileReader();
+            reader.readAsDataURL(blob); 
+            reader.onloadend = function() {
+                var base64data = reader.result; 
+                msgBlock.data = base64data.substr(base64data.indexOf(',')+1);
+                console.log(msgBlock.blockID);  
+                //console.log(msgBlock.data);   
+                sendEvent("flash-block", msgBlock);            
+            }
         }
     }
     window.onload = function (){

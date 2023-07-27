@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
+	"os"
 	"sort"
 )
 
@@ -15,22 +15,18 @@ type FlashFileWriter struct {
 	curSize int
 	// необходимый размер файла
 	maxSize  int
-	filePath string
+	tempFile *os.File
 }
 
 func newFlashFileWriter() *FlashFileWriter {
 	var writer FlashFileWriter
-	writer.maxSize = 0
-	writer.curSize = 0
-	writer.blocks = blocksArray{}
-	writer.filePath = ""
+	writer.Clear()
 	return &writer
 }
 
 // начать новую запись
 func (ff *FlashFileWriter) Start(fileSize int) {
 	ff.Clear()
-	fmt.Println(fileSize)
 	ff.maxSize = fileSize
 }
 
@@ -52,11 +48,13 @@ func (ff *FlashFileWriter) AddBlock(block *FlashBlockMessage) (bool, error) {
 
 	// временный файл для хранения прошивки
 	tempFile, err := ioutil.TempFile("", "upload-*.hex")
+	ff.tempFile = tempFile
+	//fmt.Println("Temp File Name", ff.tempFile.Name())
 	if err != nil {
 		return false, err
 	}
 	defer func() {
-		tempFile.Close()
+		ff.tempFile.Close()
 	}()
 
 	// сортируем по индексам в возрастающем порядке
@@ -64,19 +62,29 @@ func (ff *FlashFileWriter) AddBlock(block *FlashBlockMessage) (bool, error) {
 
 	// записываем данные в файл
 	for _, block := range ff.blocks {
-		tempFile.Write(block.Data)
+		ff.tempFile.Write(block.Data)
 	}
-
 	return true, nil
 }
 
 // TODO: удаление файла и данных
 func (ff *FlashFileWriter) Clear() {
-
+	ff.maxSize = 0
+	ff.curSize = 0
+	ff.blocks = blocksArray{}
+	if ff.tempFile != nil {
+		ff.tempFile.Close()
+		os.Remove(ff.tempFile.Name())
+	}
+	ff.tempFile = nil
 }
 
+// возвращает пустую строку, если временного файла не существует
 func (ff *FlashFileWriter) GetFilePath() string {
-	return ff.filePath
+	if ff.tempFile != nil {
+		return ff.tempFile.Name()
+	}
+	return ""
 }
 
 // методы sort.Interface для blocksArray

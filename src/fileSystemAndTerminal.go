@@ -36,7 +36,7 @@ func execString(name string, arg ...string) string {
 	if err != nil {
 		//fmt.Println(fmt.Sprint(err) + ": " + string(stdout))
 		fmt.Println("CMD ERROR")
-		return ""
+		return string(stdout)
 	}
 	return string(stdout)
 }
