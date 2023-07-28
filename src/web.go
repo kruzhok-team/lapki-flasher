@@ -9,7 +9,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
 const MAX_MSG_SIZE = 512 * 1024
+
+// максимальный размер файла, загружаемого на сервер (в байтах)
+const MAX_FILE_SIZE = 512 * 1024 * 1024
 
 var (
 	websocketUpgrader = websocket.Upgrader{
@@ -42,11 +46,21 @@ func NewWebSocketManager() *WebSocketManager {
 func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetListMsg] = GetList
 	m.handlers[FlashStartMsg] = FlashStart
-	m.handlers[FLashBlockMsg] = FlashBlock
+	m.handlers[FlashBinaryBlockMsg] = FlashBinaryBlock
 }
 
 // отправляет событие в соответствующий обработчик, если для события не существует обработчика возвращает ошибку ErrEventNotSupported
-func (m *WebSocketManager) routeEvent(event Event, c *WebSocketConnection) error {
+func (m *WebSocketManager) routeEvent(msgType int, payload []byte, c *WebSocketConnection) error {
+	var event Event
+	if msgType == websocket.BinaryMessage {
+		event.Type = FlashBinaryBlockMsg
+		event.Payload = payload
+	} else {
+		err := json.Unmarshal(payload, &event)
+		if err != nil {
+			return ErrUnmarshal
+		}
+	}
 	if handler, ok := m.handlers[event.Type]; ok {
 		if err := handler(event, c); err != nil {
 			return err
@@ -97,8 +111,7 @@ func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 	c.wsc.SetReadLimit(MAX_MSG_SIZE)
 
 	for {
-		_, payload, err := c.wsc.ReadMessage()
-
+		msgType, payload, err := c.wsc.ReadMessage()
 		if err != nil {
 			// Если соединения разорвано, то получится ошибка
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -106,15 +119,9 @@ func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 			}
 			break
 		}
-		// получение сообщения от клиента
-		var request Event
-		if err := json.Unmarshal(payload, &request); err != nil {
-			log.Printf("error marshalling message: %v", err)
-			errorHandler(ErrUnmarshal, c)
-			continue
-		}
+
 		// обработка сообщений
-		if err := m.routeEvent(request, c); err != nil {
+		if err := m.routeEvent(msgType, payload, c); err != nil {
 			errorHandler(err, c)
 			continue
 		}

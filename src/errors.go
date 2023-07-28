@@ -20,7 +20,7 @@ var (
 	// либо отправлен неправильный блок, либо был указан неправильный размер файла
 	ErrFlashLargeBlock = errors.New("flash-large-block")
 	// указанный размер файла превышает максимально допустимый размер файла, установленный сервером (MAX_FILE_SIZE)
-	ErrFlashLargeFile = errors.New("flash-large-block")
+	ErrFlashLargeFile = errors.New("flash-large-file")
 	// ошибка от avrdude
 	ErrAvrdude = errors.New("flash-avrdude-error")
 	// ошибка при чтение JSON-объекта

@@ -32,10 +32,11 @@ Boards: <output id="boards"></output>
 </body>
 <script>
     var curDeviceID;
-    var filePos;
     var file;
-    var blob;
+    var filePos;
     var cancel = false;
+    var reader;
+    var blob;
     var boardsArr = [];
     //Event is used to wrap all messages Send and Recieved
     //on the Websocket
@@ -81,8 +82,15 @@ Boards: <output id="boards"></output>
                 boardsArr.push(JSON.stringify(event.payload));
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
                 break;
-            case "flash-go":
-                uploadFile();
+            case "flash-next-block":
+                var blockSize = 1024;
+                var first = filePos;
+                var last = first + blockSize
+                if (last > file.size) {
+                    last == file.size;
+                }
+                blob = file.slice(first, last);
+                reader.readAsArrayBuffer(blob);
                 break;
             case "flash-done":
                 alert("flash-done!")
@@ -123,64 +131,14 @@ Boards: <output id="boards"></output>
         conn.send(JSON.stringify(event));
         console.log(JSON.stringify(event));
     }
-    function startUploadFile(){
-        var files = document.getElementById('uploadFile').files;
-        if (!files.length) {
-            alert('Please select a file!');
-            return;
-        }
-
-        file = files[0];
-        curDeviceID = document.getElementById('deviceID').value;
-        msgData = new FlashStart(curDeviceID, file.size);
-        sendEvent("flash-start", msgData);
-        filePos = 0;
-        reader = new FileReader();
-    }
-    function uploadFile(){
-        var files = document.getElementById('uploadFile').files;
-        if (!files.length) {
-            alert('Please select a file!');
-            return;
-        }
-        file = files[0];
-        filePos = 0;
-        var blockSize = 1024*1024;
-        //var readerText = new FileReader();
-        var msgBlock = new FlashBlock(0, "");
-        var blob;
-        /*readerText.addEventListener('loadend', (e) => {
-            const text = e.srcElement.result;
-            msgBlock.data = text;
-            sendEvent("flash-block", msgBlock);
-        });*/
-        for (let i = 0; i < file.size; i+=blockSize){
-            var first = i;
-            var last = first + blockSize;
-            if (last > file.size) {
-                last = file.size;
-            }
-            console.log(first, last, file.size);
-            blob = file.slice(first, last);
-            msgBlock.blockID = i;
-            var reader = new FileReader();
-            reader.readAsDataURL(blob); 
-            reader.onloadend = function() {
-                var base64data = reader.result; 
-                msgBlock.data = base64data.substr(base64data.indexOf(',')+1);
-                console.log(msgBlock.blockID);  
-                //console.log(msgBlock.data);   
-                sendEvent("flash-block", msgBlock);            
-            }
-        }
-    }
+ 
     window.onload = function (){
         // Check if the browser supports WebSocket
         if (window["WebSocket"]) {
             console.log("supports websockets");
             // Connect to websocket
             conn = new WebSocket("ws://" + document.location.host + "/flasher");
-
+            conn.binaryType = 'arraybuffer';
             // Add a listener to the onmessage event
             conn.onmessage = function (evt) {
                 console.log(evt);
@@ -196,7 +154,26 @@ Boards: <output id="boards"></output>
                 boardsArr = [];
                 sendEvent('get-list', '');
             }, false);
-            document.querySelector('#upload').addEventListener('click', startUploadFile, false);
+            document.querySelector('#upload').addEventListener('click',function(evt){
+                var files = document.getElementById('uploadFile').files;
+                if (!files.length) {
+                    alert('Please select a file!');
+                    return;
+                }
+                file = files[0];
+                curDeviceID = document.getElementById('deviceID').value;
+                msgData = new FlashStart(curDeviceID, file.size);
+                filePos = 0;
+                reader = new FileReader();
+                reader.onloadend = function(evt) {
+                    if (evt.target.readyState == FileReader.DONE) {
+                        console.log("BLOB")
+                        conn.send(blob);
+                        filePos += blob.size;
+                    }
+                };
+                sendEvent("flash-start", msgData);
+            }, false);
         } else {
             alert("Not supporting websockets");
         }

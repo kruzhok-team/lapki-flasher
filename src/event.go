@@ -2,7 +2,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 )
@@ -11,6 +10,7 @@ import (
 type EventHandler func(event Event, c *WebSocketConnection) error
 
 // Общий вид для всех сообщений, как от клиента так и от сервера
+// (исключение: бинарные данные от клиента, но все равно они приводятся сервером к этой структуре)
 type Event struct {
 	// Тип сообщения (flash-start, get-list и т.д.)
 	Type string `json:"type"`
@@ -61,13 +61,17 @@ const (
 	// прошивка прошла успешна
 	FlashDoneMsg = "flash-done"
 	// клиент может начать передачу блоков
-	FlashGoMsg = "flash-go"
-	// часть файла с прошивкой
-	FLashBlockMsg = "flash-block"
+	FlashNextBlockMsg = "flash-next-block"
+	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
+	FlashBinaryBlockMsg = "flash-block"
 	// устройство удалено из списка
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
 	DeviceUpdatePortMsg = "device-update-port"
+	// запрос на следующий блок бинарных данных
+	flashNextBlockMsg = "flash-next-block"
+	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
+	binaryBloMsg = "binaryMsg"
 )
 
 // отправить клиенту список всех устройств
@@ -123,13 +127,11 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
-	fmt.Println("FLASH-START")
 	if c.IsFlashing() {
 		return ErrFlashNotFinished
 	}
 	var msg FlashStartMessage
 	err := json.Unmarshal(event.Payload, &msg)
-	fmt.Println(msg.ID)
 	for i := range detector.boards {
 		fmt.Println(i)
 	}
@@ -138,6 +140,9 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	if msg.FileSize < 1 {
 		return nil
+	}
+	if msg.FileSize > MAX_FILE_SIZE {
+		return ErrFlashLargeFile
 	}
 	board, exists, updated := detector.GetBoard(msg.ID)
 	if !exists {
@@ -154,33 +159,19 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
 	}
-	FlashGo(c)
+	FlashNextBlock(c)
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.StartFlashing(board, msg.FileSize)
 	return nil
 }
 
-// принятие блока с данными файла
-func FlashBlock(event Event, c *WebSocketConnection) error {
+// принятие блока с бинарными данными файла
+func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	if !c.IsFlashing() {
 		return ErrFlashNotStarted
 	}
 
-	var msgStr FlashBlockMessageString
-	//fmt.Println(event.Payload)
-	err := json.Unmarshal(event.Payload, &msgStr)
-	if err != nil {
-		return err
-	}
-	var msg FlashBlockMessage
-	msg.BlockID = msgStr.BlockID
-	msg.Data, err = base64.StdEncoding.DecodeString(msgStr.Data)
-	//fmt.Println("LEN", len(msg.Data), c.FileWriter.maxSize, c.FileWriter.curSize)
-	//fmt.Println(msgStr.Data)
-	if err != nil {
-		return err
-	}
-	fileCreated, err := c.FileWriter.AddBlock(&msg)
+	fileCreated, err := c.FileWriter.AddBlock(event.Payload)
 	if err != nil {
 		return err
 	}
@@ -191,11 +182,13 @@ func FlashBlock(event Event, c *WebSocketConnection) error {
 			return err
 		}
 		FlashDone(c)
+	} else {
+		FlashNextBlock(c)
 	}
 	return nil
 }
 
-// отмена прошивки
+// TODO: отмена прошивки
 func FlashCancel(event Event, c *WebSocketConnection) error {
 	if !c.IsFlashing() {
 		return nil
@@ -209,7 +202,7 @@ func FlashDone(c *WebSocketConnection) {
 	c.sentOutgoingEventMessage(FlashDoneMsg, nil)
 }
 
-// клиент может начать передачу блоков
-func FlashGo(c *WebSocketConnection) {
-	c.sentOutgoingEventMessage(FlashGoMsg, nil)
+// запрос на следующий блок с бинаными данными файла
+func FlashNextBlock(c *WebSocketConnection) {
+	c.sentOutgoingEventMessage(FlashNextBlockMsg, nil)
 }
