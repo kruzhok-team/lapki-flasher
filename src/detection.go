@@ -9,6 +9,7 @@ const NOT_FOUND = ""
 
 type BoardType struct {
 	ProductID    string
+	VendorID     string
 	Name         string
 	Controller   string
 	Programmer   string
