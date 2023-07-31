@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/windows/registry"
@@ -68,7 +69,13 @@ func detectBoards() map[string]*BoardToFlash {
 					continue
 				}
 				boardType.VendorID = vendor
-				boards[path] = NewBoardToFlash(boardType, portName)
+				detectedBoard := NewBoardToFlash(boardType, portName)
+				serialIndex := strings.LastIndex(path, "\\")
+				possibleSerialID := path[serialIndex+1:]
+				if !strings.Contains(possibleSerialID, "&") {
+					detectedBoard.SerialID = path[serialIndex+1:]
+				}
+				boards[path] = detectedBoard
 			}
 		}
 		end := time.Now()
