@@ -67,6 +67,7 @@ func detectBoards() map[string]*BoardToFlash {
 				if portName == NOT_FOUND {
 					continue
 				}
+				boardType.VendorID = vendor
 				boards[path] = NewBoardToFlash(boardType, portName)
 			}
 		}
