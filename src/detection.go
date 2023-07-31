@@ -24,6 +24,7 @@ func (board BoardType) hasBootloader() bool {
 type BoardToFlash struct {
 	Type     BoardType
 	PortName string
+	SerialID string
 	mu       sync.Mutex
 	// устройство прошивается
 	flashing bool

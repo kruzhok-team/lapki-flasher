@@ -132,9 +132,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	var msg FlashStartMessage
 	err := json.Unmarshal(event.Payload, &msg)
-	for i := range detector.boards {
-		fmt.Println(i)
-	}
 	if err != nil {
 		return err
 	}
