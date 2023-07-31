@@ -24,6 +24,7 @@ type DeviceMessage struct {
 	Controller string `json:"controller,omitempty"`
 	Programmer string `json:"programmer,omitempty"`
 	PortName   string `json:"portName,omitempty"`
+	SerialID   string `json:serialID,omitempty`
 }
 
 type FlashStartMessage struct {
@@ -99,6 +100,7 @@ func Device(deviceID string, board *BoardToFlash, c *WebSocketConnection) error 
 		board.Type.Controller,
 		board.Type.Programmer,
 		board.PortName,
+		board.SerialID,
 	}
 	err := c.sentOutgoingEventMessage(DeviceMsg, boardMessage)
 	if err != nil {
