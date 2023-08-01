@@ -10,10 +10,10 @@ import (
 )
 
 // максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
-const MAX_MSG_SIZE = 512 * 1024
+const MAX_MSG_SIZE = 1024
 
 // максимальный размер файла, загружаемого на сервер (в байтах)
-const MAX_FILE_SIZE = 512 * 1024 * 1024
+const MAX_FILE_SIZE = 2 * 1024 * 1024
 
 var (
 	websocketUpgrader = websocket.Upgrader{
