@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -28,18 +29,24 @@ type ConnectionList map[*WebSocketConnection]bool
 // Менеджер используется для контроля и хранения соединений с клиентами
 type WebSocketManager struct {
 	// обработчики сообщений (событий)
-	handlers    map[string]EventHandler
+	handlers map[string]EventHandler
+	// список соединений
 	connections ConnectionList
+	// время ожидания pong от клиента
+	pongWait time.Duration
+	// время отправки ping от сервера, не может быть меньше чем pongWait
+	pingInterval time.Duration
 }
 
 // Инициализация менеджера
 func NewWebSocketManager() *WebSocketManager {
-	m := &WebSocketManager{
-		connections: make(ConnectionList),
-		handlers:    make(map[string]EventHandler),
-	}
+	var m WebSocketManager
+	m.connections = make(ConnectionList)
+	m.handlers = make(map[string]EventHandler)
+	m.pongWait = 10 * time.Second
+	m.pingInterval = (m.pongWait * 9) / 10
 	m.setupEventHandlers()
-	return m
+	return &m
 }
 
 // инициализация обработчиков событий
@@ -83,7 +90,8 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 	c := NewWebSocket(conn)
 	m.addClient(c)
 	//
-	go m.connectionHandler(c)
+	go m.readerHandler(c)
+	go m.writerHandler(c)
 }
 
 // добавление нового клиента
@@ -103,12 +111,24 @@ func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
 	}
 }
 
-// обработчик соединения
-func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
+// обработчик входящих сообщений
+func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 	defer func() {
 		m.removeClient(c)
 	}()
+
 	c.wsc.SetReadLimit(MAX_MSG_SIZE)
+
+	// устанавливаем первый таймер для понга
+	if err := c.wsc.SetReadDeadline(time.Now().Add(m.pongWait)); err != nil {
+		log.Println(err)
+		return
+	}
+	// добавляем обработчик для понга
+	c.wsc.SetPongHandler(func(appData string) error {
+		//log.Println("pong")
+		return c.wsc.SetReadDeadline(time.Now().Add(m.pongWait))
+	})
 
 	for {
 		msgType, payload, err := c.wsc.ReadMessage()
@@ -120,10 +140,42 @@ func (m *WebSocketManager) connectionHandler(c *WebSocketConnection) {
 			break
 		}
 
-		// обработка сообщений
+		// обработка сообщений и ошибок
 		if err := m.routeEvent(msgType, payload, c); err != nil {
 			errorHandler(err, c)
 			continue
+		}
+	}
+}
+
+// обработчик исходящих сообщений
+func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
+	// вызывает пинг согласно указанному инервалу
+	ticker := time.NewTicker(m.pingInterval)
+	defer func() {
+		ticker.Stop()
+		m.removeClient(c)
+	}()
+	for {
+		select {
+		// обработка сообщений
+		case event, isOpen := <-c.outgoingEventMessage:
+			if !isOpen {
+				return
+			}
+			err := c.wsc.WriteJSON(event)
+			if err != nil {
+				log.Println("Writing JSON error:", err.Error())
+				return
+			}
+		// отправка пинга
+		case <-ticker.C:
+			//log.Println("ping")
+			err := c.wsc.WriteMessage(websocket.PingMessage, []byte{})
+			if err != nil {
+				log.Println("writemsg: ", err)
+				return
+			}
 		}
 	}
 }
