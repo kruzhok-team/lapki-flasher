@@ -19,13 +19,6 @@
 <span id="cancelButton" style="display: none;">
   <button id="cancel" style="color: red">CANCEL</button>
 </span>
-
-<br>
-<br>
-Upload %: <output id="pct"></output>
-<br>
-<br>
-Status Messages: <output id="list"></output>
 <br>
 <br>
 Boards: <output id="boards"></output>
@@ -81,7 +74,7 @@ Boards: <output id="boards"></output>
                 document.getElementById('boards').innerHTML = '';
                 console.log(event.payload)
                 curBoard = JSON.parse(JSON.stringify(event.payload))
-                correctString = "name: " + curBoard.name +  ", deviceID: " + curBoard.deviceID  + ", controller: " + curBoard.controller + ", programmer: " + curBoard.programmer + ", port: " + curBoard.portName
+                correctString = "[name: " + curBoard.name +  ", deviceID: " + curBoard.deviceID  + ", controller: " + curBoard.controller + ", programmer: " + curBoard.programmer + ", port: " + curBoard.portName + "]"
                 console.log(correctString)
                 boardsArr.push(correctString)
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
