@@ -176,8 +176,8 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	}
 	if fileCreated {
 		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
-		c.avrMsg = avrMsg
 		if err != nil {
+			c.avrMsg = avrMsg
 			c.StopFlashing()
 			return ErrAvrdude
 		}

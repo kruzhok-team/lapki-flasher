@@ -38,6 +38,9 @@ func errorHandler(err error, c *WebSocketConnection) {
 	case ErrAvrdude:
 		c.StopFlashing()
 		payload = c.avrMsg
+		defer func() {
+			c.avrMsg = ""
+		}()
 	}
 	c.sentOutgoingEventMessage(msgType, payload)
 }
