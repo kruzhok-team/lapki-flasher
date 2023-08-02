@@ -24,7 +24,7 @@ type DeviceMessage struct {
 	Controller string `json:"controller,omitempty"`
 	Programmer string `json:"programmer,omitempty"`
 	PortName   string `json:"portName,omitempty"`
-	SerialID   string `json:serialID,omitempty`
+	SerialID   string `json:"serialID,omitempty"`
 }
 
 type FlashStartMessage struct {
