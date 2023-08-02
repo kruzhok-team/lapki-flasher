@@ -51,11 +51,11 @@ Boards: <output id="boards"></output>
     }
     class Device {
         constructor(id, name, controller, programmer, port){
-            this.id = id;
+            this.deviceID = id;
             this.name = name;
             this.controller = controller;
             this.programmer = programmer;
-            this.port = port; 
+            this.portName = port; 
         }
     }
     class FlashStart {
@@ -79,7 +79,11 @@ Boards: <output id="boards"></output>
                 // Format payload
                 const deviceEvent = Object.assign(new Device, event.payload);
                 document.getElementById('boards').innerHTML = '';
-                boardsArr.push(JSON.stringify(event.payload));
+                console.log(event.payload)
+                curBoard = JSON.parse(JSON.stringify(event.payload))
+                correctString = "name: " + curBoard.name +  ", deviceID: " + curBoard.deviceID  + ", controller: " + curBoard.controller + ", programmer: " + curBoard.programmer + ", port: " + curBoard.portName
+                console.log(correctString)
+                boardsArr.push(correctString)
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
                 break;
             case "flash-next-block":
