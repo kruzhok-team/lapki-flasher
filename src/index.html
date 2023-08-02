@@ -149,6 +149,7 @@ Boards: <output id="boards"></output>
             //document.getElementById('deviceID').onsubmit = uploadFile();
             document.querySelector('#boardList').addEventListener('click', function(evt){
                 boardsArr = [];
+                document.getElementById('boards').innerHTML = '<ul>' + '</ul>';
                 sendEvent('get-list', '');
             }, false);
             document.querySelector('#upload').addEventListener('click',function(evt){
