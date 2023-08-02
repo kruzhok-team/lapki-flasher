@@ -70,12 +70,9 @@ Boards: <output id="boards"></output>
         switch (event.type) {
             case "device":
                 // Format payload
-                const deviceEvent = Object.assign(new Device, event.payload);
+                var deviceEvent = Object.assign(new Device, event.payload);
                 document.getElementById('boards').innerHTML = '';
-                console.log(event.payload)
-                curBoard = JSON.parse(JSON.stringify(event.payload))
-                correctString = "[name: " + curBoard.name +  ", deviceID: " + curBoard.deviceID  + ", controller: " + curBoard.controller + ", programmer: " + curBoard.programmer + ", port: " + curBoard.portName + "]"
-                console.log(correctString)
+                correctString = "[name: " + deviceEvent.name +  ", deviceID: " + deviceEvent.deviceID  + ", controller: " + deviceEvent.controller + ", programmer: " + deviceEvent.programmer + ", port: " + deviceEvent.portName + "]"
                 boardsArr.push(correctString)
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
                 break;
@@ -115,6 +112,22 @@ Boards: <output id="boards"></output>
                 break;
             case "unmarshal-err":
                 alert("unmarshal");
+                break;
+            case "device-update-delete":
+                deviceDeleted = Object.assign(new Device, event.payload);
+                alert("device deleted " + deviceDeleted.deviceID);
+                break;
+            case "device-update-port":
+                devicePorted = Object.assign(new Device, event.payload);
+                alert("device update port " + devicePorted.deviceID);
+            break;
+            case "device-occupied":
+                deviceOccupied = Object.assign(new Device, event.payload);
+                alert("device occupied " + deviceOccupied.deviceID);
+                break;
+            case "device-realised":
+                deviceRealised = Object.assign(new Device, event.payload);
+                alert("device realised " + deviceRealised.deviceID);
                 break;
             default:
                 alert("unsupported message type");

@@ -8,15 +8,23 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// сообщение для отправки
+type OutgoingEventMessage struct {
+	// содержание сообщение
+	event *Event
+	// true, если нужно отправить сообщение всем клиентам
+	toAll bool
+}
+
 type WebSocketConnection struct {
 	wsc        *websocket.Conn
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
-	FlashingBoard *BoardToFlash
+	FlashingBoard   *BoardToFlash
+	FlashingBoardID string
 	// сообщение от avrdude
-	avrMsg string
-	// сообщение для отправки клиенту
-	outgoingEventMessage chan Event
+	avrMsg      string
+	outgoingMsg chan OutgoingEventMessage
 }
 
 func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
@@ -25,7 +33,7 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.FlashingBoard = nil
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
-	c.outgoingEventMessage = make(chan Event)
+	c.outgoingMsg = make(chan OutgoingEventMessage)
 	return &c
 }
 
@@ -60,6 +68,14 @@ func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload a
 		msgType,
 		data,
 	}
-	c.outgoingEventMessage <- event
+	var outgoingMsg OutgoingEventMessage
+	outgoingMsg.event = &event
+	switch msgType {
+	case DeviceUpdateDeleteMsg, DeviceUpdatePortMsg, DeviceOccupiedMsg, DeviceRealisedMsg:
+		outgoingMsg.toAll = true
+	default:
+		outgoingMsg.toAll = false
+	}
+	c.outgoingMsg <- outgoingMsg
 	return
 }

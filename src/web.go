@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -32,10 +31,6 @@ type WebSocketManager struct {
 	handlers map[string]EventHandler
 	// список соединений
 	connections ConnectionList
-	// время ожидания pong от клиента
-	pongWait time.Duration
-	// время отправки ping от сервера, не может быть меньше чем pongWait
-	pingInterval time.Duration
 }
 
 // Инициализация менеджера
@@ -43,8 +38,6 @@ func NewWebSocketManager() *WebSocketManager {
 	var m WebSocketManager
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
-	m.pongWait = 10 * time.Second
-	m.pingInterval = (m.pongWait * 9) / 10
 	m.setupEventHandlers()
 	return &m
 }
@@ -139,19 +132,32 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 
 // обработчик исходящих сообщений
 func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
-	// вызывает пинг согласно указанному инервалу
-	ticker := time.NewTicker(m.pingInterval)
 	defer func() {
-		ticker.Stop()
 		m.removeClient(c)
 	}()
 	for {
-		event, isOpen := <-c.outgoingEventMessage
+		outgoing, isOpen := <-c.outgoingMsg
 		if !isOpen {
 			return
 		}
-		err := c.wsc.WriteJSON(event)
-		log.Println("writer", event.Type)
+
+		// некоторые сообщения нужно отправить всем клиентам
+		if outgoing.toAll {
+			for conn := range m.connections {
+				if conn != c {
+					var curOutgoing OutgoingEventMessage
+					curOutgoing.event = outgoing.event
+					curOutgoing.toAll = false
+					conn.outgoingMsg <- curOutgoing
+				}
+			}
+		}
+		// отправить одному клиенту
+		if outgoing.toAll == true && (outgoing.event.Type == DeviceOccupiedMsg || outgoing.event.Type == DeviceRealisedMsg) {
+			continue
+		}
+		err := c.wsc.WriteJSON(outgoing.event)
+		log.Println("writer", outgoing.event.Type)
 		if err != nil {
 			log.Println("Writing JSON error:", err.Error())
 			return
