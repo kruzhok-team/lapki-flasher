@@ -126,7 +126,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 	}
 	// добавляем обработчик для понга
 	c.wsc.SetPongHandler(func(appData string) error {
-		//log.Println("pong")
+		log.Println("pong")
 		return c.wsc.SetReadDeadline(time.Now().Add(m.pongWait))
 	})
 
@@ -157,23 +157,25 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 		m.removeClient(c)
 	}()
 	for {
+		//fmt.Println(c.outgoingEventMessage)
 		select {
+		// отправка пинга
+		case <-ticker.C:
+			log.Println("ping")
+			err := c.wsc.WriteMessage(websocket.PingMessage, []byte{})
+			if err != nil {
+				log.Println("writemsg: ", err)
+				return
+			}
 		// обработка сообщений
 		case event, isOpen := <-c.outgoingEventMessage:
 			if !isOpen {
 				return
 			}
 			err := c.wsc.WriteJSON(event)
+			log.Println("writer", event.Type)
 			if err != nil {
 				log.Println("Writing JSON error:", err.Error())
-				return
-			}
-		// отправка пинга
-		case <-ticker.C:
-			//log.Println("ping")
-			err := c.wsc.WriteMessage(websocket.PingMessage, []byte{})
-			if err != nil {
-				log.Println("writemsg: ", err)
 				return
 			}
 		}

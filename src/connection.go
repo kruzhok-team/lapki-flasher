@@ -15,6 +15,8 @@ type WebSocketConnection struct {
 	FlashingBoard *BoardToFlash
 	// сообщение от avrdude
 	avrMsg string
+	// сообщение для отправки клиенту
+	outgoingEventMessage chan Event
 }
 
 func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
@@ -23,6 +25,7 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.FlashingBoard = nil
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
+	c.outgoingEventMessage = make(chan Event)
 	return &c
 }
 
@@ -57,10 +60,6 @@ func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload a
 		msgType,
 		data,
 	}
-	err = c.wsc.WriteJSON(event)
-	if err != nil {
-		log.Println("Writing JSON error:", err.Error())
-		return
-	}
+	c.outgoingEventMessage <- event
 	return
 }
