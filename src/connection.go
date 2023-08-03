@@ -3,9 +3,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/tjgq/ticker"
 )
 
 // сообщение для отправки
@@ -24,6 +27,8 @@ type WebSocketConnection struct {
 	// сообщение от avrdude
 	avrMsg      string
 	outgoingMsg chan OutgoingEventMessage
+	// отправляет тик, когда get-list снова может быть использован
+	getListCoolDown *ticker.Ticker
 }
 
 func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
@@ -33,6 +38,7 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
+	c.getListCoolDown = ticker.New(5 * time.Second)
 	return &c
 }
 
@@ -57,6 +63,7 @@ func (c *WebSocketConnection) StopFlashing() {
 }
 
 // отправка сообщения клиенту
+// lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any) (err error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -70,11 +77,22 @@ func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload a
 	var outgoingMsg OutgoingEventMessage
 	outgoingMsg.event = &event
 	switch msgType {
-	case DeviceUpdateDeleteMsg, DeviceUpdatePortMsg, DeviceOccupiedMsg, DeviceRealisedMsg:
+	case DeviceUpdateDeleteMsg, DeviceUpdatePortMsg:
 		outgoingMsg.toAll = true
 	default:
 		outgoingMsg.toAll = false
 	}
 	c.outgoingMsg <- outgoingMsg
 	return
+}
+
+func (c *WebSocketConnection) CoolDowm() {
+	for {
+		time, open := <-c.getListCoolDown.C
+		fmt.Println(time)
+		if !open {
+			return
+		}
+		c.getListCoolDown.Stop()
+	}
 }

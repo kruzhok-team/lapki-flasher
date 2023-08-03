@@ -78,11 +78,19 @@ const (
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
 	fmt.Println("get-list")
+	if !c.getListCoolDown.Stopped() {
+		return ErrGetListCoolDown
+	}
+	c.getListCoolDown.Start()
 	detector.Update()
 	detector.DeleteUnused()
+	if detector.boardsNum() == 0 {
+		return nil
+	}
 	IDs, boards := detector.GetBoards()
 	for i := range IDs {
-		err := Device(IDs[i], boards[i], c)
+		var err error
+		err = Device(IDs[i], boards[i], c)
 		if err != nil {
 			fmt.Println("getList() error", err.Error())
 			return err
@@ -92,6 +100,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 }
 
 // отправить клиенту описание устройства
+// lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func Device(deviceID string, board *BoardToFlash, c *WebSocketConnection) error {
 	fmt.Println("device")
 	boardMessage := DeviceMessage{

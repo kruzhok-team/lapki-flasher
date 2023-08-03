@@ -82,7 +82,8 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 	}
 	c := NewWebSocket(conn)
 	m.addClient(c)
-	//
+
+	go c.CoolDowm()
 	go m.readerHandler(c)
 	go m.writerHandler(c)
 }

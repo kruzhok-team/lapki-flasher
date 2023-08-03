@@ -27,6 +27,8 @@ var (
 	ErrAvrdude = errors.New("flash-avrdude-error")
 	// ошибка при чтение JSON-объекта
 	ErrUnmarshal = errors.New("unmarshal-err")
+	// прошлый запрос get-list находится в cooldown
+	ErrGetListCoolDown = errors.New("get-list-cooldown")
 )
 
 func errorHandler(err error, c *WebSocketConnection) {
