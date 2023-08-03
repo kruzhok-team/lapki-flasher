@@ -118,6 +118,11 @@ func (d *Detector) Update() {
 	}
 }
 
+// получить количество, подключённых плат
+func (d *Detector) boardsNum() int {
+	return len(d.boards)
+}
+
 // true = устройство заблокировано для прошивки
 func (board *BoardToFlash) IsFlashBlocked() bool {
 	board.mu.Lock()
