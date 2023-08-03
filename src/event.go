@@ -72,9 +72,7 @@ const (
 	// запрос на следующий блок бинарных данных
 	flashNextBlockMsg = "flash-next-block"
 	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
-	binaryBloMsg      = "binaryMsg"
-	DeviceOccupiedMsg = "device-occupied"
-	DeviceRealisedMsg = "device-realised"
+	binaryBloMsg = "binaryMsg"
 )
 
 // отправить клиенту список всех устройств

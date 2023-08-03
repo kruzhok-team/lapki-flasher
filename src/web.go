@@ -153,7 +153,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 			}
 		}
 		// отправить одному клиенту
-		if outgoing.toAll == true && (outgoing.event.Type == DeviceOccupiedMsg || outgoing.event.Type == DeviceRealisedMsg) {
+		if outgoing.toAll == true {
 			continue
 		}
 		err := c.wsc.WriteJSON(outgoing.event)
