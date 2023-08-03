@@ -162,8 +162,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.StartFlashing(board, msg.FileSize)
-	c.FlashingBoardID = msg.ID
-	DeviceOccupied(msg.ID, c)
 	FlashNextBlock(c)
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.StartFlashing(board, msg.FileSize)
@@ -204,7 +202,6 @@ func FlashCancel(event Event, c *WebSocketConnection) error {
 
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
-	DeviceRealised(c)
 	c.StopFlashing()
 	c.sentOutgoingEventMessage(FlashDoneMsg, nil)
 }
@@ -212,18 +209,4 @@ func FlashDone(c *WebSocketConnection) {
 // запрос на следующий блок с бинаными данными файла
 func FlashNextBlock(c *WebSocketConnection) {
 	c.sentOutgoingEventMessage(FlashNextBlockMsg, nil)
-}
-
-func DeviceOccupied(deviceID string, c *WebSocketConnection) {
-	dev := DeviceUpdateDeleteMessage{
-		deviceID,
-	}
-	c.sentOutgoingEventMessage(DeviceOccupiedMsg, dev)
-}
-
-func DeviceRealised(c *WebSocketConnection) {
-	dev := DeviceUpdateDeleteMessage{
-		c.FlashingBoardID,
-	}
-	c.sentOutgoingEventMessage(DeviceRealisedMsg, dev)
 }
