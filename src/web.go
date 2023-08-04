@@ -43,7 +43,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(time.Second * 5)
+	m.updateTicker = *ticker.New(time.Second * 30)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
