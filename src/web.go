@@ -43,7 +43,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(time.Second * 30)
+	m.updateTicker = *ticker.New(time.Second * 5)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
@@ -173,34 +173,9 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 func (m *WebSocketManager) updater() {
 	for {
 		<-m.updateTicker.C
-		newBoards := detectBoards()
-		//var newDevicesMsgs []DeviceMessage
-		//var portUpdatedMsgs []DeviceUpdatePortMessage
-		//var deletedMsgs []DeviceUpdateDeleteMessage
-		for deviceID, newBoard := range newBoards {
-			oldBoard, exists := detector.GetBoard(deviceID)
-			if exists {
-				if oldBoard.getPort() != newBoard.PortName {
-					oldBoard.setPort(newBoard.PortName)
-					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(newBoard, deviceID))
-					//portUpdatedMsgs = append(portUpdatedMsgs, *newDeviceUpdatePortMessage(newBoard, deviceID))
-				}
-			} else {
-				detector.AddBoard(deviceID, newBoard)
-				m.sendMessageToAll(DeviceMsg, newDeviceMessage(newBoard, deviceID))
-				//newDevicesMsgs = append(newDevicesMsgs, *newDeviceMessage(newBoard, deviceID))
-			}
+		if len(m.connections) > 0 {
+			UpdateList(nil, m)
 		}
-		detector.mu.Lock()
-		for deviceID := range detector.boards {
-			_, exists := newBoards[deviceID]
-			if !exists {
-				//deletedMsgs = append(deletedMsgs, *newDeviceUpdateDeleteMessage(deviceID))
-				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
-				delete(detector.boards, deviceID)
-			}
-		}
-		detector.mu.Unlock()
 	}
 }
 
@@ -208,4 +183,49 @@ func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
 	for connection := range m.connections {
 		connection.sentOutgoingEventMessage(msgType, payload, false)
 	}
+}
+
+func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
+	sendToAll := c == nil
+	newBoards := detectBoards()
+	// отправляем все устройства клиенту
+	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
+	// отправляем всем клиентам новые устройства
+	for deviceID, newBoard := range newBoards {
+		oldBoard, exists := detector.GetBoard(deviceID)
+		if exists {
+			if oldBoard.getPort() != newBoard.PortName {
+				oldBoard.setPort(newBoard.PortName)
+				if sendToAll {
+					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(newBoard, deviceID))
+				} else {
+					DeviceUpdatePort(deviceID, newBoard, c)
+				}
+			}
+			if !sendToAll {
+				Device(deviceID, newBoard, false, c)
+			}
+		} else {
+			detector.AddBoard(deviceID, newBoard)
+			if sendToAll {
+				m.sendMessageToAll(DeviceMsg, newDeviceMessage(newBoard, deviceID))
+			} else {
+				Device(deviceID, newBoard, true, c)
+			}
+		}
+	}
+	detector.mu.Lock()
+	for deviceID := range detector.boards {
+		_, exists := newBoards[deviceID]
+		if !exists {
+			//deletedMsgs = append(deletedMsgs, *newDeviceUpdateDeleteMessage(deviceID))
+			if sendToAll {
+				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
+			} else {
+				DeviceUpdateDelete(deviceID, c)
+			}
+			delete(detector.boards, deviceID)
+		}
+	}
+	detector.mu.Unlock()
 }

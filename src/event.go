@@ -78,26 +78,7 @@ const (
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
 	fmt.Println("get-list")
-	//c.getListCoolDown.Start()
-	newBoards := detectBoards()
-	// отправляем все устройства клиенту
-	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
-	// отправляем всем клиентам новые устройства
-	for deviceID, newBoard := range newBoards {
-		oldBoard, exists := detector.GetBoard(deviceID)
-		sentMsgToAll := false
-		if exists {
-			if oldBoard.getPort() != newBoard.PortName {
-				oldBoard.setPort(newBoard.PortName)
-				DeviceUpdatePort(deviceID, newBoard, c)
-			}
-		} else {
-			detector.AddBoard(deviceID, newBoard)
-			sentMsgToAll = true
-		}
-		Device(deviceID, newBoard, sentMsgToAll, c)
-	}
-	detector.DeleteAndAlert(newBoards, c)
+	UpdateList(c, nil)
 	return nil
 }
 
