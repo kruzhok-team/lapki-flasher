@@ -43,7 +43,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(time.Second * 5)
+	m.updateTicker = *ticker.New(time.Second * 15)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
@@ -110,6 +110,7 @@ func (m *WebSocketManager) addClient(c *WebSocketConnection) {
 
 // удаление клиента
 func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
+	log.Println("remove client")
 	if _, ok := m.connections[c]; ok {
 		// нужно разблокировать устройство, если прошивка ещё не завершилась
 		if c.IsFlashing() {
@@ -131,7 +132,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 	for {
 		msgType, payload, err := c.wsc.ReadMessage()
 		if err != nil {
-			// Если соединения разорвано, то получится ошибка
+			log.Println("reader: removed")
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error reading message: %v", err)
 			}
