@@ -68,6 +68,10 @@ func (m *WebSocketManager) routeEvent(msgType int, payload []byte, c *WebSocketC
 			return ErrUnmarshal
 		}
 	}
+	if event.Type == GetListMsg {
+		m.updateTicker.Stop()
+		defer m.updateTicker.Start()
+	}
 	if handler, ok := m.handlers[event.Type]; ok {
 		if err := handler(event, c); err != nil {
 			return err
@@ -89,7 +93,11 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 	}
 	c := NewWebSocket(conn)
 	m.addClient(c)
-
+	defer func() {
+		m.updateTicker.Stop()
+		UpdateList(c, nil)
+		m.updateTicker.Start()
+	}()
 	go c.CoolDowm()
 	go m.readerHandler(c)
 	go m.writerHandler(c)
@@ -173,6 +181,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 func (m *WebSocketManager) updater() {
 	for {
 		<-m.updateTicker.C
+		log.Println("update")
 		if len(m.connections) > 0 {
 			UpdateList(nil, m)
 		}
