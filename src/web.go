@@ -17,6 +17,9 @@ const MAX_MSG_SIZE = 1024
 // максимальный размер файла, загружаемого на сервер (в байтах)
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
+// максимальное количество сообщений, которые ожидают своей обработки
+const MAX_WAITING_MESSAGES = 50
+
 var (
 	websocketUpgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -43,7 +46,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(time.Second * 15)
+	m.updateTicker = *ticker.New(time.Second * 5)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
@@ -57,17 +60,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 }
 
 // отправляет событие в соответствующий обработчик, если для события не существует обработчика возвращает ошибку ErrEventNotSupported
-func (m *WebSocketManager) routeEvent(msgType int, payload []byte, c *WebSocketConnection) error {
-	var event Event
-	if msgType == websocket.BinaryMessage {
-		event.Type = FlashBinaryBlockMsg
-		event.Payload = payload
-	} else {
-		err := json.Unmarshal(payload, &event)
-		if err != nil {
-			return ErrUnmarshal
-		}
-	}
+func (m *WebSocketManager) routeEvent(event Event, c *WebSocketConnection) error {
 	if event.Type == GetListMsg {
 		m.updateTicker.Stop()
 		defer m.updateTicker.Start()
@@ -98,9 +91,10 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		UpdateList(c, nil)
 		m.updateTicker.Start()
 	}()
-	go c.CoolDowm()
+	// go c.CoolDowm()
 	go m.readerHandler(c)
 	go m.writerHandler(c)
+	go m.eventHandler(c)
 }
 
 // добавление нового клиента
@@ -128,7 +122,6 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 	}()
 
 	c.wsc.SetReadLimit(MAX_MSG_SIZE)
-
 	for {
 		msgType, payload, err := c.wsc.ReadMessage()
 		if err != nil {
@@ -140,8 +133,35 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 		}
 
 		// обработка сообщений и ошибок
-		if err := m.routeEvent(msgType, payload, c); err != nil {
+		/*if err := m.routeEvent(msgType, payload, c); err != nil {
 			errorHandler(err, c)
+			continue
+		}*/
+
+		var event Event
+		if msgType == websocket.BinaryMessage {
+			event.Type = FlashBinaryBlockMsg
+			event.Payload = payload
+		} else {
+			err := json.Unmarshal(payload, &event)
+			if err != nil {
+				errorHandler(ErrUnmarshal, c)
+				continue
+			}
+		}
+		if event.Type == FlashStartMsg && c.IsFlashing() {
+			errorHandler(ErrFlashNotFinished, c)
+			continue
+		}
+		select {
+		case c.readEvent <- event:
+		default:
+			log.Println("read channel is full!")
+			if msgType == websocket.BinaryMessage {
+				c.sentOutgoingEventMessage(ErrWaitingBinaryMessagesLimit.Error(), nil, false)
+			} else {
+				c.sentOutgoingEventMessage(ErrWaitingMessagesLimit.Error(), payload, false)
+			}
 			continue
 		}
 	}
@@ -175,6 +195,22 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 		if err != nil {
 			log.Println("Writing JSON error:", err.Error())
 			return
+		}
+	}
+}
+
+func (m *WebSocketManager) eventHandler(c *WebSocketConnection) {
+	defer func() {
+		m.removeClient(c)
+	}()
+	for {
+		event, isOpen := <-c.readEvent
+		if !isOpen {
+			return
+		}
+		if err := m.routeEvent(event, c); err != nil {
+			errorHandler(err, c)
+			continue
 		}
 	}
 }

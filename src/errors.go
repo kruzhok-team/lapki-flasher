@@ -29,6 +29,9 @@ var (
 	ErrUnmarshal = errors.New("unmarshal-err")
 	// прошлый запрос get-list находится в cooldown
 	ErrGetListCoolDown = errors.New("get-list-cooldown")
+	//
+	ErrWaitingMessagesLimit       = errors.New("waiting-message-limit")
+	ErrWaitingBinaryMessagesLimit = errors.New("waiting-binary-message-limit")
 )
 
 func errorHandler(err error, c *WebSocketConnection) {

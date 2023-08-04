@@ -29,6 +29,8 @@ type WebSocketConnection struct {
 	outgoingMsg chan OutgoingEventMessage
 	// отправляет тик, когда get-list снова может быть использован
 	getListCoolDown *ticker.Ticker
+	//
+	readEvent chan Event
 }
 
 func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
@@ -39,6 +41,7 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.getListCoolDown = ticker.New(5 * time.Second)
+	c.readEvent = make(chan Event, MAX_WAITING_MESSAGES)
 	return &c
 }
 
