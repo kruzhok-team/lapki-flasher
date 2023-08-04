@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 )
 
 // обработчик события
@@ -113,6 +114,7 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
+	log.Println("Flash-start")
 	if c.IsFlashing() {
 		return ErrFlashNotFinished
 	}
@@ -128,10 +130,11 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		return ErrFlashLargeFile
 	}
 	board, exists := detector.GetBoard(msg.ID)
-	updated := board.updatePortName(msg.ID)
 	if !exists {
+		log.Println("test")
 		return ErrFlashWrongID
 	}
+	updated := board.updatePortName(msg.ID)
 	if updated {
 		if board.IsConnected() {
 			DeviceUpdatePort(msg.ID, board, c)
