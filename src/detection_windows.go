@@ -125,8 +125,8 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		return false
 	}
 	portName := findPortName(&ID)
-	if board.PortName != portName {
-		board.PortName = portName
+	if board.getPort() != portName {
+		board.setPort(portName)
 		return true
 	}
 	return false

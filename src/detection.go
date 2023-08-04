@@ -53,6 +53,7 @@ type DetectedBoard struct {
 type Detector struct {
 	// список доступных для прошивки устройств
 	boards map[string]*BoardToFlash
+	mu     sync.Mutex
 }
 
 func NewDetector() *Detector {
@@ -61,23 +62,31 @@ func NewDetector() *Detector {
 	return &d
 }
 
-// возвращает устройство, соответствующее ID, существует ли устройство в списке и обновился ли порт
-func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool, bool) {
+// возвращает устройство, соответствующее ID, существует ли устройство в списке
+func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	value, exists := d.boards[ID]
-	portUpdated := false
-	if exists {
-		portUpdated = value.updatePortName(ID)
-	}
-	return value, exists, portUpdated
+	return value, exists
+}
+
+func (d *Detector) AddBoard(ID string, board *BoardToFlash) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.boards[ID] = board
 }
 
 // удаляет устройство из списка
 func (d *Detector) DeleteBoard(ID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	delete(d.boards, ID)
 }
 
 // удаляет все платы, которые не подключены в данный момент, возвращает ID устройств, которые были удалены
 func (d *Detector) DeleteUnused() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var deletedID []string
 	for ID, board := range d.boards {
 		if !board.IsConnected() {
@@ -89,6 +98,8 @@ func (d *Detector) DeleteUnused() []string {
 }
 
 func (d *Detector) GetBoards() ([]string, []*BoardToFlash) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var IDs []string
 	var boards []*BoardToFlash
 	for ID, board := range d.boards {
@@ -98,7 +109,21 @@ func (d *Detector) GetBoards() ([]string, []*BoardToFlash) {
 	return IDs, boards
 }
 
+func (d *Detector) GetIDs() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	IDs := make([]string, len(d.boards))
+	index := 0
+	for id := range d.boards {
+		IDs[index] = id
+		index++
+	}
+	return IDs
+}
+
 func (d *Detector) Update() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.boards == nil {
 		d.boards = detectBoards()
 		return
@@ -123,6 +148,19 @@ func (d *Detector) boardsNum() int {
 	return len(d.boards)
 }
 
+// удаляем устройства, которых больше нет и уведомляем об этом всех клиентов
+func (d *Detector) DeleteAndAlert(newBoards map[string]*BoardToFlash, c *WebSocketConnection) {
+	d.mu.Lock()
+	for deviceID := range detector.boards {
+		_, exists := newBoards[deviceID]
+		if !exists {
+			delete(detector.boards, deviceID)
+			DeviceUpdateDelete(deviceID, c)
+		}
+	}
+	d.mu.Unlock()
+}
+
 // true = устройство заблокировано для прошивки
 func (board *BoardToFlash) IsFlashBlocked() bool {
 	board.mu.Lock()
@@ -135,6 +173,18 @@ func (board *BoardToFlash) SetLock(lock bool) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.flashing = lock
+}
+
+func (board *BoardToFlash) getPort() string {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.PortName
+}
+
+func (board *BoardToFlash) setPort(newPortName string) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.PortName = newPortName
 }
 
 func vendorList() []string {

@@ -63,8 +63,8 @@ func (c *WebSocketConnection) StopFlashing() {
 }
 
 // отправка сообщения клиенту
-// lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any) (err error) {
+// toAll = true, если сообщение нужно отправить всем клиентам
+func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any, toAll bool) (err error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Println("Marshal JSON error:", err.Error())
@@ -76,12 +76,7 @@ func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload a
 	}
 	var outgoingMsg OutgoingEventMessage
 	outgoingMsg.event = &event
-	switch msgType {
-	case DeviceUpdateDeleteMsg, DeviceUpdatePortMsg:
-		outgoingMsg.toAll = true
-	default:
-		outgoingMsg.toAll = false
-	}
+	outgoingMsg.toAll = toAll
 	c.outgoingMsg <- outgoingMsg
 	return
 }

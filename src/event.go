@@ -78,30 +78,32 @@ const (
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
 	fmt.Println("get-list")
-	if !c.getListCoolDown.Stopped() {
-		return ErrGetListCoolDown
-	}
-	c.getListCoolDown.Start()
-	detector.Update()
-	detector.DeleteUnused()
-	if detector.boardsNum() == 0 {
-		return nil
-	}
-	IDs, boards := detector.GetBoards()
-	for i := range IDs {
-		var err error
-		err = Device(IDs[i], boards[i], c)
-		if err != nil {
-			fmt.Println("getList() error", err.Error())
-			return err
+	//c.getListCoolDown.Start()
+	newBoards := detectBoards()
+	// отправляем все устройства клиенту
+	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
+	// отправляем всем клиентам новые устройства
+	for deviceID, newBoard := range newBoards {
+		oldBoard, exists := detector.GetBoard(deviceID)
+		sentMsgToAll := false
+		if exists {
+			if oldBoard.getPort() != newBoard.PortName {
+				oldBoard.setPort(newBoard.PortName)
+				DeviceUpdatePort(deviceID, newBoard, c)
+			}
+		} else {
+			detector.AddBoard(deviceID, newBoard)
+			sentMsgToAll = true
 		}
+		Device(deviceID, newBoard, sentMsgToAll, c)
 	}
+	detector.DeleteAndAlert(newBoards, c)
 	return nil
 }
 
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func Device(deviceID string, board *BoardToFlash, c *WebSocketConnection) error {
+func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnection) error {
 	fmt.Println("device")
 	boardMessage := DeviceMessage{
 		deviceID,
@@ -111,7 +113,7 @@ func Device(deviceID string, board *BoardToFlash, c *WebSocketConnection) error 
 		board.PortName,
 		board.SerialID,
 	}
-	err := c.sentOutgoingEventMessage(DeviceMsg, boardMessage)
+	err := c.sentOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
 	if err != nil {
 		fmt.Println("device() error:", err.Error())
 	}
@@ -120,20 +122,12 @@ func Device(deviceID string, board *BoardToFlash, c *WebSocketConnection) error 
 
 // сообщение о том, что порт обновлён
 func DeviceUpdatePort(deviceID string, board *BoardToFlash, c *WebSocketConnection) {
-	dev := DeviceUpdatePortMessage{
-		deviceID,
-		board.PortName,
-	}
-	c.sentOutgoingEventMessage(DeviceUpdatePortMsg, dev)
+	c.sentOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
 }
 
 // сообщение о том, что устройство удалено
 func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
-	detector.DeleteBoard(deviceID)
-	dev := DeviceUpdateDeleteMessage{
-		deviceID,
-	}
-	c.sentOutgoingEventMessage(DeviceUpdateDeleteMsg, dev)
+	c.sentOutgoingEventMessage(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID), true)
 }
 
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
@@ -152,7 +146,8 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if msg.FileSize > MAX_FILE_SIZE {
 		return ErrFlashLargeFile
 	}
-	board, exists, updated := detector.GetBoard(msg.ID)
+	board, exists := detector.GetBoard(msg.ID)
+	updated := board.updatePortName(msg.ID)
 	if !exists {
 		return ErrFlashWrongID
 	}
@@ -160,6 +155,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		if board.IsConnected() {
 			DeviceUpdatePort(msg.ID, board, c)
 		} else {
+			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
 			return ErrFlashDisconnected
 		}
@@ -210,10 +206,49 @@ func FlashCancel(event Event, c *WebSocketConnection) error {
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
 	c.StopFlashing()
-	c.sentOutgoingEventMessage(FlashDoneMsg, nil)
+	c.sentOutgoingEventMessage(FlashDoneMsg, nil, false)
 }
 
 // запрос на следующий блок с бинаными данными файла
 func FlashNextBlock(c *WebSocketConnection) {
-	c.sentOutgoingEventMessage(FlashNextBlockMsg, nil)
+	c.sentOutgoingEventMessage(FlashNextBlockMsg, nil, false)
+}
+
+func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+	boardMessage := DeviceMessage{
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.SerialID,
+	}
+	return &boardMessage
+}
+
+func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+	boardMessage := DeviceMessage{
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.SerialID,
+	}
+	return &boardMessage
+}
+
+func newDeviceUpdatePortMessage(board *BoardToFlash, deviceID string) *DeviceUpdatePortMessage {
+	boardMessage := DeviceUpdatePortMessage{
+		deviceID,
+		board.PortName,
+	}
+	return &boardMessage
+}
+
+func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
+	boardMessage := DeviceUpdateDeleteMessage{
+		deviceID,
+	}
+	return &boardMessage
 }

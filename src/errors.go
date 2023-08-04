@@ -44,5 +44,5 @@ func errorHandler(err error, c *WebSocketConnection) {
 			c.avrMsg = ""
 		}()
 	}
-	c.sentOutgoingEventMessage(msgType, payload)
+	c.sentOutgoingEventMessage(msgType, payload, false)
 }

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/tjgq/ticker"
 )
 
 // максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
@@ -31,6 +33,8 @@ type WebSocketManager struct {
 	handlers map[string]EventHandler
 	// список соединений
 	connections ConnectionList
+	// отпраляет сигнал, когда нужно обновить устройства для всех
+	updateTicker ticker.Ticker
 }
 
 // Инициализация менеджера
@@ -39,6 +43,9 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
+	m.updateTicker = *ticker.New(time.Second * 5)
+	m.updateTicker.Start()
+	go m.updater()
 	return &m
 }
 
@@ -154,14 +161,51 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 			}
 		}
 		// отправить одному клиенту
-		if outgoing.toAll == true {
-			continue
-		}
 		err := c.wsc.WriteJSON(outgoing.event)
 		log.Println("writer", outgoing.event.Type)
 		if err != nil {
 			log.Println("Writing JSON error:", err.Error())
 			return
 		}
+	}
+}
+
+func (m *WebSocketManager) updater() {
+	for {
+		<-m.updateTicker.C
+		newBoards := detectBoards()
+		//var newDevicesMsgs []DeviceMessage
+		//var portUpdatedMsgs []DeviceUpdatePortMessage
+		//var deletedMsgs []DeviceUpdateDeleteMessage
+		for deviceID, newBoard := range newBoards {
+			oldBoard, exists := detector.GetBoard(deviceID)
+			if exists {
+				if oldBoard.getPort() != newBoard.PortName {
+					oldBoard.setPort(newBoard.PortName)
+					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(newBoard, deviceID))
+					//portUpdatedMsgs = append(portUpdatedMsgs, *newDeviceUpdatePortMessage(newBoard, deviceID))
+				}
+			} else {
+				detector.AddBoard(deviceID, newBoard)
+				m.sendMessageToAll(DeviceMsg, newDeviceMessage(newBoard, deviceID))
+				//newDevicesMsgs = append(newDevicesMsgs, *newDeviceMessage(newBoard, deviceID))
+			}
+		}
+		detector.mu.Lock()
+		for deviceID := range detector.boards {
+			_, exists := newBoards[deviceID]
+			if !exists {
+				//deletedMsgs = append(deletedMsgs, *newDeviceUpdateDeleteMessage(deviceID))
+				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
+				delete(detector.boards, deviceID)
+			}
+		}
+		detector.mu.Unlock()
+	}
+}
+
+func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
+	for connection := range m.connections {
+		connection.sentOutgoingEventMessage(msgType, payload, false)
 	}
 }
