@@ -79,17 +79,17 @@ const (
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
 	fmt.Println("get-list")
-	if c.cooldown.isBlocked() {
+	if c.getListCooldown.isBlocked() {
 		return ErrGetListCoolDown
 	}
 	//fmt.Println("FROZEN", c.cooldown.frozen)
 	isSingle := len(c.manager.connections) < 2
 	if !isSingle {
-		c.cooldown.freeze()
+		c.getListCooldown.freeze()
 	}
 	UpdateList(c, nil)
 	if !isSingle {
-		c.cooldown.start()
+		c.getListCooldown.start()
 	}
 	return nil
 }
