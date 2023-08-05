@@ -29,8 +29,9 @@ var (
 	ErrUnmarshal = errors.New("unmarshal-err")
 	// прошлый запрос get-list находится в cooldown
 	ErrGetListCoolDown = errors.New("get-list-cooldown")
-	//
-	ErrWaitingMessagesLimit       = errors.New("waiting-message-limit")
+	// Слишком много запросов от клиента всё ещё находятся в обработке, сервер возвращает сообщение обработно, оно будет записано в payload
+	ErrWaitingMessagesLimit = errors.New("waiting-message-limit")
+	// аналогично ErrWaitingMessagesLimit, но для бинарных данных, не возвращает данные обратно клиенту
 	ErrWaitingBinaryMessagesLimit = errors.New("waiting-binary-message-limit")
 )
 
