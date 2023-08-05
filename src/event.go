@@ -82,15 +82,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 	if c.getListCooldown.isBlocked() {
 		return ErrGetListCoolDown
 	}
-	//fmt.Println("FROZEN", c.cooldown.frozen)
-	isSingle := len(c.manager.connections) < 2
-	if !isSingle {
-		c.getListCooldown.freeze()
-	}
-	UpdateList(c, nil)
-	if !isSingle {
-		c.getListCooldown.start()
-	}
+	UpdateList(c, c.manager)
 	return nil
 }
 

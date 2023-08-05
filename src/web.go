@@ -95,7 +95,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
-		UpdateList(c, nil)
+		UpdateList(c, m)
 		m.updateTicker.Start()
 	}()
 	go m.writerHandler(c)
@@ -233,6 +233,30 @@ func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
 
 func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	sendToAll := c == nil
+
+	isSingle := len(m.connections) < 2
+	// замораживаем блокировки
+	if !isSingle {
+		if sendToAll {
+			for connection := range m.connections {
+				connection.getListCooldown.freeze()
+			}
+		} else {
+			c.getListCooldown.freeze()
+		}
+	}
+	// запускаем временные блокировки
+	defer func() {
+		if !isSingle {
+			if sendToAll {
+				for connection := range m.connections {
+					connection.getListCooldown.start()
+				}
+			} else {
+				c.getListCooldown.start()
+			}
+		}
+	}()
 	newBoards := detectBoards()
 	// отправляем все устройства клиенту
 	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
