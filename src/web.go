@@ -91,7 +91,6 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		UpdateList(c, nil)
 		m.updateTicker.Start()
 	}()
-	// go c.CoolDowm()
 	go m.writerHandler(c)
 	go m.eventHandler(c)
 	go m.readerHandler(c)
@@ -131,12 +130,6 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 			}
 			break
 		}
-
-		// обработка сообщений и ошибок
-		/*if err := m.routeEvent(msgType, payload, c); err != nil {
-			errorHandler(err, c)
-			continue
-		}*/
 
 		var event Event
 		if msgType == websocket.BinaryMessage {

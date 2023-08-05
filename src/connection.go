@@ -3,12 +3,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/tjgq/ticker"
 )
 
 // сообщение для отправки
@@ -27,9 +24,7 @@ type WebSocketConnection struct {
 	// сообщение от avrdude
 	avrMsg      string
 	outgoingMsg chan OutgoingEventMessage
-	// отправляет тик, когда get-list снова может быть использован
-	getListCoolDown *ticker.Ticker
-	//
+	// канал для прочитанных сообщений от клиента
 	readEvent chan Event
 }
 
@@ -40,7 +35,6 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
-	c.getListCoolDown = ticker.New(5 * time.Second)
 	c.readEvent = make(chan Event, MAX_WAITING_MESSAGES)
 	return &c
 }
@@ -82,15 +76,4 @@ func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload a
 	outgoingMsg.toAll = toAll
 	c.outgoingMsg <- outgoingMsg
 	return
-}
-
-func (c *WebSocketConnection) CoolDowm() {
-	for {
-		time, open := <-c.getListCoolDown.C
-		fmt.Println(time)
-		if !open {
-			return
-		}
-		c.getListCoolDown.Stop()
-	}
 }
