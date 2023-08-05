@@ -27,6 +27,9 @@ const MAX_WAITING_MESSAGES = 50
 */
 const GET_LIST_COOLDOWN_DURATION = 5 * time.Second
 
+// количество времени между автоматическими обновлениями
+const UPDATE_LIST_TIME = 30 * time.Second
+
 var (
 	websocketUpgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -53,7 +56,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(time.Second * 5)
+	m.updateTicker = *ticker.New(UPDATE_LIST_TIME)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
