@@ -20,6 +20,13 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024
 // максимальное количество сообщений, которые ожидают своей обработки
 const MAX_WAITING_MESSAGES = 50
 
+/*
+минимальное время, через которое клиент может снова запросить список устройств;
+
+игнорируется, если количество клиентов меньше чем 2
+*/
+const GET_LIST_COOLDOWN_DURATION = 5 * time.Second
+
 var (
 	websocketUpgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -84,7 +91,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn)
+	c := NewWebSocket(conn, m)
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()

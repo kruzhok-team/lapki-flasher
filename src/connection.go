@@ -26,9 +26,13 @@ type WebSocketConnection struct {
 	outgoingMsg chan OutgoingEventMessage
 	// канал для прочитанных сообщений от клиента
 	readEvent chan Event
+	cooldown  Cooldown
+	// TODO: подумать о том, можно ли не добавлять ссылку на менеджера
+	// (сейчас она нужна только для того, чтобы узнать количество соединений, чтобы понять нужно ли ставить блокировку или нет)
+	manager *WebSocketManager
 }
 
-func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
+func NewWebSocket(wsc *websocket.Conn, manager *WebSocketManager) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
@@ -36,6 +40,8 @@ func NewWebSocket(wsc *websocket.Conn) *WebSocketConnection {
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.readEvent = make(chan Event, MAX_WAITING_MESSAGES)
+	c.cooldown = *newCooldown(GET_LIST_COOLDOWN_DURATION)
+	c.manager = manager
 	return &c
 }
 
@@ -61,7 +67,8 @@ func (c *WebSocketConnection) StopFlashing() {
 
 // отправка сообщения клиенту
 // toAll = true, если сообщение нужно отправить всем клиентам
-func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any, toAll bool) (err error) {
+// startCooldown[0] = true, если нужно запустить cooldown
+func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Println("Marshal JSON error:", err.Error())

@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// управление состоянием блокировки
 type Cooldown struct {
 	// продолжительность блокировки
 	duration time.Duration
