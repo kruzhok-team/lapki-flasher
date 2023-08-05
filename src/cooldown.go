@@ -40,9 +40,6 @@ func (cd *Cooldown) isBlocked() bool {
 func (cd *Cooldown) start() {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
-	if !cd.manager.hasMultipleConnections() {
-		return
-	}
 	cd.frozen = false
 	cd.lastTimeCalled = time.Now()
 }
@@ -51,9 +48,6 @@ func (cd *Cooldown) start() {
 func (cd *Cooldown) freeze() {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
-	if !cd.manager.hasMultipleConnections() {
-		return
-	}
 	cd.frozen = true
 }
 
