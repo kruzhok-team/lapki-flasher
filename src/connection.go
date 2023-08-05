@@ -26,13 +26,10 @@ type WebSocketConnection struct {
 	outgoingMsg chan OutgoingEventMessage
 	// канал для прочитанных сообщений от клиента
 	readEvent       chan Event
-	getListCooldown Cooldown
-	// TODO: подумать о том, можно ли не добавлять ссылку на менеджера
-	// (сейчас она нужна только для того, чтобы узнать количество соединений, чтобы понять нужно ли ставить блокировку или нет)
-	manager *WebSocketManager
+	getListCooldown *Cooldown
 }
 
-func NewWebSocket(wsc *websocket.Conn, manager *WebSocketManager) *WebSocketConnection {
+func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
@@ -40,8 +37,7 @@ func NewWebSocket(wsc *websocket.Conn, manager *WebSocketManager) *WebSocketConn
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.readEvent = make(chan Event, MAX_WAITING_MESSAGES)
-	c.getListCooldown = *newCooldown(GET_LIST_COOLDOWN_DURATION)
-	c.manager = manager
+	c.getListCooldown = getListCoolDown
 	return &c
 }
 

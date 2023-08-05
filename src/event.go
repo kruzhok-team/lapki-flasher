@@ -82,7 +82,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 	if c.getListCooldown.isBlocked() {
 		return ErrGetListCoolDown
 	}
-	UpdateList(c, c.manager)
+	UpdateList(c, nil)
 	return nil
 }
 

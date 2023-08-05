@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// управление состоянием блокировки
+// управление состоянием блокировки, блокировка не действует, если количество соединений меньше чем 2
 type Cooldown struct {
 	// продолжительность блокировки
 	duration time.Duration
@@ -15,18 +15,24 @@ type Cooldown struct {
 	mu sync.Mutex
 	// true = блокировка находится в замороженном состоянии
 	frozen bool
+	// нужен для определения текущего количества соединений
+	manager *WebSocketManager
 }
 
-func newCooldown(duration time.Duration) *Cooldown {
+func newCooldown(duration time.Duration, manager *WebSocketManager) *Cooldown {
 	var cd Cooldown
 	cd.duration = duration
 	cd.lastTimeCalled = time.Time{}
+	cd.manager = manager
 	return &cd
 }
 
 func (cd *Cooldown) isBlocked() bool {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
+	if !cd.manager.hasMultipleConnections() {
+		return false
+	}
 	return cd.frozen || time.Now().Sub(cd.lastTimeCalled) < cd.duration
 }
 
@@ -34,6 +40,9 @@ func (cd *Cooldown) isBlocked() bool {
 func (cd *Cooldown) start() {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
+	if !cd.manager.hasMultipleConnections() {
+		return
+	}
 	cd.frozen = false
 	cd.lastTimeCalled = time.Now()
 }
@@ -42,6 +51,9 @@ func (cd *Cooldown) start() {
 func (cd *Cooldown) freeze() {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
+	if !cd.manager.hasMultipleConnections() {
+		return
+	}
 	cd.frozen = true
 }
 

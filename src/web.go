@@ -59,6 +59,10 @@ func NewWebSocketManager() *WebSocketManager {
 	return &m
 }
 
+func (m *WebSocketManager) hasMultipleConnections() bool {
+	return len(m.connections) > 1
+}
+
 // инициализация обработчиков событий
 func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetListMsg] = GetList
@@ -91,7 +95,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn, m)
+	c := NewWebSocket(conn, newCooldown(GET_LIST_COOLDOWN_DURATION, m))
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
@@ -234,27 +238,22 @@ func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
 func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	sendToAll := c == nil
 
-	isSingle := len(m.connections) < 2
 	// замораживаем блокировки
-	if !isSingle {
-		if sendToAll {
-			for connection := range m.connections {
-				connection.getListCooldown.freeze()
-			}
-		} else {
-			c.getListCooldown.freeze()
+	if sendToAll {
+		for connection := range m.connections {
+			connection.getListCooldown.freeze()
 		}
+	} else {
+		c.getListCooldown.freeze()
 	}
 	// запускаем временные блокировки
 	defer func() {
-		if !isSingle {
-			if sendToAll {
-				for connection := range m.connections {
-					connection.getListCooldown.start()
-				}
-			} else {
-				c.getListCooldown.start()
+		if sendToAll {
+			for connection := range m.connections {
+				connection.getListCooldown.start()
 			}
+		} else {
+			c.getListCooldown.start()
 		}
 	}()
 	newBoards := detectBoards()
