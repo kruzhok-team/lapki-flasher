@@ -92,9 +92,9 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		m.updateTicker.Start()
 	}()
 	// go c.CoolDowm()
-	go m.readerHandler(c)
 	go m.writerHandler(c)
 	go m.eventHandler(c)
+	go m.readerHandler(c)
 }
 
 // добавление нового клиента
