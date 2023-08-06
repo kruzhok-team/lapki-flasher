@@ -81,7 +81,7 @@ Boards: <output id="boards"></output>
                 var first = filePos;
                 var last = first + blockSize
                 if (last > file.size) {
-                    last == file.size;
+                    last = file.size;
                 }
                 blob = file.slice(first, last);
                 reader.readAsArrayBuffer(blob);
