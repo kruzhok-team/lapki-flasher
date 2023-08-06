@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"os/exec"
 
 	"github.com/gorilla/websocket"
 )
@@ -27,6 +28,7 @@ type WebSocketConnection struct {
 	// канал для прочитанных сообщений от клиента
 	readEvent       chan Event
 	getListCooldown *Cooldown
+	flashProcces    *exec.Cmd
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown) *WebSocketConnection {
@@ -58,6 +60,10 @@ func (c *WebSocketConnection) StopFlashing() {
 		c.FlashingBoard.SetLock(false)
 		c.FlashingBoard = nil
 		c.FileWriter.Clear()
+		if c.flashProcces != nil {
+			c.flashProcces.Process.Kill()
+		}
+		c.flashProcces = nil
 	}
 }
 

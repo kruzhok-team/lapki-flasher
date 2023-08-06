@@ -74,6 +74,8 @@ const (
 	flashNextBlockMsg = "flash-next-block"
 	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
 	binaryBloMsg = "binaryMsg"
+	//
+	FlashCancelMsg = "flash-cancel"
 )
 
 // отправить клиенту список всех устройств
@@ -169,7 +171,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath(), c.flashProcces)
 		if err != nil {
 			c.avrMsg = avrMsg
 			c.StopFlashing()
@@ -183,11 +185,12 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 }
 
 // TODO: отмена прошивки
-func FlashCancel(event Event, c *WebSocketConnection) error {
-	if !c.IsFlashing() {
+func FlashCancel(c *WebSocketConnection) error {
+	if !c.IsFlashing() || c.flashProcces == nil {
 		return nil
 	}
-	return nil
+	err := c.flashProcces.Process.Kill()
+	return err
 }
 
 // отправить сообщение о том, что прошивка прошла успешна

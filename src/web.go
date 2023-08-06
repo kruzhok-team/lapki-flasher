@@ -124,6 +124,8 @@ func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
 			c.StopFlashing()
 		}
 		c.wsc.Close()
+		close(c.outgoingMsg)
+		close(c.readEvent)
 		delete(m.connections, c)
 	}
 }
@@ -156,8 +158,15 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 				continue
 			}
 		}
-		if event.Type == FlashStartMsg && c.IsFlashing() {
-			errorHandler(ErrFlashNotFinished, c)
+		// обработка сообщений на случай, если eventHandler занят другими запросами
+		switch event.Type {
+		case FlashStartMsg:
+			if c.IsFlashing() {
+				errorHandler(ErrFlashNotFinished, c)
+				continue
+			}
+		case FlashCancelMsg:
+			FlashCancel(c)
 			continue
 		}
 		select {
@@ -177,6 +186,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 // обработчик исходящих сообщений
 func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 	defer func() {
+		log.Println("writer: removed")
 		m.removeClient(c)
 	}()
 	for {
@@ -208,6 +218,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 
 func (m *WebSocketManager) eventHandler(c *WebSocketConnection) {
 	defer func() {
+		log.Println("event: removed")
 		m.removeClient(c)
 	}()
 	for {
