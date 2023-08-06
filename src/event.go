@@ -52,6 +52,10 @@ type DeviceUpdatePortMessage struct {
 	PortName string `json:"portName"`
 }
 
+type MaxFileSize struct {
+	Size int `json:"size"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -75,7 +79,9 @@ const (
 	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
 	binaryBloMsg = "binaryMsg"
 	//
-	FlashCancelMsg = "flash-cancel"
+	FlashCancelMsg    = "flash-cancel"
+	GetMaxFileSizeMsg = "get-max-file-size"
+	MaxFileSizeMsg    = "max-file-size"
 )
 
 // отправить клиенту список всех устройств
@@ -241,4 +247,8 @@ func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
 		deviceID,
 	}
 	return &boardMessage
+}
+
+func GetMaxFileSize(event Event, c *WebSocketConnection) error {
+	return c.sentOutgoingEventMessage(MaxFileSizeMsg, MaxFileSize{MAX_FILE_SIZE}, false)
 }

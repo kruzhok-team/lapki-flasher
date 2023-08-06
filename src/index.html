@@ -13,6 +13,10 @@
     <button id="upload">Upload</button>
 </span>  
 <br><br>
+<span id="getSizeButton">
+    <button id="fileSize">get file size</button>
+</span>  
+<br><br>
 <span id="boardListButton">
     <button id="boardList">Board list</button>
 </span>
@@ -184,6 +188,9 @@ Boards: <output id="boards"></output>
                     }
                 };
                 sendEvent("flash-start", msgData);
+            }, false);
+            document.querySelector('#fileSize').addEventListener('click', function(evt){
+                sendEvent('get-max-file-size', '');
             }, false);
         } else {
             alert("Not supporting websockets");

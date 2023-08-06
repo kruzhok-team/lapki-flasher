@@ -71,6 +71,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetListMsg] = GetList
 	m.handlers[FlashStartMsg] = FlashStart
 	m.handlers[FlashBinaryBlockMsg] = FlashBinaryBlock
+	m.handlers[GetMaxFileSizeMsg] = GetMaxFileSize
 }
 
 // отправляет событие в соответствующий обработчик, если для события не существует обработчика возвращает ошибку ErrEventNotSupported
