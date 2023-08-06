@@ -163,7 +163,8 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 			errorHandler(ErrFlashNotFinished, c)
 			continue
 		}
-		select {
+		c.readEvent <- event
+		/*select {
 		case c.readEvent <- event:
 		default:
 			log.Println("read channel is full!")
@@ -173,7 +174,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 				c.sentOutgoingEventMessage(ErrWaitingMessagesLimit.Error(), payload, false)
 			}
 			continue
-		}
+		}*/
 	}
 }
 
