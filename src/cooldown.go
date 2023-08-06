@@ -30,10 +30,7 @@ func newCooldown(duration time.Duration, manager *WebSocketManager) *Cooldown {
 func (cd *Cooldown) isBlocked() bool {
 	cd.mu.Lock()
 	defer cd.mu.Unlock()
-	if !cd.manager.hasMultipleConnections() {
-		return false
-	}
-	return cd.frozen || time.Now().Sub(cd.lastTimeCalled) < cd.duration
+	return cd.frozen || (cd.manager.hasMultipleConnections() && time.Now().Sub(cd.lastTimeCalled) < cd.duration)
 }
 
 // начать блокировку, которая закончится через указанное в duration время
