@@ -23,26 +23,78 @@ type WebSocketConnection struct {
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *BoardToFlash
 	// сообщение от avrdude
-	avrMsg      string
-	outgoingMsg chan OutgoingEventMessage
-	// канал для прочитанных сообщений от клиента
-	readEvent       chan Event
+	avrMsg          string
+	outgoingMsg     chan OutgoingEventMessage
 	getListCooldown *Cooldown
 	// true, если все каналы (кроме этого) закрыты
-	mu     sync.Mutex
+	mu sync.Mutex
+	// true каналы для передпчи данных между горутинами открыты
 	closed bool
+	// максимальное количество одновременно обрабатываемых запросов
+	maxQueries int
+	// количество запросов, которые обрабатываются в данный момент
+	numQueries int
 }
 
-func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown) *WebSocketConnection {
+func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
-	c.readEvent = make(chan Event, MAX_WAITING_MESSAGES)
 	c.getListCooldown = getListCoolDown
+	c.maxQueries = maxQueries
+	c.numQueries = 0
 	return &c
+}
+
+func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
+	for c.getNumQueries() > c.getMaxQueries() {
+	}
+	//log.Println("FUNC IN", c.getNumQueries())
+	go func() {
+		//log.Println("GOROUTINE IN")
+		// откладываем таймер, так как обновление все равно произойдёт для всех
+		if event.Type == GetListMsg {
+			m.updateTicker.Stop()
+			defer m.updateTicker.Start()
+		}
+		c.incNumQueries()
+		handler, exists := m.handlers[event.Type]
+		if exists {
+			err := handler(event, c)
+			errorHandler(err, c)
+		} else {
+			errorHandler(ErrEventNotSupported, c)
+		}
+		c.decNumQueries()
+		//log.Println("GOROUTINE OUT")
+	}()
+	//log.Println("FUNC OUT", c.getNumQueries())
+}
+
+func (c *WebSocketConnection) getNumQueries() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.numQueries
+}
+
+func (c *WebSocketConnection) getMaxQueries() int {
+	// так как значение максимума не изменяется, то блокировать переменную нету смысла
+	return c.maxQueries
+}
+
+func (c *WebSocketConnection) incNumQueries() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.numQueries++
+}
+
+func (c *WebSocketConnection) decNumQueries() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.numQueries--
 }
 
 func (c *WebSocketConnection) IsFlashing() bool {
@@ -61,7 +113,6 @@ func (c *WebSocketConnection) closeChan() {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	close(c.readEvent)
 	close(c.outgoingMsg)
 	c.closed = true
 }

@@ -36,6 +36,9 @@ var (
 )
 
 func errorHandler(err error, c *WebSocketConnection) {
+	if err == nil {
+		return
+	}
 	msgType := err.Error()
 	var payload any
 	switch err {

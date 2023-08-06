@@ -17,6 +17,8 @@
     <button id="fileSize">get file size</button>
 </span>  
 <br><br>
+Max file size: <output id="MaxFileSize"></output>
+<br><br>
 <span id="boardListButton">
     <button id="boardList">Board list</button>
 </span>
@@ -65,6 +67,11 @@ Boards: <output id="boards"></output>
         constructor(blockID, data){
             this.blockID = blockID;
             this.data = data;
+        }
+    }
+    class MaxFS{
+        constructor(size){
+            this.size = size
         }
     }
     function routeEvent(event) {
@@ -132,6 +139,10 @@ Boards: <output id="boards"></output>
             case "device-realised":
                 deviceRealised = Object.assign(new Device, event.payload);
                 alert("device realised " + deviceRealised.deviceID);
+                break;
+            case "max-file-size":
+                maxsize = Object.assign(new MaxFS, event.payload);
+                document.getElementById('MaxFileSize').innerHTML = '<ul>' +  maxsize.size + '</ul>';
                 break;
             default:
                 alert("unsupported message type");

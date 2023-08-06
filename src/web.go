@@ -17,8 +17,8 @@ const MAX_MSG_SIZE = 1024
 // максимальный размер файла, загружаемого на сервер (в байтах)
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
-// максимальное количество сообщений, которые ожидают своей обработки
-const MAX_WAITING_MESSAGES = 50
+// максимальное количество потоков на одного клиента
+const MAX_QUERIES = 3
 
 /*
 минимальное время, через которое клиент может снова запросить список устройств;
@@ -74,22 +74,6 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetMaxFileSizeMsg] = GetMaxFileSize
 }
 
-// отправляет событие в соответствующий обработчик, если для события не существует обработчика возвращает ошибку ErrEventNotSupported
-func (m *WebSocketManager) routeEvent(event Event, c *WebSocketConnection) error {
-	if event.Type == GetListMsg {
-		m.updateTicker.Stop()
-		defer m.updateTicker.Start()
-	}
-	if handler, ok := m.handlers[event.Type]; ok {
-		if err := handler(event, c); err != nil {
-			return err
-		}
-		return nil
-	} else {
-		return ErrEventNotSupported
-	}
-}
-
 // обработка нового соединения
 func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 
@@ -99,7 +83,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn, newCooldown(GET_LIST_COOLDOWN_DURATION, m))
+	c := NewWebSocket(conn, newCooldown(GET_LIST_COOLDOWN_DURATION, m), MAX_QUERIES)
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
@@ -107,7 +91,6 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		m.updateTicker.Start()
 	}()
 	go m.writerHandler(c)
-	go m.eventHandler(c)
 	go m.readerHandler(c)
 }
 
@@ -158,12 +141,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 				continue
 			}
 		}
-		// обработка сообщений на случай, если eventHandler занят другими запросами
-		if event.Type == FlashStartMsg && c.IsFlashing() {
-			errorHandler(ErrFlashNotFinished, c)
-			continue
-		}
-		c.readEvent <- event
+		c.addQuerry(m, event)
 		/*select {
 		case c.readEvent <- event:
 		default:
@@ -207,23 +185,6 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 		if err != nil {
 			log.Println("Writing JSON error:", err.Error())
 			return
-		}
-	}
-}
-
-func (m *WebSocketManager) eventHandler(c *WebSocketConnection) {
-	defer func() {
-		log.Println("event: removed")
-		m.removeClient(c)
-	}()
-	for {
-		event, isOpen := <-c.readEvent
-		if !isOpen {
-			return
-		}
-		if err := m.routeEvent(event, c); err != nil {
-			errorHandler(err, c)
-			continue
 		}
 	}
 }
