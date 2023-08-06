@@ -117,16 +117,12 @@ func (m *WebSocketManager) addClient(c *WebSocketConnection) {
 }
 
 // удаление клиента
+// если устройство не прошилось, то оно продолжит прошиваться и затем разблокируется
 func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
 	log.Println("remove client")
 	if _, ok := m.connections[c]; ok {
-		// нужно разблокировать устройство, если прошивка ещё не завершилась
-		if c.IsFlashing() {
-			c.StopFlashing()
-		}
 		c.wsc.Close()
-		close(c.outgoingMsg)
-		close(c.readEvent)
+		c.closeChan()
 		delete(m.connections, c)
 	}
 }
@@ -139,6 +135,9 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 
 	c.wsc.SetReadLimit(MAX_MSG_SIZE)
 	for {
+		if c.isClosedChan() {
+			return
+		}
 		msgType, payload, err := c.wsc.ReadMessage()
 		if err != nil {
 			log.Println("reader: removed")
@@ -160,14 +159,8 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 			}
 		}
 		// обработка сообщений на случай, если eventHandler занят другими запросами
-		switch event.Type {
-		case FlashStartMsg:
-			if c.IsFlashing() {
-				errorHandler(ErrFlashNotFinished, c)
-				continue
-			}
-		case FlashCancelMsg:
-			FlashCancel(c)
+		if event.Type == FlashStartMsg && c.IsFlashing() {
+			errorHandler(ErrFlashNotFinished, c)
 			continue
 		}
 		select {

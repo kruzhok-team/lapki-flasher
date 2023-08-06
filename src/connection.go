@@ -4,7 +4,7 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"os/exec"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -28,7 +28,9 @@ type WebSocketConnection struct {
 	// канал для прочитанных сообщений от клиента
 	readEvent       chan Event
 	getListCooldown *Cooldown
-	flashProcces    *exec.Cmd
+	// true, если все каналы (кроме этого) закрыты
+	mu     sync.Mutex
+	closed bool
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown) *WebSocketConnection {
@@ -47,6 +49,23 @@ func (c *WebSocketConnection) IsFlashing() bool {
 	return c.FlashingBoard != nil
 }
 
+func (c *WebSocketConnection) isClosedChan() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
+func (c *WebSocketConnection) closeChan() {
+	if c.isClosedChan() {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	close(c.readEvent)
+	close(c.outgoingMsg)
+	c.closed = true
+}
+
 // блокирует устройство и запрещает клиенту прошивать другие устройства, также запускает или перезапускает FileWriter для записи данных в файл прошивки
 func (c *WebSocketConnection) StartFlashing(board *BoardToFlash, fileSize int) {
 	c.FlashingBoard = board
@@ -60,10 +79,6 @@ func (c *WebSocketConnection) StopFlashing() {
 		c.FlashingBoard.SetLock(false)
 		c.FlashingBoard = nil
 		c.FileWriter.Clear()
-		if c.flashProcces != nil {
-			c.flashProcces.Process.Kill()
-		}
-		c.flashProcces = nil
 	}
 }
 
@@ -71,6 +86,9 @@ func (c *WebSocketConnection) StopFlashing() {
 // toAll = true, если сообщение нужно отправить всем клиентам
 // startCooldown[0] = true, если нужно запустить cooldown
 func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
+	if c.isClosedChan() {
+		return
+	}
 	data, err := json.Marshal(payload)
 	if err != nil {
 		log.Println("Marshal JSON error:", err.Error())
