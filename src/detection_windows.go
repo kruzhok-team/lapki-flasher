@@ -48,7 +48,7 @@ func getInstanceId(path string) []string {
 	return possiblePathes
 }
 
-// находит все подключённые платы, считает все найденные устройства за новые
+// находит все подключённые платы
 func detectBoards() map[string]*BoardToFlash {
 	startTime := time.Now()
 	vendors := vendorList()
