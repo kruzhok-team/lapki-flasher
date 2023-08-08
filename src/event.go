@@ -56,6 +56,10 @@ type MaxFileSize struct {
 	Size int `json:"size"`
 }
 
+type AvrdudeMessage struct {
+	Avrmsg string `json:"avrmsg"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -181,8 +185,8 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	}
 	if fileCreated {
 		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		c.avrMsg = avrMsg
 		if err != nil {
-			c.avrMsg = avrMsg
 			c.StopFlashing()
 			return ErrAvrdude
 		}
@@ -196,7 +200,8 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
 	c.StopFlashing()
-	c.sentOutgoingEventMessage(FlashDoneMsg, nil, false)
+	c.sentOutgoingEventMessage(FlashDoneMsg, AvrdudeMessage{c.avrMsg}, false)
+	c.avrMsg = ""
 }
 
 // запрос на следующий блок с бинаными данными файла
