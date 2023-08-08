@@ -19,6 +19,8 @@ const ID_SERIAL = "ID_SERIAL_SHORT"
 const USEC_INITIALIZED = "USEC_INITIALIZED"
 
 func detectBoards() map[string]*BoardToFlash {
+	// start := time.Now()
+	// defer fmt.Println("detection time: ", time.Now().Sub(start))
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 	// list of supported vendors (should contain lower case only!)
@@ -62,7 +64,6 @@ func detectBoards() map[string]*BoardToFlash {
 	if err != nil {
 		log.Fatalf("OpenDevices(): %v", err)
 	}
-	//fmt.Println(d)
 	return boards
 }
 
@@ -98,9 +99,11 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	return NOT_FOUND
 }
 
-// true - если порт изменился, иначе false
+// true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
 func (board *BoardToFlash) updatePortName(ID string) bool {
+	// start := time.Now()
+	// defer fmt.Println("update port time", time.Now().Sub(start))
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
