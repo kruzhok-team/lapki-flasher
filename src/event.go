@@ -80,6 +80,8 @@ const (
 	binaryBloMsg      = "binaryMsg"
 	GetMaxFileSizeMsg = "get-max-file-size"
 	MaxFileSizeMsg    = "max-file-size"
+	// устройства не найдены
+	EmptyListMsg = "empty-list"
 )
 
 // отправить клиенту список всех устройств
@@ -89,6 +91,9 @@ func GetList(event Event, c *WebSocketConnection) error {
 		return ErrGetListCoolDown
 	}
 	UpdateList(c, nil)
+	if detector.boardsNum() == 0 {
+		c.sentOutgoingEventMessage(EmptyListMsg, nil, false)
+	}
 	return nil
 }
 
