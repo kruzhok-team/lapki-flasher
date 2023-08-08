@@ -112,7 +112,7 @@ func findPortName(instanceId *string) string {
 	return portName
 }
 
-// true - если порт изменился, иначе false
+// true - если порт изменился или не найден, иначе false
 func (board *BoardToFlash) updatePortName(ID string) bool {
 	instanceId := getInstanceId(ID)
 	// такого устройства нет
