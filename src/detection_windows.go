@@ -18,12 +18,12 @@ func getInstanceId(substring string) []string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	defer key.Close()
 	if err != nil {
-		fmt.Println("Can't find devices", err)
+		fmt.Println("Can't find devices, perhaps drivers are needed?", err)
 		return nil
 	}
 	registryValues, err := key.ReadValueNames(0)
 	if err != nil {
-		fmt.Println("Error on getting registry value names", err.Error())
+		fmt.Println("Error on getting registry value names:", err.Error())
 		return nil
 	}
 	var possiblePathes []string
@@ -34,7 +34,7 @@ func getInstanceId(substring string) []string {
 			if err == registry.ErrUnexpectedType {
 				continue
 			}
-			fmt.Println("Error on getting registry values", err.Error())
+			fmt.Println("Error on getting registry values:", err.Error())
 			continue
 		}
 		if strings.Contains(strings.ToLower(value), substring) {
@@ -42,7 +42,7 @@ func getInstanceId(substring string) []string {
 		}
 		fmt.Println(value)
 	}
-	fmt.Println("get instance", time.Now().Sub(start))
+	fmt.Println("get instance:", time.Now().Sub(start))
 	return possiblePathes
 }
 
@@ -106,7 +106,7 @@ func findPortName(instanceId *string) string {
 		return NOT_FOUND
 	}
 	if err != nil {
-		fmt.Println("Error on getting port name", err.Error())
+		fmt.Println("Error on getting port name:", err.Error())
 		return NOT_FOUND
 	}
 	return portName
