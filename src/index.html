@@ -49,12 +49,13 @@ Boards: <output id="boards"></output>
         }
     }
     class Device {
-        constructor(id, name, controller, programmer, port){
+        constructor(id, name, controller, programmer, port, serialID){
             this.deviceID = id;
             this.name = name;
             this.controller = controller;
             this.programmer = programmer;
             this.portName = port; 
+            this.sierialID = serialID; 
         }
     }
     class FlashStart {
@@ -83,7 +84,7 @@ Boards: <output id="boards"></output>
                 // Format payload
                 var deviceEvent = Object.assign(new Device, event.payload);
                 document.getElementById('boards').innerHTML = '';
-                correctString = "[name: " + deviceEvent.name +  ", deviceID: " + deviceEvent.deviceID  + ", controller: " + deviceEvent.controller + ", programmer: " + deviceEvent.programmer + ", port: " + deviceEvent.portName + "]"
+                correctString = "[name: " + deviceEvent.name +  ", deviceID: " + deviceEvent.deviceID  + ", controller: " + deviceEvent.controller + ", programmer: " + deviceEvent.programmer + ", port: " + deviceEvent.portName + ", serial: ",  deviceEvent.serialID + "]"
                 boardsArr.push(correctString)
                 document.getElementById('boards').innerHTML = '<ul>' + boardsArr + '</ul>';
                 break;
