@@ -23,38 +23,38 @@ func detectBoards() map[string]*BoardToFlash {
 	// defer fmt.Println("detection time: ", time.Now().Sub(start))
 	ctx := gousb.NewContext()
 	defer ctx.Close()
-	// list of supported vendors (should contain lower case only!)
-	vid := vendorList()
+
+	boardTemplates := boardList()
 	boards := make(map[string]*BoardToFlash)
-	groups := boardList()
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
-		for _, v := range vid {
-			if strings.ToLower(desc.Vendor.String()) == strings.ToLower(v) {
-				//fmt.Println(v, desc.Product)
-				cur_group := groups[v]
-				//fmt.Println(len(cur_group), v)
-				for _, board := range cur_group {
-					if strings.ToLower(board.ProductID) == strings.ToLower(desc.Product.String()) {
-						board.VendorID = desc.Vendor.String()
-						detectedBoard := NewBoardToFlash(board, findPortName(desc))
-						if detectedBoard.PortName == NOT_FOUND {
-							continue
+		for _, boardTemplate := range boardTemplates {
+			for _, vid := range boardTemplate.VendorIDs {
+				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) {
+					//fmt.Println(v, desc.Product)
+					//fmt.Println(len(cur_group), v)
+					for _, pid := range boardTemplate.ProductIDs {
+						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
+							detectedBoard := NewBoardToFlash(BoardType{pid, vid, boardTemplate.Name, boardTemplate.Controller, boardTemplate.Programmer, boardTemplate.BootloaderName, ""},
+								findPortName(desc))
+							if detectedBoard.PortName == NOT_FOUND {
+								continue
+							}
+							properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
+							if err != nil {
+								fmt.Println("can't find ID", err.Error())
+								continue
+							}
+							detectedBoard.SerialID = properties[1]
+							var id string
+							if detectedBoard.SerialID != NOT_FOUND {
+								id = detectedBoard.SerialID
+							} else {
+								id = properties[0]
+							}
+							boards[id] = detectedBoard
 						}
-						properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
-						if err != nil {
-							fmt.Println("can't find ID", err.Error())
-							continue
-						}
-						detectedBoard.SerialID = properties[1]
-						var id string
-						if detectedBoard.SerialID != NOT_FOUND {
-							id = detectedBoard.SerialID
-						} else {
-							id = properties[0]
-						}
-						boards[id] = detectedBoard
 					}
 				}
 			}
