@@ -1,20 +1,33 @@
 package main
 
 import (
-	"strings"
+	_ "embed"
+	"encoding/json"
+	"fmt"
 	"sync"
+	"time"
 )
 
 const NOT_FOUND = ""
 
 type BoardType struct {
-	ProductID    string
-	VendorID     string
-	Name         string
-	Controller   string
-	Programmer   string
-	Bootloader   string
-	BootloaderID string
+	ProductID      string
+	VendorID       string
+	Name           string
+	Controller     string
+	Programmer     string
+	BootloaderName string
+	BootloaderID   string
+}
+
+type BoardTemplate struct {
+	VendorIDs      []string `json:"vendorIDs"`
+	ProductIDs     []string `json:"productIDs"`
+	Name           string   `json:"name"`
+	Controller     string   `json:"controller"`
+	Programmer     string   `json:"programmer"`
+	BootloaderName string   `json:"bootloaderName"`
+	BootloaderIDs  []string `json:"bootloaderIDs"`
 }
 
 func (board BoardType) hasBootloader() bool {
@@ -187,39 +200,13 @@ func (board *BoardToFlash) setPort(newPortName string) {
 	board.PortName = newPortName
 }
 
-func vendorList() []string {
-	// lower-case only
-	vendors := []string{
-		"2a03",
-		"2341",
-	}
-	return vendors
-}
+//go:embed device_list.JSON
+var boardTemplatesRaw []byte
 
-func boardList() map[string][]BoardType {
-	boardGroups := make(map[string][]string)
-	boardGroups["2341,2a03"] = []string{
-		"8037;Arduino Micro;ATmega32U4;avr109;Arduino Micro (bootloader);0037",
-		"0043;Arduino Uno;ATmega328P;arduino;;",
-	}
-	vendorGroups := make(map[string][]BoardType)
-	for vendorsStr, boardsStr := range boardGroups {
-		var boards []BoardType
-		for _, boardParams := range boardsStr {
-			params := strings.Split(boardParams, ";")
-			var board BoardType
-			board.ProductID = params[0]
-			board.Name = params[1]
-			board.Controller = params[2]
-			board.Programmer = params[3]
-			board.Bootloader = params[4]
-			board.BootloaderID = params[5]
-			boards = append(boards, board)
-		}
-		vendorSep := strings.Split(vendorsStr, ",")
-		for _, vendor := range vendorSep {
-			vendorGroups[vendor] = boards
-		}
-	}
-	return vendorGroups
+func boardList() []BoardTemplate {
+	start := time.Now()
+	defer fmt.Println(time.Now().Sub(start))
+	var result []BoardTemplate
+	json.Unmarshal(boardTemplatesRaw, &result)
+	return result
 }

@@ -49,37 +49,47 @@ func getInstanceId(substring string) []string {
 // находит все подключённые платы
 func detectBoards() map[string]*BoardToFlash {
 	startTime := time.Now()
-	vendors := vendorList()
-	boardTypes := boardList()
 	boards := make(map[string]*BoardToFlash)
 	presentUSBDevices := getInstanceId("usb")
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
 	}
+	boardTemplates := boardList()
+	fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
 		deviceLen := len(device)
-		for _, vendor := range vendors {
-			for _, boardType := range boardTypes[vendor] {
-				pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendor, boardType.ProductID)
-				pathLen := len(pathPattern)
-				// нашли подходящее устройство
-				fmt.Println(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
-				if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
-					portName := findPortName(&device)
-					if portName == NOT_FOUND {
-						fmt.Println(device)
-						continue
+		for _, boardTemplate := range boardTemplates {
+			for _, vendorID := range boardTemplate.VendorIDs {
+				for _, productID := range boardTemplate.ProductIDs {
+					pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
+					pathLen := len(pathPattern)
+					// нашли подходящее устройство
+					fmt.Println(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
+					if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
+						portName := findPortName(&device)
+						if portName == NOT_FOUND {
+							fmt.Println(device)
+							continue
+						}
+						boardType := BoardType{
+							productID,
+							vendorID,
+							boardTemplate.Name,
+							boardTemplate.Controller,
+							boardTemplate.Programmer,
+							boardTemplate.BootloaderName,
+							"",
+						}
+						detectedBoard := NewBoardToFlash(boardType, portName)
+						serialIndex := strings.LastIndex(device, "\\")
+						possibleSerialID := device[serialIndex+1:]
+						if !strings.Contains(possibleSerialID, "&") {
+							detectedBoard.SerialID = device[serialIndex+1:]
+						}
+						boards[device] = detectedBoard
 					}
-					boardType.VendorID = vendor
-					detectedBoard := NewBoardToFlash(boardType, portName)
-					serialIndex := strings.LastIndex(device, "\\")
-					possibleSerialID := device[serialIndex+1:]
-					if !strings.Contains(possibleSerialID, "&") {
-						detectedBoard.SerialID = device[serialIndex+1:]
-					}
-					boards[device] = detectedBoard
 				}
 			}
 		}
