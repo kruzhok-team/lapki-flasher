@@ -202,7 +202,7 @@ func (m *WebSocketManager) updater() {
 
 func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
 	for connection := range m.connections {
-		connection.sentOutgoingEventMessage(msgType, payload, false)
+		connection.sendOutgoingEventMessage(msgType, payload, false)
 	}
 }
 

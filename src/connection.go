@@ -136,7 +136,7 @@ func (c *WebSocketConnection) StopFlashing() {
 // отправка сообщения клиенту
 // toAll = true, если сообщение нужно отправить всем клиентам
 // startCooldown[0] = true, если нужно запустить cooldown
-func (c *WebSocketConnection) sentOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
+func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
 	if c.isClosedChan() {
 		return
 	}
