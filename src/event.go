@@ -56,10 +56,6 @@ type MaxFileSize struct {
 	Size int `json:"size"`
 }
 
-type AvrdudeMessage struct {
-	Avrmsg string `json:"avrmsg"`
-}
-
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -96,7 +92,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 	}
 	UpdateList(c, nil)
 	if detector.boardsNum() == 0 {
-		c.sentOutgoingEventMessage(EmptyListMsg, nil, false)
+		c.sendOutgoingEventMessage(EmptyListMsg, nil, false)
 	}
 	return nil
 }
@@ -113,7 +109,7 @@ func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnec
 		board.PortName,
 		board.SerialID,
 	}
-	err := c.sentOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
+	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
 	if err != nil {
 		fmt.Println("device() error:", err.Error())
 	}
@@ -122,12 +118,12 @@ func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnec
 
 // сообщение о том, что порт обновлён
 func DeviceUpdatePort(deviceID string, board *BoardToFlash, c *WebSocketConnection) {
-	c.sentOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
+	c.sendOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
 }
 
 // сообщение о том, что устройство удалено
 func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
-	c.sentOutgoingEventMessage(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID), true)
+	c.sendOutgoingEventMessage(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID), true)
 }
 
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
@@ -200,13 +196,13 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
 	c.StopFlashing()
-	c.sentOutgoingEventMessage(FlashDoneMsg, AvrdudeMessage{c.avrMsg}, false)
+	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
 	c.avrMsg = ""
 }
 
 // запрос на следующий блок с бинаными данными файла
 func FlashNextBlock(c *WebSocketConnection) {
-	c.sentOutgoingEventMessage(FlashNextBlockMsg, nil, false)
+	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
 }
 
 func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
@@ -249,5 +245,5 @@ func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
 }
 
 func GetMaxFileSize(event Event, c *WebSocketConnection) error {
-	return c.sentOutgoingEventMessage(MaxFileSizeMsg, MaxFileSize{MAX_FILE_SIZE}, false)
+	return c.sendOutgoingEventMessage(MaxFileSizeMsg, MaxFileSize{MAX_FILE_SIZE}, false)
 }
