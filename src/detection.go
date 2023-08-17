@@ -3,9 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
 	"sync"
-	"time"
 )
 
 const NOT_FOUND = ""
@@ -204,8 +202,6 @@ func (board *BoardToFlash) setPort(newPortName string) {
 var boardTemplatesRaw []byte
 
 func boardList() []BoardTemplate {
-	start := time.Now()
-	defer fmt.Println(time.Now().Sub(start))
 	var result []BoardTemplate
 	json.Unmarshal(boardTemplatesRaw, &result)
 	return result
