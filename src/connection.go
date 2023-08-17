@@ -52,9 +52,7 @@ func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int
 func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
 	for c.getNumQueries() > c.getMaxQueries() {
 	}
-	//log.Println("FUNC IN", c.getNumQueries())
 	go func() {
-		//log.Println("GOROUTINE IN")
 		// откладываем таймер, так как обновление все равно произойдёт для всех
 		if event.Type == GetListMsg {
 			m.updateTicker.Stop()
@@ -69,9 +67,7 @@ func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
 			errorHandler(ErrEventNotSupported, c)
 		}
 		c.decNumQueries()
-		//log.Println("GOROUTINE OUT")
 	}()
-	//log.Println("FUNC OUT", c.getNumQueries())
 }
 
 func (c *WebSocketConnection) getNumQueries() int {
