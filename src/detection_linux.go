@@ -24,7 +24,7 @@ func detectBoards() map[string]*BoardToFlash {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
-	boardTemplates := boardList()
+	boardTemplates := detector.boardList()
 	boards := make(map[string]*BoardToFlash)
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {

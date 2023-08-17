@@ -63,13 +63,18 @@ type DetectedBoard struct {
 
 type Detector struct {
 	// список доступных для прошивки устройств
-	boards map[string]*BoardToFlash
-	mu     sync.Mutex
+	boards         map[string]*BoardToFlash
+	boardTemplates []BoardTemplate
+	mu             sync.Mutex
 }
+
+//go:embed device_list.JSON
+var boardTemplatesRaw []byte
 
 func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
+	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
 	return &d
 }
 
@@ -198,11 +203,6 @@ func (board *BoardToFlash) setPort(newPortName string) {
 	board.PortName = newPortName
 }
 
-//go:embed device_list.JSON
-var boardTemplatesRaw []byte
-
-func boardList() []BoardTemplate {
-	var result []BoardTemplate
-	json.Unmarshal(boardTemplatesRaw, &result)
-	return result
+func (d *Detector) boardList() []BoardTemplate {
+	return d.boardTemplates
 }

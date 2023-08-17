@@ -55,7 +55,7 @@ func detectBoards() map[string]*BoardToFlash {
 	if presentUSBDevices == nil {
 		return nil
 	}
-	boardTemplates := boardList()
+	boardTemplates := detector.boardList()
 	fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
