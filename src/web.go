@@ -143,17 +143,6 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 			}
 		}
 		c.addQuerry(m, event)
-		/*select {
-		case c.readEvent <- event:
-		default:
-			log.Println("read channel is full!")
-			if msgType == websocket.BinaryMessage {
-				c.sentOutgoingEventMessage(ErrWaitingBinaryMessagesLimit.Error(), nil, false)
-			} else {
-				c.sentOutgoingEventMessage(ErrWaitingMessagesLimit.Error(), payload, false)
-			}
-			continue
-		}*/
 	}
 }
 
