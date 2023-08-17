@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -26,17 +25,4 @@ func getAbolutePath(path string) string {
 		return ""
 	}
 	return abspath
-}
-
-// выполнение консольной команды с обработкой ошибок и возвращением stdout
-func execString(name string, arg ...string) string {
-	//fmt.Println(name, arg)
-	cmd := exec.Command(name, arg...)
-	stdout, err := cmd.CombinedOutput()
-	if err != nil {
-		//fmt.Println(fmt.Sprint(err) + ": " + string(stdout))
-		fmt.Println("CMD ERROR")
-		return string(stdout)
-	}
-	return string(stdout)
 }
