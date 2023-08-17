@@ -4,12 +4,15 @@ import (
 	_ "embed"
 	"log"
 	"net/http"
+	"os"
 )
 
 //go:embed index.html
 var staticPage []byte
 
-const webPort = ":8080"
+var webPort string
+
+const DEFAULT_PORT = ":8080"
 
 var detector *Detector
 
@@ -22,6 +25,11 @@ func main() {
 
 	manager := NewWebSocketManager()
 
+	if len(os.Args) > 1 {
+		webPort = os.Args[1]
+	} else {
+		webPort = DEFAULT_PORT
+	}
 	http.HandleFunc("/", showJS)
 	http.HandleFunc("/flasher", manager.serveWS)
 
