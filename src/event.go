@@ -52,7 +52,7 @@ type DeviceUpdatePortMessage struct {
 	PortName string `json:"portName"`
 }
 
-type MaxFileSize struct {
+type MaxFileSizeMessage struct {
 	Size int `json:"size"`
 }
 
@@ -140,7 +140,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if msg.FileSize < 1 {
 		return nil
 	}
-	if msg.FileSize > MAX_FILE_SIZE {
+	if msg.FileSize > maxFileSize {
 		return ErrFlashLargeFile
 	}
 	board, exists := detector.GetBoard(msg.ID)
@@ -245,5 +245,5 @@ func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
 }
 
 func GetMaxFileSize(event Event, c *WebSocketConnection) error {
-	return c.sendOutgoingEventMessage(MaxFileSizeMsg, MaxFileSize{MAX_FILE_SIZE}, false)
+	return c.sendOutgoingEventMessage(MaxFileSizeMsg, MaxFileSizeMessage{maxFileSize}, false)
 }

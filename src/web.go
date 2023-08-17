@@ -5,30 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/tjgq/ticker"
 )
-
-// максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
-const MAX_MSG_SIZE = 1024
-
-// максимальный размер файла, загружаемого на сервер (в байтах)
-const MAX_FILE_SIZE = 2 * 1024 * 1024
-
-// максимальное количество потоков на одного клиента
-const MAX_QUERIES = 3
-
-/*
-минимальное время, через которое клиент может снова запросить список устройств;
-
-игнорируется, если количество клиентов меньше чем 2
-*/
-const GET_LIST_COOLDOWN_DURATION = 5 * time.Second
-
-// количество времени между автоматическими обновлениями
-const UPDATE_LIST_TIME = 30 * time.Second
 
 var (
 	websocketUpgrader = websocket.Upgrader{
@@ -57,7 +37,7 @@ func NewWebSocketManager() *WebSocketManager {
 	m.connections = make(ConnectionList)
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
-	m.updateTicker = *ticker.New(UPDATE_LIST_TIME)
+	m.updateTicker = *ticker.New(updateListTime)
 	m.updateTicker.Start()
 	go m.updater()
 	return &m
@@ -84,7 +64,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn, newCooldown(GET_LIST_COOLDOWN_DURATION, m), MAX_QUERIES)
+	c := NewWebSocket(conn, newCooldown(getListCooldownDuration, m), maxThreadsPerClient)
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
@@ -117,7 +97,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 		m.removeClient(c)
 	}()
 
-	c.wsc.SetReadLimit(MAX_MSG_SIZE)
+	c.wsc.SetReadLimit(int64(maxMsgSize))
 	for {
 		if c.isClosedChan() {
 			return
