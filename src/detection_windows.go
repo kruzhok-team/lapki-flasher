@@ -5,25 +5,25 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
-	"time"
 
 	"golang.org/x/sys/windows/registry"
 )
 
 // возвращает пути к устройствам, согласно заданному шаблону, если они есть, иначе возвращает nil
 func getInstanceId(substring string) []string {
-	start := time.Now()
+	//start := time.Now()
 	keyPath := "SYSTEM\\CurrentControlSet\\Services\\usbser\\Enum"
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	defer key.Close()
 	if err != nil {
-		fmt.Println("Can't find devices, perhaps drivers are needed?", err)
+		log.Println("Can't find devices, perhaps drivers are needed?", err)
 		return nil
 	}
 	registryValues, err := key.ReadValueNames(0)
 	if err != nil {
-		fmt.Println("Error on getting registry value names:", err.Error())
+		log.Println("Error on getting registry value names:", err.Error())
 		return nil
 	}
 	var possiblePathes []string
@@ -34,21 +34,20 @@ func getInstanceId(substring string) []string {
 			if err == registry.ErrUnexpectedType {
 				continue
 			}
-			fmt.Println("Error on getting registry values:", err.Error())
+			log.Println("Error on getting registry values:", err.Error())
 			continue
 		}
 		if strings.Contains(strings.ToLower(value), substring) {
 			possiblePathes = append(possiblePathes, value)
 		}
-		fmt.Println(value)
 	}
-	fmt.Println("get instance:", time.Now().Sub(start))
+	//log.Println("get instance:", time.Now().Sub(start))
 	return possiblePathes
 }
 
 // находит все подключённые платы
 func detectBoards() map[string]*BoardToFlash {
-	startTime := time.Now()
+	//startTime := time.Now()
 	boards := make(map[string]*BoardToFlash)
 	presentUSBDevices := getInstanceId("usb")
 	// нет usb-устройств
@@ -56,7 +55,7 @@ func detectBoards() map[string]*BoardToFlash {
 		return nil
 	}
 	boardTemplates := detector.boardList()
-	fmt.Println(boardTemplates)
+	//fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
 		deviceLen := len(device)
@@ -66,7 +65,7 @@ func detectBoards() map[string]*BoardToFlash {
 					pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
 					pathLen := len(pathPattern)
 					// нашли подходящее устройство
-					fmt.Println(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
+					//log.Println(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
 					if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
 						portName := findPortName(&device)
 						if portName == NOT_FOUND {
@@ -89,34 +88,34 @@ func detectBoards() map[string]*BoardToFlash {
 							detectedBoard.SerialID = device[serialIndex+1:]
 						}
 						boards[device] = detectedBoard
+						log.Println("Device was found:", detectedBoard)
 					}
 				}
 			}
 		}
 	}
-	endTime := time.Now()
-	fmt.Println("Detection time: ", endTime.Sub(startTime))
+	//endTime := time.Now()
+	//log.Println("Detection time: ", endTime.Sub(startTime))
 	return boards
 }
 
 // возвращает имя порта, либо константу NOT_FOUND, если не удалось его не удалось найти
 func findPortName(instanceId *string) string {
 	keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", *instanceId)
-	fmt.Println(keyPath)
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	defer key.Close()
 	if err != nil {
-		fmt.Println("Registry error:", err)
+		log.Println("Registry error:", err)
 		return NOT_FOUND
 	}
 	portName, _, err := key.GetStringValue("PortName")
 	//fmt.Println("PORT NAME", portName)
 	if err == registry.ErrNotExist {
-		fmt.Println("Port name doesn't exists")
+		log.Println("Port name doesn't exists")
 		return NOT_FOUND
 	}
 	if err != nil {
-		fmt.Println("Error on getting port name:", err.Error())
+		log.Println("Error on getting port name:", err.Error())
 		return NOT_FOUND
 	}
 	return portName
@@ -132,7 +131,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		return true
 	}
 	if len(instanceId) > 1 {
-		fmt.Printf("updatePortName: found more than one devices that are matched ID = %s\n", ID)
+		log.Printf("updatePortName: found more than one devices that are matched ID = %s\n", ID)
 		return false
 	}
 	portName := findPortName(&ID)
