@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -53,7 +52,7 @@ func setArgs() {
 
 func main() {
 	setArgs()
-	fmt.Printf("Модуль загрузчика запущен со следующими параметрами:\n порт: %s\n максимальный размер файла: %d\n максимальный размер сообщения: %d\n максимальное количество потоков (горутин) для обработки запросов на одного клиента: %d\n перерыв для запроса списка устройств: %v\n промежуток времени между автоматическими обновлениями: %v\n", webPort, maxFileSize, maxMsgSize, maxThreadsPerClient, getListCooldownDuration, updateListTime)
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n порт: %s\n максимальный размер файла: %d\n максимальный размер сообщения: %d\n максимальное количество потоков (горутин) для обработки запросов на одного клиента: %d\n перерыв для запроса списка устройств: %v\n промежуток времени между автоматическими обновлениями: %v\n", webPort, maxFileSize, maxMsgSize, maxThreadsPerClient, getListCooldownDuration, updateListTime)
 
 	detector = NewDetector()
 	manager := NewWebSocketManager()
