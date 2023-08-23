@@ -1,0 +1,249 @@
+// обработка и отправка сообщений
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+)
+
+// обработчик события
+type EventHandler func(event Event, c *WebSocketConnection) error
+
+// Общий вид для всех сообщений, как от клиента так и от сервера
+// (исключение: бинарные данные от клиента, но все равно они приводятся сервером к этой структуре)
+type Event struct {
+	// Тип сообщения (flash-start, get-list и т.д.)
+	Type string `json:"type"`
+	// Параметры сообщения, не все сообщения обязаны иметь параметры
+	Payload json.RawMessage `json:"payload"`
+}
+
+type DeviceMessage struct {
+	ID         string `json:"deviceID"`
+	Name       string `json:"name,omitempty"`
+	Controller string `json:"controller,omitempty"`
+	Programmer string `json:"programmer,omitempty"`
+	PortName   string `json:"portName,omitempty"`
+	SerialID   string `json:"serialID,omitempty"`
+}
+
+type FlashStartMessage struct {
+	ID       string `json:"deviceID"`
+	FileSize int    `json:"fileSize"`
+}
+
+type FlashBlockMessage struct {
+	BlockID int    `json:"blockID"`
+	Data    []byte `json:"data"`
+}
+
+type FlashBlockMessageString struct {
+	BlockID int    `json:"blockID"`
+	Data    string `json:"data"`
+}
+
+type DeviceUpdateDeleteMessage struct {
+	ID string `json:"deviceID"`
+}
+
+type DeviceUpdatePortMessage struct {
+	ID       string `json:"deviceID"`
+	PortName string `json:"portName"`
+}
+
+type MaxFileSizeMessage struct {
+	Size int `json:"size"`
+}
+
+// типы сообщений (событий)
+const (
+	// запрос на получение списка всех устройств
+	GetListMsg = "get-list"
+	// описание устройства
+	DeviceMsg = "device"
+	// запрос на прошивку устройства
+	FlashStartMsg = "flash-start"
+	// прошивка прошла успешна
+	FlashDoneMsg = "flash-done"
+	// клиент может начать передачу блоков
+	FlashNextBlockMsg = "flash-next-block"
+	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
+	FlashBinaryBlockMsg = "flash-block"
+	// устройство удалено из списка
+	DeviceUpdateDeleteMsg = "device-update-delete"
+	// устройство поменяло порт
+	DeviceUpdatePortMsg = "device-update-port"
+	// запрос на следующий блок бинарных данных
+	flashNextBlockMsg = "flash-next-block"
+	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
+	binaryBloMsg      = "binaryMsg"
+	GetMaxFileSizeMsg = "get-max-file-size"
+	MaxFileSizeMsg    = "max-file-size"
+	// устройства не найдены
+	EmptyListMsg = "empty-list"
+)
+
+// отправить клиенту список всех устройств
+func GetList(event Event, c *WebSocketConnection) error {
+	fmt.Println("get-list")
+	if c.getListCooldown.isBlocked() {
+		return ErrGetListCoolDown
+	}
+	UpdateList(c, nil)
+	if detector.boardsNum() == 0 {
+		c.sendOutgoingEventMessage(EmptyListMsg, nil, false)
+	}
+	return nil
+}
+
+// отправить клиенту описание устройства
+// lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
+func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnection) error {
+	fmt.Println("device")
+	boardMessage := DeviceMessage{
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.SerialID,
+	}
+	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
+	if err != nil {
+		fmt.Println("device() error:", err.Error())
+	}
+	return err
+}
+
+// сообщение о том, что порт обновлён
+func DeviceUpdatePort(deviceID string, board *BoardToFlash, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
+}
+
+// сообщение о том, что устройство удалено
+func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID), true)
+}
+
+// подготовка к чтению файла с прошивкой и к его загрузке на устройство
+func FlashStart(event Event, c *WebSocketConnection) error {
+	log.Println("Flash-start")
+	if c.IsFlashing() {
+		return ErrFlashNotFinished
+	}
+	var msg FlashStartMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	if msg.FileSize < 1 {
+		return nil
+	}
+	if msg.FileSize > maxFileSize {
+		return ErrFlashLargeFile
+	}
+	board, exists := detector.GetBoard(msg.ID)
+	if !exists {
+		log.Println("test")
+		return ErrFlashWrongID
+	}
+	updated := board.updatePortName(msg.ID)
+	if updated {
+		if board.IsConnected() {
+			DeviceUpdatePort(msg.ID, board, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			return ErrFlashDisconnected
+		}
+	}
+	if board.IsFlashBlocked() {
+		return ErrFlashBlocked
+	}
+	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
+	c.StartFlashing(board, msg.FileSize)
+	FlashNextBlock(c)
+	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
+	c.StartFlashing(board, msg.FileSize)
+	return nil
+}
+
+// принятие блока с бинарными данными файла
+func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
+	if !c.IsFlashing() {
+		return ErrFlashNotStarted
+	}
+
+	fileCreated, err := c.FileWriter.AddBlock(event.Payload)
+	if err != nil {
+		return err
+	}
+	if fileCreated {
+		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		c.avrMsg = avrMsg
+		if err != nil {
+			c.StopFlashing()
+			return ErrAvrdude
+		}
+		FlashDone(c)
+	} else {
+		FlashNextBlock(c)
+	}
+	return nil
+}
+
+// отправить сообщение о том, что прошивка прошла успешна
+func FlashDone(c *WebSocketConnection) {
+	c.StopFlashing()
+	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
+	c.avrMsg = ""
+}
+
+// запрос на следующий блок с бинаными данными файла
+func FlashNextBlock(c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
+}
+
+func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+	boardMessage := DeviceMessage{
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.SerialID,
+	}
+	return &boardMessage
+}
+
+func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+	boardMessage := DeviceMessage{
+		deviceID,
+		board.Type.Name,
+		board.Type.Controller,
+		board.Type.Programmer,
+		board.PortName,
+		board.SerialID,
+	}
+	return &boardMessage
+}
+
+func newDeviceUpdatePortMessage(board *BoardToFlash, deviceID string) *DeviceUpdatePortMessage {
+	boardMessage := DeviceUpdatePortMessage{
+		deviceID,
+		board.PortName,
+	}
+	return &boardMessage
+}
+
+func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
+	boardMessage := DeviceUpdateDeleteMessage{
+		deviceID,
+	}
+	return &boardMessage
+}
+
+func GetMaxFileSize(event Event, c *WebSocketConnection) error {
+	return c.sendOutgoingEventMessage(MaxFileSizeMsg, MaxFileSizeMessage{maxFileSize}, false)
+}

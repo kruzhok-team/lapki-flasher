@@ -2,58 +2,63 @@ package main
 
 import (
 	_ "embed"
-	"fmt"
+	"flag"
 	"log"
 	"net/http"
 	"time"
 )
 
-const webPort = ":8080"
+//go:embed index.html
+var staticPage []byte
 
-func setupRoutes() {
-	//http.HandleFunc("/", showJS)
-	//http.HandleFunc("/upload", uploadHandler)
-	log.Fatal(http.ListenAndServe(webPort, nil))
+var webAddress string
+
+// максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
+var maxMsgSize int
+
+// максимальный размер файла, загружаемого на сервер (в байтах)
+var maxFileSize int
+
+// максимальное количество потоков (горутин) на обработку запросов на одного клиента
+var maxThreadsPerClient int
+
+/*
+минимальное время, через которое клиент может снова запросить список устройств;
+
+игнорируется, если количество клиентов меньше чем 2
+*/
+var getListCooldownDuration time.Duration
+
+// количество времени между автоматическими обновлениями
+var updateListTime time.Duration
+
+var detector *Detector
+
+func showJS(w http.ResponseWriter, r *http.Request) {
+	w.Write(staticPage)
+}
+
+func setArgs() {
+	flag.StringVar(&webAddress, "address", "localhost:8080", "адресс для подключения")
+	flag.IntVar(&maxMsgSize, "msgSize", 1024, "максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)")
+	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
+	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
+	getListCooldownSeconds := flag.Int("listCooldown", 2, "минимальное время (в секундах), через которое клиент может снова запросить список устройств, игнорируется, если количество клиентов меньше чем 2")
+	updateListTimeSeconds := flag.Int("updateList", 15, "количество секунд между автоматическими обновлениями")
+	flag.Parse()
+	getListCooldownDuration = time.Second * time.Duration(*getListCooldownSeconds)
+	updateListTime = time.Second * time.Duration(*updateListTimeSeconds)
 }
 
 func main() {
-	/*vendorGroups := boardList()
-	for i, v := range vendorGroups {
-		fmt.Printf("i: %s v: %v\n", i, v)
-	}
-	fmt.Println()
-	boards = DetectBoards()
-	for _, board := range boards {
-		fmt.Printf("board: %v %t\n", board, board.Type.hasBootloader())
-	}*/
-	//setupRoutes()
-	d := New()
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	fmt.Println("PAUSE")
-	time.Sleep(8 * time.Second)
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.DeleteUnused()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	fmt.Println("PAUSE")
-	time.Sleep(8 * time.Second)
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
-	d.Update()
-	for i, v := range d.boards {
-		fmt.Println(i, v, d.IsNew(i), v.IsConnected())
-	}
+	setArgs()
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n адрес: %s\n максимальный размер файла: %d\n максимальный размер сообщения: %d\n максимальное количество потоков (горутин) для обработки запросов на одного клиента: %d\n перерыв для запроса списка устройств: %v\n промежуток времени между автоматическими обновлениями: %v\n", webAddress, maxFileSize, maxMsgSize, maxThreadsPerClient, getListCooldownDuration, updateListTime)
+
+	detector = NewDetector()
+	manager := NewWebSocketManager()
+
+	http.HandleFunc("/", showJS)
+	http.HandleFunc("/flasher", manager.serveWS)
+
+	log.Fatal(http.ListenAndServe(webAddress, nil))
 }
