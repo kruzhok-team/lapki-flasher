@@ -61,7 +61,7 @@ Boards: <output id="boards"></output>
             document.getElementById('uploadButton').style.display = 'none';
             document.getElementById('cancelButton').style.display = 'block';
             // Open and configure websocket connection.
-            ws = new WebSocket("ws://localhost:8080/upload", 'echo-protocol');
+            ws = new WebSocket("ws://localhost:8080/upload");
 			//alert ("new WebSocket")
             ws.binaryType = 'arraybuffer';
             // Send filename and size to the server when the connection is opened.
@@ -122,7 +122,7 @@ Boards: <output id="boards"></output>
         document.getElementById('boards').innerHTML = '';
         const boardsArr = []
         // Open and configure websocket connection.
-        ws = new WebSocket("ws://localhost:8080/list", 'echo-protocol');
+        ws = new WebSocket("ws://localhost:8080/list");
         //alert ("new WebSocket")
         ws.binaryType = 'arraybuffer';
         // Process message sent from server.
