@@ -18,12 +18,12 @@ func getInstanceId(substring string) []string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	defer key.Close()
 	if err != nil {
-		log.Println("Can't find devices, perhaps drivers are needed?", err)
+		printLog("No devices are connected or drivers are not installed", err)
 		return nil
 	}
 	registryValues, err := key.ReadValueNames(0)
 	if err != nil {
-		log.Println("Error on getting registry value names:", err.Error())
+		printLog("Error on getting registry value names:", err.Error())
 		return nil
 	}
 	var possiblePathes []string
@@ -34,14 +34,14 @@ func getInstanceId(substring string) []string {
 			if err == registry.ErrUnexpectedType {
 				continue
 			}
-			log.Println("Error on getting registry values:", err.Error())
+			printLog("Error on getting registry values:", err.Error())
 			continue
 		}
 		if strings.Contains(strings.ToLower(value), substring) {
 			possiblePathes = append(possiblePathes, value)
 		}
 	}
-	//log.Println("get instance:", time.Now().Sub(start))
+	//printLog("get instance:", time.Now().Sub(start))
 	return possiblePathes
 }
 
@@ -65,11 +65,11 @@ func detectBoards() map[string]*BoardToFlash {
 					pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
 					pathLen := len(pathPattern)
 					// нашли подходящее устройство
-					//log.Println(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
+					//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
 					if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
 						portName := findPortName(&device)
 						if portName == NOT_FOUND {
-							fmt.Println(device)
+							printLog(device)
 							continue
 						}
 						boardType := BoardType{
@@ -88,14 +88,14 @@ func detectBoards() map[string]*BoardToFlash {
 							detectedBoard.SerialID = device[serialIndex+1:]
 						}
 						boards[device] = detectedBoard
-						log.Println("Device was found:", detectedBoard)
+						printLog("Device was found:", detectedBoard)
 					}
 				}
 			}
 		}
 	}
 	//endTime := time.Now()
-	//log.Println("Detection time: ", endTime.Sub(startTime))
+	//printLog("Detection time: ", endTime.Sub(startTime))
 	return boards
 }
 
@@ -105,17 +105,17 @@ func findPortName(instanceId *string) string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
 	defer key.Close()
 	if err != nil {
-		log.Println("Registry error:", err)
+		printLog("Registry error:", err)
 		return NOT_FOUND
 	}
 	portName, _, err := key.GetStringValue("PortName")
 	//fmt.Println("PORT NAME", portName)
 	if err == registry.ErrNotExist {
-		log.Println("Port name doesn't exists")
+		printLog("Port name doesn't exists")
 		return NOT_FOUND
 	}
 	if err != nil {
-		log.Println("Error on getting port name:", err.Error())
+		printLog("Error on getting port name:", err.Error())
 		return NOT_FOUND
 	}
 	return portName

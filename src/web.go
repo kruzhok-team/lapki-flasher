@@ -57,7 +57,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 
 // обработка нового соединения
 func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
-	log.Println("New connection")
+	printLog("New connection")
 	conn, err := websocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -82,7 +82,7 @@ func (m *WebSocketManager) addClient(c *WebSocketConnection) {
 // удаление клиента
 // если устройство не прошилось, то оно продолжит прошиваться и затем разблокируется
 func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
-	log.Println("remove client")
+	printLog("remove client")
 	if _, ok := m.connections[c]; ok {
 		c.wsc.Close()
 		c.closeChan()
@@ -103,7 +103,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 		}
 		msgType, payload, err := c.wsc.ReadMessage()
 		if err != nil {
-			log.Println("reader: removed")
+			printLog("reader: removed")
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error reading message: %v", err)
 			}
@@ -128,7 +128,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 // обработчик исходящих сообщений
 func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 	defer func() {
-		log.Println("writer: removed")
+		printLog("writer: removed")
 		m.removeClient(c)
 	}()
 	for {
@@ -150,7 +150,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 		}
 		// отправить одному клиенту
 		err := c.wsc.WriteJSON(outgoing.event)
-		log.Println("writer", outgoing.event.Type)
+		printLog("writer", outgoing.event.Type)
 		if err != nil {
 			log.Println("Writing JSON error:", err.Error())
 			return
@@ -161,7 +161,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 func (m *WebSocketManager) updater() {
 	for {
 		<-m.updateTicker.C
-		log.Println("update")
+		printLog("update")
 		if len(m.connections) > 0 {
 			UpdateList(nil, m)
 		}

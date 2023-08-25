@@ -3,7 +3,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 )
 
@@ -86,7 +85,7 @@ const (
 
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
-	fmt.Println("get-list")
+	printLog("get-list")
 	if c.getListCooldown.isBlocked() {
 		return ErrGetListCoolDown
 	}
@@ -100,7 +99,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnection) error {
-	fmt.Println("device")
+	//printLog("device")
 	boardMessage := DeviceMessage{
 		deviceID,
 		board.Type.Name,
@@ -111,7 +110,7 @@ func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnec
 	}
 	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
 	if err != nil {
-		fmt.Println("device() error:", err.Error())
+		printLog("device() error:", err.Error())
 	}
 	return err
 }
@@ -145,7 +144,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	board, exists := detector.GetBoard(msg.ID)
 	if !exists {
-		log.Println("test")
 		return ErrFlashWrongID
 	}
 	updated := board.updatePortName(msg.ID)

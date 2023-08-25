@@ -3,7 +3,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -138,7 +137,7 @@ func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload a
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
-		log.Println("Marshal JSON error:", err.Error())
+		printLog("Marshal JSON error:", err.Error())
 		return
 	}
 	event := Event{

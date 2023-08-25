@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -21,7 +21,7 @@ func exists(path string) (bool, error) {
 func getAbolutePath(path string) string {
 	abspath, err := filepath.Abs(path)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		return ""
 	}
 	return abspath
