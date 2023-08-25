@@ -43,7 +43,7 @@ func detectBoards() map[string]*BoardToFlash {
 							}
 							properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
 							if err != nil {
-								fmt.Println("can't find ID", err.Error())
+								log.Println("can't find ID", err.Error())
 								continue
 							}
 							detectedBoard.SerialID = properties[1]
@@ -85,7 +85,7 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	for _, conf := range desc.Configs {
 		for _, inter := range conf.Interfaces {
 			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
-			fmt.Println("DIR", dir)
+			log.Println("DIR", dir)
 			existance, _ := exists(dir)
 			if existance {
 				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
@@ -111,7 +111,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 	} else {
 		properties, err = findProperty(board.getPort(), ID_SERIAL)
 	}
-	fmt.Println(board.Type.ProductID, board.Type.ProductID)
+	log.Println(board.Type.ProductID, board.Type.ProductID)
 	if err == nil && properties[0] == ID {
 		return false
 	}
@@ -125,7 +125,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		if desc.Product.String() == board.Type.ProductID && desc.Vendor.String() == board.Type.VendorID {
 			portName := findPortName(desc)
 			properties, _ = findProperty(portName, ID_SERIAL)
-			fmt.Println("prop", properties)
+			log.Println("prop", properties)
 			if properties[0] == board.SerialID {
 				newPortName = portName
 				return false
@@ -149,7 +149,7 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 	cmd := exec.Command("udevadm", "info", "--query=property", "--name="+portName)
 	stdout, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(string(stdout), err.Error())
+		log.Println(string(stdout), err.Error())
 		return nil, err
 	}
 	lines := strings.Split(string(stdout), "\n")
