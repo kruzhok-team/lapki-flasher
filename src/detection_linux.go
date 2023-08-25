@@ -98,7 +98,7 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	// в каком порядке идут порты? Надо проверить
 	ports := strconv.Itoa(desc.Path[0])
 	num_ports := len(desc.Path)
-	for i := 1; i < num_ports; i++ {
+	for i := num_ports - 1; i >= 1; i-- {
 		ports += "." + strconv.Itoa(desc.Path[i])
 	}
 
