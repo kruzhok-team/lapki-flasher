@@ -8,7 +8,7 @@ buildGoModule rec {
 
   src = ../flasher/src;
   
-  vendorSha256 = "sha256-LCZ3iV8cAzlCGvqFxWmYKD47tyg12RTCGUOwX89K2EU="; 
+  vendorSha256 = "sha256-sWCi7ZfBAH8xYZukxyFFa08MBb+xWG5r1nmP7IZuBGE="; 
 
   nativeBuildInputs = [ pkg-config makeWrapper ];
   propagatedBuildInputs = [ libusb1 avrdude ];
