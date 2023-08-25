@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"strings"
 )
 
 // обработчик события
@@ -65,7 +66,7 @@ const (
 	FlashStartMsg = "flash-start"
 	// прошивка прошла успешна
 	FlashDoneMsg = "flash-done"
-	// клиент может начать передачу блоков
+	// запрос на следующий блок бинарных данных
 	FlashNextBlockMsg = "flash-next-block"
 	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
 	FlashBinaryBlockMsg = "flash-block"
@@ -73,8 +74,6 @@ const (
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
 	DeviceUpdatePortMsg = "device-update-port"
-	// запрос на следующий блок бинарных данных
-	flashNextBlockMsg = "flash-next-block"
 	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
 	binaryBloMsg      = "binaryMsg"
 	GetMaxFileSizeMsg = "get-max-file-size"
@@ -158,6 +157,13 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
+	}
+	boardToFlashName := strings.ToLower(board.Type.Name)
+	for _, boardName := range notSupportedBoards {
+		if boardToFlashName == strings.ToLower(boardName) {
+			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
+			return nil
+		}
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.StartFlashing(board, msg.FileSize)

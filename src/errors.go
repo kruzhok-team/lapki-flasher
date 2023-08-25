@@ -33,6 +33,8 @@ var (
 	ErrWaitingMessagesLimit = errors.New("waiting-message-limit")
 	// аналогично ErrWaitingMessagesLimit, но для бинарных данных, не возвращает данные обратно клиенту
 	ErrWaitingBinaryMessagesLimit = errors.New("waiting-binary-message-limit")
+	// плата ${name} не поддерживается для прошивки
+	ErrNotSupported = errors.New("flash-not-supported")
 )
 
 func errorHandler(err error, c *WebSocketConnection) {

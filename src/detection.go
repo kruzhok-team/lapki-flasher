@@ -8,6 +8,8 @@ import (
 
 const NOT_FOUND = ""
 
+var notSupportedBoards = [1]string{"Arduino Micro"}
+
 type BoardType struct {
 	ProductID      string
 	VendorID       string
