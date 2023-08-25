@@ -5,11 +5,13 @@ package main
 
 import (
 	"fmt"
-	"log"
+	stdlog "log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/google/gousb"
 )
@@ -17,6 +19,28 @@ import (
 const DEV = "/dev"
 const ID_SERIAL = "ID_SERIAL_SHORT"
 const USEC_INITIALIZED = "USEC_INITIALIZED"
+
+// настройка для выбранной ОС
+func setupOS() {
+	stdlog.SetOutput(new(LogrusWriter))
+
+}
+
+// удаление сообщения "interrupted [code -10]" из консоли
+
+type LogrusWriter int
+
+const interruptedError = "interrupted [code -10]"
+
+func (LogrusWriter) Write(data []byte) (int, error) {
+	logmessage := string(data)
+	if strings.Contains(logmessage, interruptedError) {
+		log.Tracef("gousb_logs:%s", logmessage)
+		return len(data), nil
+	}
+	log.Infof("gousb_logs:%s", logmessage)
+	return len(data), nil
+}
 
 func detectBoards() map[string]*BoardToFlash {
 	// start := time.Now()

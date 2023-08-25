@@ -11,6 +11,11 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// настройка ОС (для Windows она не требуется, поэтому функция пустая)
+func setupOS() {
+
+}
+
 // возвращает пути к устройствам, согласно заданному шаблону, если они есть, иначе возвращает nil
 func getInstanceId(substring string) []string {
 	//start := time.Now()

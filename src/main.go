@@ -61,6 +61,7 @@ func printLog(v ...any) {
 }
 
 func main() {
+	setupOS()
 	setArgs()
 	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n адрес: %s\n максимальный размер файла: %d\n максимальный размер сообщения: %d\n максимальное количество потоков (горутин) для обработки запросов на одного клиента: %d\n перерыв для запроса списка устройств: %v\n промежуток времени между автоматическими обновлениями: %v\n вывод подробной информации в консоль: %v", webAddress, maxFileSize, maxMsgSize, maxThreadsPerClient, getListCooldownDuration, updateListTime, verbose)
 
