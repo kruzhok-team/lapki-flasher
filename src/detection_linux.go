@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -61,7 +62,8 @@ func detectBoards() map[string]*BoardToFlash {
 		return false
 	})
 	if err != nil {
-		log.Fatalf("OpenDevices(): %v", err)
+		log.Printf("OpenDevices(): %v\n", err)
+		return nil
 	}
 	return boards
 }
