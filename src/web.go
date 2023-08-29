@@ -162,7 +162,7 @@ func (m *WebSocketManager) updater() {
 	for {
 		<-m.updateTicker.C
 		printLog("update")
-		if len(m.connections) > 0 {
+		if m.hasMultipleConnections() {
 			UpdateList(nil, m)
 		}
 	}
