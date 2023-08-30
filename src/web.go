@@ -18,15 +18,12 @@ var (
 	}
 )
 
-// список соединений с клиентами
-type ConnectionList map[*WebSocketConnection]bool
-
 // Менеджер используется для контроля и хранения соединений с клиентами
 type WebSocketManager struct {
 	// обработчики сообщений (событий)
 	handlers map[string]EventHandler
 	// список соединений
-	connections ConnectionList
+	connections *syncLenMap
 	// отпраляет сигнал, когда нужно обновить устройства для всех
 	updateTicker ticker.Ticker
 }
@@ -34,7 +31,7 @@ type WebSocketManager struct {
 // Инициализация менеджера
 func NewWebSocketManager() *WebSocketManager {
 	var m WebSocketManager
-	m.connections = make(ConnectionList)
+	m.connections = initSyncLenMap()
 	m.handlers = make(map[string]EventHandler)
 	m.setupEventHandlers()
 	m.updateTicker = *ticker.New(updateListTime)
@@ -44,7 +41,7 @@ func NewWebSocketManager() *WebSocketManager {
 }
 
 func (m *WebSocketManager) hasMultipleConnections() bool {
-	return len(m.connections) > 1
+	return (m.connections.Len() > 1)
 }
 
 // инициализация обработчиков событий
@@ -76,17 +73,16 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 
 // добавление нового клиента
 func (m *WebSocketManager) addClient(c *WebSocketConnection) {
-	m.connections[c] = true
+	m.connections.Add(c, true)
 }
 
 // удаление клиента
 // если устройство не прошилось, то оно продолжит прошиваться и затем разблокируется
 func (m *WebSocketManager) removeClient(c *WebSocketConnection) {
 	printLog("remove client")
-	if _, ok := m.connections[c]; ok {
+	if m.connections.Remove(c) {
 		c.wsc.Close()
 		c.closeChan()
-		delete(m.connections, c)
 	}
 }
 
@@ -139,14 +135,14 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 
 		// некоторые сообщения нужно отправить всем клиентам
 		if outgoing.toAll {
-			for conn := range m.connections {
+			m.connections.Range(func(conn *WebSocketConnection, value bool) {
 				if conn != c {
 					var curOutgoing OutgoingEventMessage
 					curOutgoing.event = outgoing.event
 					curOutgoing.toAll = false
 					conn.outgoingMsg <- curOutgoing
 				}
-			}
+			})
 		}
 		// отправить одному клиенту
 		err := c.wsc.WriteJSON(outgoing.event)
@@ -169,9 +165,9 @@ func (m *WebSocketManager) updater() {
 }
 
 func (m *WebSocketManager) sendMessageToAll(msgType string, payload any) {
-	for connection := range m.connections {
+	m.connections.Range(func(connection *WebSocketConnection, value bool) {
 		connection.sendOutgoingEventMessage(msgType, payload, false)
-	}
+	})
 }
 
 func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
@@ -179,18 +175,18 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 
 	// замораживаем блокировки
 	if sendToAll {
-		for connection := range m.connections {
+		m.connections.Range(func(connection *WebSocketConnection, value bool) {
 			connection.getListCooldown.freeze()
-		}
+		})
 	} else {
 		c.getListCooldown.freeze()
 	}
 	// запускаем временные блокировки
 	defer func() {
 		if sendToAll {
-			for connection := range m.connections {
+			m.connections.Range(func(connection *WebSocketConnection, value bool) {
 				connection.getListCooldown.start()
-			}
+			})
 		} else {
 			c.getListCooldown.start()
 		}
