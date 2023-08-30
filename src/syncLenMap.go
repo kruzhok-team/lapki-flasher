@@ -40,7 +40,7 @@ func (s *syncLenMap) Remove(key *WebSocketConnection) bool {
 	_, exists := s.m[key]
 	if exists {
 		delete(s.m, key)
-		s.count++
+		s.count--
 	}
 	return exists
 }
