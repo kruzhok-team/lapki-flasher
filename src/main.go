@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+//go:embed index.html
+var staticPage []byte
+
 var webAddress string
 
 // максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)
@@ -33,6 +36,10 @@ var updateListTime time.Duration
 var verbose bool
 
 var detector *Detector
+
+func showJS(w http.ResponseWriter, r *http.Request) {
+	w.Write(staticPage)
+}
 
 func setArgs() {
 	flag.StringVar(&webAddress, "address", "localhost:8080", "адресс для подключения")
@@ -60,7 +67,7 @@ func main() {
 
 	detector = NewDetector()
 	manager := NewWebSocketManager()
-
+	http.HandleFunc("/", showJS)
 	http.HandleFunc("/flasher", manager.serveWS)
 
 	log.Fatal(http.ListenAndServe(webAddress, nil))
