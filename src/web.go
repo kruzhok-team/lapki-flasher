@@ -157,7 +157,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 func (m *WebSocketManager) updater() {
 	for {
 		<-m.updateTicker.C
-		if m.connections.Len() > 0 {
+		if alwaysUpdate || m.connections.Len() > 0 {
 			printLog("update")
 			UpdateList(nil, m)
 		}
