@@ -32,6 +32,7 @@ var updateListTime time.Duration
 // выводить в консоль подробную информацию
 var verbose bool
 
+// находит и хранит информацию об устройствах
 var detector *Detector
 
 func setArgs() {
