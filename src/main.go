@@ -73,7 +73,8 @@ func printArgsDesc() {
 	updateListTimeStr := fmt.Sprintf("промежуток времени между автоматическими обновлениями: %v", updateListTime)
 	verboseStr := fmt.Sprintf("вывод подробной информации в консоль: %v", verbose)
 	alwaysUpdateStr := fmt.Sprintf("постоянное обновление списка устройств: %v", alwaysUpdate)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n", webAddressStr, maxFileSizeStr, maxMsgSizeStr, maxThreadsPerClientStr, getListCooldownDurationStr, updateListTimeStr, verboseStr, alwaysUpdateStr)
+	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n", webAddressStr, maxFileSizeStr, maxMsgSizeStr, maxThreadsPerClientStr, getListCooldownDurationStr, updateListTimeStr, verboseStr, alwaysUpdateStr, fakeBoardsNumStr)
 }
 
 func main() {
