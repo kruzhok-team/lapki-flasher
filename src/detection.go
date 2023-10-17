@@ -145,6 +145,7 @@ func (d *Detector) GetIDs() []string {
 	return IDs
 }
 
+// на данный момент эта функция не используется, возможно стоит её насовсем убрать
 func (d *Detector) Update() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
