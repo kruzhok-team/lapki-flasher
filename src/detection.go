@@ -80,8 +80,9 @@ var boardTemplatesRaw []byte
 func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
-	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	// добавление фальшивых плат
 	d.generateFakeBoards()
+	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
 	return &d
 }
 
@@ -149,12 +150,6 @@ func (d *Detector) Update() {
 	defer d.mu.Unlock()
 	if d.boards == nil {
 		d.boards = detectBoards()
-		// добавление фальшивых плат
-		if fakeBoardsNum > 0 {
-			for ID, board := range d.fakeBoards {
-				d.boards[ID] = board
-			}
-		}
 		return
 	}
 
@@ -248,6 +243,10 @@ func (d *Detector) generateFakeBoards() {
 		newFakeBoard := NewBoardToFlash(fakeType, fakePort)
 		newFakeBoard.SerialID = fakeID
 		d.fakeBoards[fakeID] = newFakeBoard
+	}
+
+	for ID, board := range d.fakeBoards {
+		d.boards[ID] = board
 	}
 }
 
