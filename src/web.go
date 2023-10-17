@@ -192,9 +192,18 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 		}
 	}()
 	newBoards := detectBoards()
+	// добавление фальшивых плат к действительно обнаруженным
+	if fakeBoardsNum > 0 {
+		if newBoards == nil {
+			newBoards = make(map[string]*BoardToFlash)
+		}
+		for ID, board := range detector.fakeBoards {
+			newBoards[ID] = board
+		}
+	}
 	// отправляем все устройства клиенту
 	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
-	// отправляем всем клиентам новые устройства
+	// отправляем всем остальным клиентам только новые устройства
 	for deviceID, newBoard := range newBoards {
 		oldBoard, exists := detector.GetBoard(deviceID)
 		if exists {
