@@ -145,14 +145,16 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if !exists {
 		return ErrFlashWrongID
 	}
-	updated := board.updatePortName(msg.ID)
-	if updated {
-		if board.IsConnected() {
-			DeviceUpdatePort(msg.ID, board, c)
-		} else {
-			detector.DeleteBoard(msg.ID)
-			DeviceUpdateDelete(msg.ID, c)
-			return ErrFlashDisconnected
+	if !detector.isFake(msg.ID) {
+		updated := board.updatePortName(msg.ID)
+		if updated {
+			if board.IsConnected() {
+				DeviceUpdatePort(msg.ID, board, c)
+			} else {
+				detector.DeleteBoard(msg.ID)
+				DeviceUpdateDelete(msg.ID, c)
+				return ErrFlashDisconnected
+			}
 		}
 	}
 	if board.IsFlashBlocked() {
@@ -184,7 +186,15 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		avrMsg, err := flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		// сообщение от программы avrdude
+		var avrMsg string
+		// сообщение об ошибке (если есть)
+		var err error
+		if detector.isFake(c.FlashingBoard.SerialID) {
+			avrMsg, err = fakeFlash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		} else {
+			avrMsg, err = flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+		}
 		c.avrMsg = avrMsg
 		if err != nil {
 			c.StopFlashing()
