@@ -149,19 +149,20 @@ func (d *Detector) Update() {
 	defer d.mu.Unlock()
 	if d.boards == nil {
 		d.boards = detectBoards()
+		// добавление фальшивых плат
+		if fakeBoardsNum > 0 {
+			for ID, board := range d.fakeBoards {
+				d.boards[ID] = board
+			}
+		}
 		return
 	}
 
 	for ID, board := range d.boards {
 		// фальшивые платы должны игнорироваться, иначе будет обнаружено, что у них не настоящих портов
-		if fakeBoardsNum > 0 {
-			_, exists := d.fakeBoards[ID]
-			if exists {
-				continue
-			}
+		if !d.isFake(ID) {
+			board.updatePortName(ID)
 		}
-
-		board.updatePortName(ID)
 	}
 	// сравниваем старый список с новым, чтобы найти новые устройства
 	curBoards := detectBoards()
@@ -248,4 +249,15 @@ func (d *Detector) generateFakeBoards() {
 		newFakeBoard.SerialID = fakeID
 		d.fakeBoards[fakeID] = newFakeBoard
 	}
+}
+
+// true = плата с данным ID является фальшивой
+func (d *Detector) isFake(ID string) bool {
+	if fakeBoardsNum > 0 {
+		_, exists := d.fakeBoards[ID]
+		if exists {
+			return true
+		}
+	}
+	return false
 }
