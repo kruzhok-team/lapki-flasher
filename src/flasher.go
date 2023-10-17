@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"time"
 )
 
 const AVRDUDE = "avrdude"
@@ -22,5 +23,12 @@ func flash(board *BoardToFlash, filePath string) (avrdudeMessage string, err err
 	} else {
 		avrdudeMessage = outputString
 	}
+	return
+}
+
+// симуляция процесса прошивки, вместо неё, программа просто ждёт определённо время
+func fakeFlash(board *BoardToFlash, filePath string) (avrdudeMessage string, err error) {
+	time.Sleep(5 * time.Second)
+	avrdudeMessage = "Fake flashing is completed"
 	return
 }
