@@ -3,12 +3,15 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"sync"
 )
 
 const NOT_FOUND = ""
 
 var notSupportedBoards = [1]string{"Arduino Micro"}
+
+var fakeBoards map[string]*BoardToFlash
 
 type BoardType struct {
 	ProductID      string
@@ -77,6 +80,7 @@ func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	generateFakeBoards()
 	return &d
 }
 
@@ -148,6 +152,14 @@ func (d *Detector) Update() {
 	}
 
 	for ID, board := range d.boards {
+		// фальшивые платы должны игнорироваться, иначе будет обнаружено, что у них не настоящих портов
+		if fakeBoardsNum > 0 {
+			_, exists := fakeBoards[ID]
+			if exists {
+				continue
+			}
+		}
+
 		board.updatePortName(ID)
 	}
 	// сравниваем старый список с новым, чтобы найти новые устройства
@@ -207,4 +219,32 @@ func (board *BoardToFlash) setPort(newPortName string) {
 
 func (d *Detector) boardList() []BoardTemplate {
 	return d.boardTemplates
+}
+
+// генерация фальшивых плат, которые будут восприниматься программой как настоящие
+func generateFakeBoards() {
+	fakeBoards = make(map[string]*BoardToFlash)
+
+	// фальшивые параметры для фальшивых плат
+
+	vendorID := "-0000"
+	productID := "-0000"
+	name := "Fake Board"
+	controller := "Fake Controller"
+	programmer := "Fake Programmer"
+	fakeType := BoardType{
+		ProductID:  productID,
+		VendorID:   vendorID,
+		Name:       name,
+		Controller: controller,
+		Programmer: programmer,
+	}
+
+	for i := 0; i < fakeBoardsNum; i++ {
+		fakeID := fmt.Sprintf("fakeid-%d", i)
+		fakePort := fmt.Sprintf("fakecom-%d", i)
+		newFakeBoard := NewBoardToFlash(fakeType, fakePort)
+		newFakeBoard.SerialID = fakeID
+		fakeBoards[fakeID] = newFakeBoard
+	}
 }
