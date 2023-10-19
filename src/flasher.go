@@ -28,7 +28,7 @@ func flash(board *BoardToFlash, filePath string) (avrdudeMessage string, err err
 
 // симуляция процесса прошивки, вместо неё, программа просто ждёт определённо время
 func fakeFlash(board *BoardToFlash, filePath string) (avrdudeMessage string, err error) {
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 	avrdudeMessage = "Fake flashing is completed"
 	return
 }
