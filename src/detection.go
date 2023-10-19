@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"sync"
 )
 
@@ -68,6 +69,9 @@ type Detector struct {
 	boards         map[string]*BoardToFlash
 	boardTemplates []BoardTemplate
 	mu             sync.Mutex
+
+	// симуляция плат
+	fakeBoards map[string]*BoardToFlash
 }
 
 //go:embed device_list.JSON
@@ -76,6 +80,8 @@ var boardTemplatesRaw []byte
 func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardToFlash)
+	// добавление фальшивых плат
+	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
 	return &d
 }
@@ -139,6 +145,7 @@ func (d *Detector) GetIDs() []string {
 	return IDs
 }
 
+// на данный момент эта функция не используется, возможно стоит её насовсем убрать
 func (d *Detector) Update() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -148,7 +155,10 @@ func (d *Detector) Update() {
 	}
 
 	for ID, board := range d.boards {
-		board.updatePortName(ID)
+		// фальшивые платы должны игнорироваться, иначе будет обнаружено, что у них не настоящих портов
+		if !d.isFake(ID) {
+			board.updatePortName(ID)
+		}
 	}
 	// сравниваем старый список с новым, чтобы найти новые устройства
 	curBoards := detectBoards()
@@ -207,4 +217,47 @@ func (board *BoardToFlash) setPort(newPortName string) {
 
 func (d *Detector) boardList() []BoardTemplate {
 	return d.boardTemplates
+}
+
+// генерация фальшивых плат, которые будут восприниматься программой как настоящие
+func (d *Detector) generateFakeBoards() {
+	d.fakeBoards = make(map[string]*BoardToFlash)
+
+	// фальшивые параметры для фальшивых плат
+
+	vendorID := "-0000"
+	productID := "-0000"
+	name := "Fake Board"
+	controller := "Fake Controller"
+	programmer := "Fake Programmer"
+	fakeType := BoardType{
+		ProductID:  productID,
+		VendorID:   vendorID,
+		Name:       name,
+		Controller: controller,
+		Programmer: programmer,
+	}
+
+	for i := 0; i < fakeBoardsNum; i++ {
+		fakeID := fmt.Sprintf("fakeid-%d", i)
+		fakePort := fmt.Sprintf("fakecom-%d", i)
+		newFakeBoard := NewBoardToFlash(fakeType, fakePort)
+		newFakeBoard.SerialID = fakeID
+		d.fakeBoards[fakeID] = newFakeBoard
+	}
+
+	for ID, board := range d.fakeBoards {
+		d.boards[ID] = board
+	}
+}
+
+// true = плата с данным ID является фальшивой
+func (d *Detector) isFake(ID string) bool {
+	if fakeBoardsNum > 0 {
+		_, exists := d.fakeBoards[ID]
+		if exists {
+			return true
+		}
+	}
+	return false
 }
