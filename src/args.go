@@ -45,14 +45,19 @@ func setArgs() {
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
 	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
 	flag.IntVar(&fakeBoardsNum, "stub", 0, "количество ненастоящих, симулируемых устройств, которые будут восприниматься как настоящие, применяется для тестирования, при значении 0 или меньше фальшивые устройства не добавляются")
-	if fakeBoardsNum < 0 {
-		fakeBoardsNum = 0
-	}
 	flag.BoolVar(&verbose, "verbose", false, "выводить в консоль подробную информацию")
 	flag.BoolVar(&alwaysUpdate, "alwaysUpdate", false, "всегда искать устройства и обновлять их список, даже когда ни один клиент не подключён (используется для тестирования)")
 	getListCooldownSeconds := flag.Int("listCooldown", 2, "минимальное время (в секундах), через которое клиент может снова запросить список устройств, игнорируется, если количество клиентов меньше чем 2")
-	updateListTimeSeconds := flag.Int("updateList", 15, "количество секунд между автоматическими обновлениями")
+	updateListTimeSeconds := flag.Int("updateList", 15, "количество секунд между автоматическими обновлениями, не может быть меньше единицы, если получено значение меньше единицы, то оно заменяется на 1")
+	fmt.Println(*updateListTimeSeconds, fakeBoardsNum, verbose)
 	flag.Parse()
+	fmt.Println(*updateListTimeSeconds, fakeBoardsNum, verbose)
+	if fakeBoardsNum < 0 {
+		fakeBoardsNum = 0
+	}
+	if *updateListTimeSeconds < 1 {
+		*updateListTimeSeconds = 1
+	}
 	getListCooldownDuration = time.Second * time.Duration(*getListCooldownSeconds)
 	updateListTime = time.Second * time.Duration(*updateListTimeSeconds)
 }
