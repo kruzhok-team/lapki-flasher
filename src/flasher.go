@@ -10,7 +10,7 @@ import (
 func flash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
 	flash := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
 	args := []string{"-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash}
-	if configPath == "" {
+	if configPath != "" {
 		args = append(args, "-C", configPath)
 	}
 	printLog(avrdudePath, args)
