@@ -47,7 +47,7 @@ var configPath string
 // чтение флагов и происвоение им стандартных значений
 func setArgs() {
 	flag.StringVar(&webAddress, "address", "localhost:8080", "адресс для подключения")
-	flag.StringVar(&avrdudePath, "avrdudePath", "avrdude.exe", "путь к avrdude (напишите avrdude, елси нужно, чтобы использовался системный путь)")
+	flag.StringVar(&avrdudePath, "avrdudePath", "avrdude", "путь к avrdude, используется системный путь по-умолчанию")
 	flag.StringVar(&configPath, "configPath", "", "путь к файлу конфигурации avrdude")
 	flag.IntVar(&maxMsgSize, "msgSize", 1024, "максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)")
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
