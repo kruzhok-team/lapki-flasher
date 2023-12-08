@@ -5,15 +5,17 @@ import (
 	"time"
 )
 
-const AVRDUDE = "avrdude"
-
 // прошивка,
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
-func flash(board *BoardToFlash, filePath string) (avrdudeMessage string, err error) {
-	flash := "flash:w:" + getAbolutePath(filePath) + ":a"
-	printLog(AVRDUDE, "-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash)
+func flash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
+	flash := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
 	// без опции "-D" не может прошить Arduino Mega
-	cmd := exec.Command(AVRDUDE, "-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash)
+	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flash}
+	if configPath != "" {
+		args = append(args, "-C", configPath)
+	}
+	printLog(avrdudePath, args)
+	cmd := exec.Command(avrdudePath, args...)
 	stdout, err := cmd.CombinedOutput()
 	outputString := string(stdout)
 	if err != nil {
