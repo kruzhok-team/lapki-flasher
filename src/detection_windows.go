@@ -21,7 +21,11 @@ func getInstanceId(substring string) []string {
 	//start := time.Now()
 	keyPath := "SYSTEM\\CurrentControlSet\\Services\\usbser\\Enum"
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-	defer key.Close()
+	defer func() {
+		if err := key.Close(); err != nil {
+			printLog("Error on closing registry key:", err.Error())
+		}
+	}()
 	if err != nil {
 		printLog("No devices are connected or drivers are not installed", err)
 		return nil
