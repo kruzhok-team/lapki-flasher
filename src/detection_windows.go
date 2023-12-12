@@ -112,7 +112,11 @@ func detectBoards() map[string]*BoardToFlash {
 func findPortName(instanceId *string) string {
 	keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", *instanceId)
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-	defer key.Close()
+	defer func() {
+		if err := key.Close(); err != nil {
+			printLog("Error on closing registry key:", err.Error())
+		}
+	}()
 	if err != nil {
 		printLog("Registry error:", err)
 		return NOT_FOUND
