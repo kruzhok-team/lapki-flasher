@@ -75,7 +75,7 @@ func detectBoards() map[string]*BoardToFlash {
 					pathLen := len(pathPattern)
 					// нашли подходящее устройство
 					//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
-					if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
+					if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
 						portName := findPortName(&device)
 						if portName == NOT_FOUND {
 							printLog(device)
