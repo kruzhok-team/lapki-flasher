@@ -38,9 +38,17 @@ var alwaysUpdate bool
 // количество ненастоящих, симулируемых устройств, которые будут восприниматься как настоящие, применяется для тестирования
 var fakeBoardsNum int
 
+// путь к avrdude
+var avrdudePath string
+
+// путь к файлу конфигурации (если пустой, то он не будет передаваться через аргументы в avrdude)
+var configPath string
+
 // чтение флагов и происвоение им стандартных значений
 func setArgs() {
 	flag.StringVar(&webAddress, "address", "localhost:8080", "адресс для подключения")
+	flag.StringVar(&avrdudePath, "avrdudePath", "avrdude", "путь к avrdude, используется системный путь по-умолчанию")
+	flag.StringVar(&configPath, "configPath", "", "путь к файлу конфигурации avrdude")
 	flag.IntVar(&maxMsgSize, "msgSize", 1024, "максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)")
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
 	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
@@ -73,5 +81,7 @@ func printArgsDesc() {
 	verboseStr := fmt.Sprintf("вывод подробной информации в консоль: %v", verbose)
 	alwaysUpdateStr := fmt.Sprintf("постоянное обновление списка устройств: %v", alwaysUpdate)
 	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n", webAddressStr, maxFileSizeStr, maxMsgSizeStr, maxThreadsPerClientStr, getListCooldownDurationStr, updateListTimeStr, verboseStr, alwaysUpdateStr, fakeBoardsNumStr)
+	avrdudePathStr := fmt.Sprintf("путь к avrdude (напишите avrdude, если нужно, чтобы использовался системный путь): %s", avrdudePath)
+	configPathStr := fmt.Sprintf("путь к файлу конфигурации avrdude: %s", configPath)
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n", webAddressStr, maxFileSizeStr, maxMsgSizeStr, maxThreadsPerClientStr, getListCooldownDurationStr, updateListTimeStr, verboseStr, alwaysUpdateStr, fakeBoardsNumStr, avrdudePathStr, configPathStr)
 }
