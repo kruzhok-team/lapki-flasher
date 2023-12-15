@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
@@ -153,4 +154,12 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		return true
 	}
 	return false
+}
+
+// перезагрузка порта
+func rebootPort(portName string) (err error) {
+	cmd := exec.Command("MODE", portName, "BAUD=1200")
+	_, err = cmd.CombinedOutput()
+	print(cmd.Args, err)
+	return err
 }
