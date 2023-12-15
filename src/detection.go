@@ -9,7 +9,8 @@ import (
 
 const NOT_FOUND = ""
 
-var notSupportedBoards = [1]string{"Arduino Micro"}
+// список плат, которые распознаются загрузчиком, но не могут быть прошиты
+var notSupportedBoards = []string{""}
 
 type BoardType struct {
 	ProductID      string
