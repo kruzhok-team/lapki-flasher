@@ -13,27 +13,27 @@ const NOT_FOUND = ""
 var notSupportedBoards = []string{""}
 
 type BoardType struct {
-	ProductID      string
-	VendorID       string
-	Name           string
-	Controller     string
-	Programmer     string
-	BootloaderName string
-	BootloaderID   string
+	typeID           int
+	ProductID        string
+	VendorID         string
+	Name             string
+	Controller       string
+	Programmer       string
+	BootloaderTypeID int
 }
 
 type BoardTemplate struct {
-	VendorIDs      []string `json:"vendorIDs"`
-	ProductIDs     []string `json:"productIDs"`
-	Name           string   `json:"name"`
-	Controller     string   `json:"controller"`
-	Programmer     string   `json:"programmer"`
-	BootloaderName string   `json:"bootloaderName"`
-	BootloaderIDs  []string `json:"bootloaderIDs"`
+	ID           int      `json:"ID"`
+	VendorIDs    []string `json:"vendorIDs"`
+	ProductIDs   []string `json:"productIDs"`
+	Name         string   `json:"name"`
+	Controller   string   `json:"controller"`
+	Programmer   string   `json:"programmer"`
+	BootloaderID int      `json:"bootloaderIDs"`
 }
 
 func (board BoardType) hasBootloader() bool {
-	return board.BootloaderID != ""
+	return board.BootloaderTypeID > -1
 }
 
 type BoardToFlash struct {
@@ -161,18 +161,21 @@ func (d *Detector) generateFakeBoards() {
 	d.fakeBoards = make(map[string]*BoardToFlash)
 
 	// фальшивые параметры для фальшивых плат
-
+	id := -1
 	vendorID := "-0000"
 	productID := "-0000"
 	name := "Fake Board"
 	controller := "Fake Controller"
 	programmer := "Fake Programmer"
+	bootloaderID := -1
 	fakeType := BoardType{
-		ProductID:  productID,
-		VendorID:   vendorID,
-		Name:       name,
-		Controller: controller,
-		Programmer: programmer,
+		typeID:           id,
+		ProductID:        productID,
+		VendorID:         vendorID,
+		Name:             name,
+		Controller:       controller,
+		Programmer:       programmer,
+		BootloaderTypeID: bootloaderID,
 	}
 
 	for i := 0; i < fakeBoardsNum; i++ {
