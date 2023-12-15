@@ -197,3 +197,8 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 	//fmt.Println(id)
 	return answers, nil
 }
+
+// TODO: перезагрузка порта
+func rebootPort(portName string) (err error) {
+	return err
+}
