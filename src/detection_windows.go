@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// настройка ОС (для Windows она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свою реализацию этой функции)
+// настройка ОС (для Windows она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
 func setupOS() {
 
 }
@@ -162,4 +162,13 @@ func rebootPort(portName string) (err error) {
 	_, err = cmd.CombinedOutput()
 	print(cmd.Args, err)
 	return err
+}
+
+// найти bootloader для композитного устройства такого как Arduino Micro
+func refToBoot(board *BoardToFlash) (bootloader *BoardToFlash) {
+	if board.refToBoot != nil {
+		return board.refToBoot
+	}
+
+	return bootloader
 }

@@ -202,3 +202,8 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 func rebootPort(portName string) (err error) {
 	return err
 }
+
+// TODO: найти bootloader для композитного устройства такого как Arduino Micro
+func refToBoot(board *BoardToFlash) (bootloader *BoardToFlash) {
+	return bootloader
+}
