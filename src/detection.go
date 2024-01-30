@@ -43,6 +43,8 @@ type BoardToFlash struct {
 	mu       sync.Mutex
 	// устройство прошивается
 	flashing bool
+	// bootloader, связанный с платой, nil - если не найден, или отсутствует вообще
+	refToBoot *BoardToFlash
 }
 
 func NewBoardToFlash(Type BoardType, PortName string) *BoardToFlash {
@@ -50,12 +52,58 @@ func NewBoardToFlash(Type BoardType, PortName string) *BoardToFlash {
 	board.Type = Type
 	board.PortName = PortName
 	board.flashing = false
+
+	if board.Type.hasBootloader() {
+		var bootloader BoardToFlash
+		board.refToBoot = &bootloader
+		board.refToBoot.flashing = false
+		bootTemplate := findTemplateByID(board.Type.BootloaderTypeID)
+		if bootTemplate == nil {
+			//TODO
+		}
+		board.refToBoot.Type = BoardType{
+			typeID:           bootTemplate.ID,
+			Name:             bootTemplate.Name,
+			Controller:       bootTemplate.Controller,
+			Programmer:       bootTemplate.Programmer,
+			BootloaderTypeID: bootTemplate.BootloaderID,
+		}
+	}
 	return &board
+}
+
+// находит шаблон платы по его id
+func findTemplateByID(boardID int) *BoardTemplate {
+	var template BoardTemplate
+	if boardID < len(detector.boardTemplates) {
+		template = detector.boardTemplates[boardID]
+		// ожидается, что в файле с шаблонами прошивок (device_list.JSON) нумеровка индексов будет идти по порядку, но если это не так, то придётся перебать все шаблоны
+		if template.ID != boardID {
+			foundCorrectBootloader := false
+			for _, templ := range detector.boardTemplates {
+				if templ.ID == boardID {
+					template = templ
+					foundCorrectBootloader = true
+					break
+				}
+			}
+			if foundCorrectBootloader {
+				printLog("Не найден шаблон для устройства")
+				return nil
+			}
+		}
+	}
+	return &template
 }
 
 // подключено ли устройство
 func (board *BoardToFlash) IsConnected() bool {
 	return board.PortName != NOT_FOUND
+}
+
+// найдено ли устройство
+func (board *BoardToFlash) IsIdentified() bool {
+	return board.SerialID != ""
 }
 
 type DetectedBoard struct {
