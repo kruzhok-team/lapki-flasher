@@ -191,54 +191,34 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			c.getListCooldown.start()
 		}
 	}()
-	newBoards := detectBoards()
-	// добавление фальшивых плат к действительно обнаруженным
-	if fakeBoardsNum > 0 {
-		if newBoards == nil {
-			newBoards = make(map[string]*BoardToFlash)
-		}
-		for ID, board := range detector.fakeBoards {
-			newBoards[ID] = board
-		}
-	}
 	// отправляем все устройства клиенту
-	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
+	// отправляем все клиентам изменения в устройстве, если таковые имеются
 	// отправляем всем остальным клиентам только новые устройства
-	for deviceID, newBoard := range newBoards {
-		oldBoard, exists := detector.GetBoard(deviceID)
-		if exists {
-			if oldBoard.getPort() != newBoard.PortName {
-				oldBoard.setPort(newBoard.PortName)
-				if sendToAll {
-					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(newBoard, deviceID))
-				} else {
-					DeviceUpdatePort(deviceID, newBoard, c)
-				}
-			}
-			if !sendToAll {
-				Device(deviceID, newBoard, false, c)
-			}
+	detectedBoards, updatedPort, newDevices, deletedDevices := detector.Update()
+	if !sendToAll {
+		for deviceID, device := range detectedBoards {
+			Device(deviceID, device, false, c)
+		}
+	}
+	for deviceID, device := range updatedPort {
+		if sendToAll {
+			m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(device, deviceID))
 		} else {
-			detector.AddBoard(deviceID, newBoard)
-			if sendToAll {
-				m.sendMessageToAll(DeviceMsg, newDeviceMessage(newBoard, deviceID))
-			} else {
-				Device(deviceID, newBoard, true, c)
-			}
+			DeviceUpdatePort(deviceID, device, c)
 		}
 	}
-	detector.mu.Lock()
-	for deviceID := range detector.boards {
-		_, exists := newBoards[deviceID]
-		if !exists {
-			//deletedMsgs = append(deletedMsgs, *newDeviceUpdateDeleteMessage(deviceID))
-			if sendToAll {
-				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
-			} else {
-				DeviceUpdateDelete(deviceID, c)
-			}
-			delete(detector.boards, deviceID)
+	for deviceID, device := range newDevices {
+		if sendToAll {
+			m.sendMessageToAll(DeviceMsg, newDeviceMessage(device, deviceID))
+		} else {
+			Device(deviceID, device, true, c)
 		}
 	}
-	detector.mu.Unlock()
+	for deviceID := range deletedDevices {
+		if sendToAll {
+			m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
+		} else {
+			DeviceUpdateDelete(deviceID, c)
+		}
+	}
 }

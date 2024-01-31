@@ -135,6 +135,55 @@ func NewDetector() *Detector {
 	return &d
 }
 
+// Обновление текущего списка устройств.
+// Вовращает:
+//
+// updatedPort - список устройств с новыми значениями портов;
+// newDevices - список устройств, которых не было в старом списке;
+// deletedDevices - спискок устройств, которые были в старом списке, но которых нет в обновлённом;
+func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPort map[string]*BoardToFlash, newDevices map[string]*BoardToFlash, deletedDevices map[string]*BoardToFlash) {
+	detectedBoards = detectBoards()
+
+	// добавление фальшивых плат к действительно обнаруженным
+	if fakeBoardsNum > 0 {
+		if detectedBoards == nil {
+			detectedBoards = make(map[string]*BoardToFlash)
+		}
+		for ID, board := range detector.fakeBoards {
+			detectedBoards[ID] = board
+		}
+	}
+
+	// обновление информации о старых устройствах и добавление новых
+	updatedPort = make(map[string]*BoardToFlash)
+	newDevices = make(map[string]*BoardToFlash)
+	deletedDevices = make(map[string]*BoardToFlash)
+	for deviceID, newBoard := range detectedBoards {
+		oldBoard, exists := detector.GetBoard(deviceID)
+		if exists {
+			if oldBoard.getPort() != newBoard.PortName {
+				oldBoard.setPort(newBoard.PortName)
+				updatedPort[deviceID] = newBoard
+			}
+		} else {
+			detector.AddBoard(deviceID, newBoard)
+			newDevices[deviceID] = newBoard
+		}
+	}
+	// удаление
+	detector.mu.Lock()
+	for deviceID := range detector.boards {
+		board, exists := detectedBoards[deviceID]
+		if !exists {
+			deletedDevices[deviceID] = board
+			delete(detector.boards, deviceID)
+		}
+	}
+	detector.mu.Unlock()
+
+	return
+}
+
 // возвращает устройство, соответствующее ID, существует ли устройство в списке
 func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool) {
 	d.mu.Lock()
