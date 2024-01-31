@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+
+	"golang.org/x/tools/go/analysis/passes/nilfunc"
 )
 
 const NOT_FOUND = ""
@@ -113,6 +115,13 @@ type DetectedBoard struct {
 	Status bool
 }
 
+type DeviceWithBootloader struct {
+	device *BoardToFlash
+	ID     string
+}
+func (dewboot *DeviceWithBootloader) {
+	dewb
+}
 type Detector struct {
 	// список доступных для прошивки устройств
 	boards         map[string]*BoardToFlash
@@ -121,6 +130,9 @@ type Detector struct {
 
 	// симуляция плат
 	fakeBoards map[string]*BoardToFlash
+
+	// устройство с bootloader, которое планируется прошить (загрузчик не может прошивать несколько устройств с bootloader одновременно)
+	deviceWithBootloader DeviceWithBootloader
 }
 
 //go:embed device_list.JSON
@@ -132,6 +144,7 @@ func NewDetector() *Detector {
 	// добавление фальшивых плат
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	d.deviceWithBootloader.device = nil
 	return &d
 }
 
@@ -158,6 +171,10 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 	updatedPort = make(map[string]*BoardToFlash)
 	newDevices = make(map[string]*BoardToFlash)
 	deletedDevices = make(map[string]*BoardToFlash)
+	if d.BootloaderDeviceFlash() {
+		detectedBoards
+	}
+	bootloaderCnt := 0
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := detector.GetBoard(deviceID)
 		if exists {
@@ -166,6 +183,14 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 				updatedPort[deviceID] = newBoard
 			}
 		} else {
+			if d.isBootloaderFlashing() && d.deviceWithBootloader.Type.BootloaderTypeID == newBoard.Type.typeID {
+				bootloaderCnt++
+				d.deviceWithBootloader.refToBoot = newBoard
+				if bootloaderCnt > 1 {
+					printLog("Bootloader: ошибка")
+				}
+				continue
+			}
 			detector.AddBoard(deviceID, newBoard)
 			newDevices[deviceID] = newBoard
 		}
@@ -182,6 +207,18 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 	detector.mu.Unlock()
 
 	return
+}
+
+func (d *Detector) isBootloaderFlashing() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.deviceWithBootloader != nil
+}
+
+func (d *Detector) BootloaderDeviceFlash(board *BoardToFlash) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.deviceWithBootloader = board
 }
 
 // возвращает устройство, соответствующее ID, существует ли устройство в списке
