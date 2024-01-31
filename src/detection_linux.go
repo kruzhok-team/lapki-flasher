@@ -42,6 +42,7 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
+// находит все подключённые платы
 func detectBoards() map[string]*BoardToFlash {
 	// start := time.Now()
 	// defer fmt.Println("detection time: ", time.Now().Sub(start))
