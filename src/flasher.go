@@ -5,20 +5,38 @@ import (
 	"time"
 )
 
+func flashBootloader(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
+	if e := rebootPort(board.PortName); e != nil {
+		return "Не удалось перезагрузить порт", e
+	}
+	printLog("TEST1")
+	detector.deviceWithBootloader <- board
+	printLog("TEST2")
+	go detector.Update()
+	board = <-detector.bootloader
+	printLog("TEST3")
+	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
+	// без опции "-D" не может прошить Arduino Mega
+	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flashFile}
+	if configPath != "" {
+		args = append(args, "-C", configPath)
+	}
+	printLog(avrdudePath, args)
+	flash(board, args)
+	return
+}
+
 // прошивка, с автоматическим прописыванием необходимых параметров для avrdude
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
 func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
-	portName := board.PortName
 	if board.Type.hasBootloader() {
-		if e := rebootPort(portName); e != nil {
-			return "", e
-		}
-		board.refToBoot = refToBoot(board)
-		portName = board.refToBoot.PortName
+		go flashBootloader(board, hexFilePath)
+		return
 	}
+	printLog("TEST4")
 	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
 	// без опции "-D" не может прошить Arduino Mega
-	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", portName, "-U", flashFile}
+	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flashFile}
 	if configPath != "" {
 		args = append(args, "-C", configPath)
 	}

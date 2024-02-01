@@ -98,7 +98,7 @@ func detectBoards() map[string]*BoardToFlash {
 							detectedBoard.SerialID = device[serialIndex+1:]
 						}
 						boards[device] = detectedBoard
-						printLog("Device was found:", detectedBoard)
+						printLog("Device was found:", detectedBoard, device)
 					}
 				}
 			}
@@ -106,6 +106,7 @@ func detectBoards() map[string]*BoardToFlash {
 	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
+	printLog(boards)
 	return boards
 }
 
@@ -162,13 +163,4 @@ func rebootPort(portName string) (err error) {
 	_, err = cmd.CombinedOutput()
 	print(cmd.Args, err)
 	return err
-}
-
-// найти bootloader для композитного устройства такого как Arduino Micro
-func refToBoot(board *BoardToFlash) (bootloader *BoardToFlash) {
-	if board.refToBoot != nil {
-		return board.refToBoot
-	}
-
-	return bootloader
 }

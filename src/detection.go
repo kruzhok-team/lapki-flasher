@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-
-	"golang.org/x/tools/go/analysis/passes/nilfunc"
 )
 
 const NOT_FOUND = ""
@@ -108,20 +106,6 @@ func (board *BoardToFlash) IsIdentified() bool {
 	return board.SerialID != ""
 }
 
-type DetectedBoard struct {
-	FlashBoard BoardToFlash
-	// true - устройство добавилсоь при последнем вызове функции update(), иначе если оно добавилось раньше false,
-	// то есть устройства со значением true меняют своё значение на false при следующем вызове update()
-	Status bool
-}
-
-type DeviceWithBootloader struct {
-	device *BoardToFlash
-	ID     string
-}
-func (dewboot *DeviceWithBootloader) {
-	dewb
-}
 type Detector struct {
 	// список доступных для прошивки устройств
 	boards         map[string]*BoardToFlash
@@ -131,8 +115,11 @@ type Detector struct {
 	// симуляция плат
 	fakeBoards map[string]*BoardToFlash
 
-	// устройство с bootloader, которое планируется прошить (загрузчик не может прошивать несколько устройств с bootloader одновременно)
-	deviceWithBootloader DeviceWithBootloader
+	// Устройство, bootloader которого нужно обнаружить во время обновления.
+	// Bootloader этой платы не будет считаться отдельным устройством, вместо него в списке будет находиться сама плата
+	deviceWithBootloader chan *BoardToFlash
+	bootloader           chan *BoardToFlash
+	removeBootloader     chan bool
 }
 
 //go:embed device_list.JSON
@@ -144,7 +131,9 @@ func NewDetector() *Detector {
 	// добавление фальшивых плат
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
-	d.deviceWithBootloader.device = nil
+	d.deviceWithBootloader = make(chan *BoardToFlash)
+	d.bootloader = make(chan *BoardToFlash)
+	d.removeBootloader = make(chan bool)
 	return &d
 }
 
@@ -171,9 +160,7 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 	updatedPort = make(map[string]*BoardToFlash)
 	newDevices = make(map[string]*BoardToFlash)
 	deletedDevices = make(map[string]*BoardToFlash)
-	if d.BootloaderDeviceFlash() {
-		detectedBoards
-	}
+
 	bootloaderCnt := 0
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := detector.GetBoard(deviceID)
@@ -183,42 +170,39 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 				updatedPort[deviceID] = newBoard
 			}
 		} else {
-			if d.isBootloaderFlashing() && d.deviceWithBootloader.Type.BootloaderTypeID == newBoard.Type.typeID {
-				bootloaderCnt++
-				d.deviceWithBootloader.refToBoot = newBoard
-				if bootloaderCnt > 1 {
-					printLog("Bootloader: ошибка")
+			select {
+			case DWBL := <-d.deviceWithBootloader:
+				printLog("DWBL")
+				if DWBL.Type.BootloaderTypeID == newBoard.Type.typeID {
+					bootloaderCnt++
+					if bootloaderCnt > 1 {
+						printLog("Неопределённость: найдено два и более bootloader, подходящих для устройства")
+						continue
+					}
+					d.bootloader <- newBoard
+					d.AddBoard(deviceID, DWBL)
+					newDevices[deviceID] = DWBL
 				}
-				continue
+				printLog("DWBL-END")
+			default:
+				printLog("DEFAULT")
+				d.AddBoard(deviceID, newBoard)
+				newDevices[deviceID] = newBoard
 			}
-			detector.AddBoard(deviceID, newBoard)
-			newDevices[deviceID] = newBoard
 		}
 	}
 	// удаление
-	detector.mu.Lock()
-	for deviceID := range detector.boards {
+	d.mu.Lock()
+	for deviceID := range d.boards {
 		board, exists := detectedBoards[deviceID]
 		if !exists {
 			deletedDevices[deviceID] = board
-			delete(detector.boards, deviceID)
+			delete(d.boards, deviceID)
 		}
 	}
-	detector.mu.Unlock()
+	d.mu.Unlock()
 
 	return
-}
-
-func (d *Detector) isBootloaderFlashing() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.deviceWithBootloader != nil
-}
-
-func (d *Detector) BootloaderDeviceFlash(board *BoardToFlash) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.deviceWithBootloader = board
 }
 
 // возвращает устройство, соответствующее ID, существует ли устройство в списке
