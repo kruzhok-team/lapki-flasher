@@ -115,11 +115,9 @@ type Detector struct {
 	// симуляция плат
 	fakeBoards map[string]*BoardToFlash
 
-	// Устройство, bootloader которого нужно обнаружить во время обновления.
-	// Bootloader этой платы не будет считаться отдельным устройством, вместо него в списке будет находиться сама плата
-	deviceWithBootloader chan *BoardToFlash
-	bootloader           chan *BoardToFlash
-	removeBootloader     chan bool
+	// Список ID типов плат, которые не нужно добавлять, при обновлении.
+	// Старые устройства, если они не отсоединялись, останутся в списке, даже если их typeID находится в списке
+	dontAddTypes map[int]void
 }
 
 //go:embed device_list.JSON
@@ -131,19 +129,23 @@ func NewDetector() *Detector {
 	// добавление фальшивых плат
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
-	d.deviceWithBootloader = make(chan *BoardToFlash)
-	d.bootloader = make(chan *BoardToFlash)
-	d.removeBootloader = make(chan bool)
+	d.dontAddTypes = make(map[int]void)
 	return &d
 }
 
 // Обновление текущего списка устройств.
 // Вовращает:
-//
+// detectedBoards - все платы, которые удалось обнаружить;
 // updatedPort - список устройств с новыми значениями портов;
 // newDevices - список устройств, которых не было в старом списке;
 // deletedDevices - спискок устройств, которые были в старом списке, но которых нет в обновлённом;
-func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPort map[string]*BoardToFlash, newDevices map[string]*BoardToFlash, deletedDevices map[string]*BoardToFlash) {
+// notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes
+func (d *Detector) Update() (
+	detectedBoards map[string]*BoardToFlash,
+	updatedPort map[string]*BoardToFlash,
+	newDevices map[string]*BoardToFlash,
+	deletedDevices map[string]*BoardToFlash,
+	notAddedDevices map[string]*BoardToFlash) {
 	detectedBoards = detectBoards()
 
 	// добавление фальшивых плат к действительно обнаруженным
@@ -160,8 +162,8 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 	updatedPort = make(map[string]*BoardToFlash)
 	newDevices = make(map[string]*BoardToFlash)
 	deletedDevices = make(map[string]*BoardToFlash)
+	notAddedDevices = make(map[string]*BoardToFlash)
 
-	bootloaderCnt := 0
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := detector.GetBoard(deviceID)
 		if exists {
@@ -170,22 +172,9 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 				updatedPort[deviceID] = newBoard
 			}
 		} else {
-			select {
-			case DWBL := <-d.deviceWithBootloader:
-				printLog("DWBL")
-				if DWBL.Type.BootloaderTypeID == newBoard.Type.typeID {
-					bootloaderCnt++
-					if bootloaderCnt > 1 {
-						printLog("Неопределённость: найдено два и более bootloader, подходящих для устройства")
-						continue
-					}
-					d.bootloader <- newBoard
-					d.AddBoard(deviceID, DWBL)
-					newDevices[deviceID] = DWBL
-				}
-				printLog("DWBL-END")
-			default:
-				printLog("DEFAULT")
+			if _, ok := d.dontAddTypes[newBoard.Type.typeID]; ok {
+				notAddedDevices[deviceID] = newBoard
+			} else {
 				d.AddBoard(deviceID, newBoard)
 				newDevices[deviceID] = newBoard
 			}
@@ -203,6 +192,19 @@ func (d *Detector) Update() (detectedBoards map[string]*BoardToFlash, updatedPor
 	d.mu.Unlock()
 
 	return
+}
+
+// попросить дектектора, чтобы он не добавлял новые устройства с данным typeID в список (старые устройства с этим typeID останутся в списке)
+func (d *Detector) DontAddThisType(typeID int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.dontAddTypes[typeID] = void{}
+}
+
+func (d *Detector) AddThisType(typeID int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.dontAddTypes, typeID)
 }
 
 // возвращает устройство, соответствующее ID, существует ли устройство в списке

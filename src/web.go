@@ -194,7 +194,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	// отправляем все устройства клиенту
 	// отправляем все клиентам изменения в устройстве, если таковые имеются
 	// отправляем всем остальным клиентам только новые устройства
-	detectedBoards, updatedPort, newDevices, deletedDevices := detector.Update()
+	detectedBoards, updatedPort, newDevices, deletedDevices, _ := detector.Update()
 	if !sendToAll {
 		for deviceID, device := range detectedBoards {
 			Device(deviceID, device, false, c)

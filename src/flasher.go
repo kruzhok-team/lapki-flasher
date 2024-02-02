@@ -1,47 +1,52 @@
 package main
 
 import (
+	"errors"
 	"os/exec"
+	"sync"
 	"time"
 )
 
-func flashBootloader(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
-	printLog("TEST1")
-	detector.deviceWithBootloader <- board
-	if e := rebootPort(board.PortName); e != nil {
-		<-detector.deviceWithBootloader
-		return "Не удалось перезагрузить порт", e
-	}
-	printLog("TEST2")
-	detector.Update()
-	board = <-detector.bootloader
-	printLog("TEST3")
-	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
-	// без опции "-D" не может прошить Arduino Mega
-	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flashFile}
-	if configPath != "" {
-		args = append(args, "-C", configPath)
-	}
-	printLog(avrdudePath, args)
-	flash(board, args)
-	return
-}
+var flasherSync sync.Mutex
 
 // прошивка, с автоматическим прописыванием необходимых параметров для avrdude
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
 func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
 	if board.Type.hasBootloader() {
+		flasherSync.Lock()
+		defer flasherSync.Unlock()
 		if e := rebootPort(board.PortName); e != nil {
 			return "Не удалось перезагрузить порт", e
 		}
-		printLog("TEST1")
-		detector.deviceWithBootloader <- board
-		printLog("TEST2")
-		go detector.Update()
-		printLog("TEST3")
-		board = <-detector.bootloader
+		bootloaderType := board.Type.BootloaderTypeID
+		detector.DontAddThisType(bootloaderType)
+		defer detector.AddThisType(bootloaderType)
+		var notAddedDevices map[string]*BoardToFlash
+		found := false
+		for i := 0; i < 10; i++ {
+			// TODO: возможно стоит добавить количество необходимого времени в параметры сервера
+			time.Sleep(500 * time.Millisecond)
+			printLog("Попытка найти подходящее устройство", i)
+			_, _, _, _, notAddedDevices = detector.Update()
+			sameTypeCnt := 0
+			for _, dev := range notAddedDevices {
+				if dev.Type.typeID == bootloaderType {
+					board = dev
+					sameTypeCnt++
+					if sameTypeCnt > 1 {
+						return "Не удалось опознать Bootloader. Ошибка могла быть вызвана перезагрузкой одного из устройств, либо из-за подключения нового.", errors.New("bootloader: too many")
+					}
+					found = true
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return "Не удалось найти Bootloader.", errors.New("bootloader: not found")
+		}
 	}
-	printLog("TEST4")
 	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
 	// без опции "-D" не может прошить Arduino Mega
 	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flashFile}
@@ -49,8 +54,7 @@ func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, 
 		args = append(args, "-C", configPath)
 	}
 	printLog(avrdudePath, args)
-	flash(board, args)
-	return
+	return flash(board, args)
 }
 
 // прошивка через avrdude с аргументами, указанными в avrdudeArgs
