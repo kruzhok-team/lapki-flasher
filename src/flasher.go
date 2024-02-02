@@ -6,13 +6,14 @@ import (
 )
 
 func flashBootloader(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
-	if e := rebootPort(board.PortName); e != nil {
-		return "Не удалось перезагрузить порт", e
-	}
 	printLog("TEST1")
 	detector.deviceWithBootloader <- board
+	if e := rebootPort(board.PortName); e != nil {
+		<-detector.deviceWithBootloader
+		return "Не удалось перезагрузить порт", e
+	}
 	printLog("TEST2")
-	go detector.Update()
+	detector.Update()
 	board = <-detector.bootloader
 	printLog("TEST3")
 	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
@@ -30,8 +31,15 @@ func flashBootloader(board *BoardToFlash, hexFilePath string) (avrdudeMessage st
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
 func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
 	if board.Type.hasBootloader() {
-		go flashBootloader(board, hexFilePath)
-		return
+		if e := rebootPort(board.PortName); e != nil {
+			return "Не удалось перезагрузить порт", e
+		}
+		printLog("TEST1")
+		detector.deviceWithBootloader <- board
+		printLog("TEST2")
+		go detector.Update()
+		printLog("TEST3")
+		board = <-detector.bootloader
 	}
 	printLog("TEST4")
 	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
