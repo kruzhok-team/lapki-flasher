@@ -61,8 +61,16 @@ func detectBoards() map[string]*BoardToFlash {
 					//fmt.Println(len(cur_group), v)
 					for _, pid := range boardTemplate.ProductIDs {
 						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
-							detectedBoard := NewBoardToFlash(BoardType{pid, vid, boardTemplate.Name, boardTemplate.Controller, boardTemplate.Programmer, boardTemplate.BootloaderName, ""},
-								findPortName(desc))
+							boardType := BoardType{
+								boardTemplate.ID,
+								pid,
+								vid,
+								boardTemplate.Name,
+								boardTemplate.Controller,
+								boardTemplate.Programmer,
+								boardTemplate.BootloaderID,
+							}
+							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
 							if detectedBoard.PortName == NOT_FOUND {
 								continue
 							}
