@@ -29,7 +29,7 @@ type BoardTemplate struct {
 	Name         string   `json:"name"`
 	Controller   string   `json:"controller"`
 	Programmer   string   `json:"programmer"`
-	BootloaderID int      `json:"bootloaderIDs"`
+	BootloaderID int      `json:"bootloaderID"`
 }
 
 func (board BoardType) hasBootloader() bool {
