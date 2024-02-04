@@ -25,14 +25,5 @@
     "controller": "ATmega328P",
     "programmer": "arduino",
     "bootloaderID": -1
-  },
-  {
-    "ID": 3,
-    "name": "Arduino Mega",
-    "productIDs": ["0042"],
-    "vendorIDs": ["2341"],
-    "controller": "ATmega2560",
-    "programmer": "wiring",
-    "bootloaderID": -1
   }
 ]
