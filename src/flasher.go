@@ -21,6 +21,7 @@ func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, 
 		bootloaderType := board.Type.BootloaderTypeID
 		detector.DontAddThisType(bootloaderType)
 		defer detector.AddThisType(bootloaderType)
+		defer time.Sleep(500 * time.Millisecond)
 		var notAddedDevices map[string]*BoardToFlash
 		found := false
 		for i := 0; i < 25; i++ {
