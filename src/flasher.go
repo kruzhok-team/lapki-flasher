@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const AVRDUDE = "avrdude"
+var flasherSync sync.Mutex
 
 // прошивка, с автоматическим прописыванием необходимых параметров для avrdude
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
