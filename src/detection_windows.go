@@ -161,6 +161,6 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 func rebootPort(portName string) (err error) {
 	cmd := exec.Command("MODE", portName, "BAUD=1200")
 	_, err = cmd.CombinedOutput()
-	print(cmd.Args, err)
+	printLog(cmd.Args, err)
 	return err
 }
