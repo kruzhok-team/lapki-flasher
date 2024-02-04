@@ -192,9 +192,12 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 		}
 	}()
 	// отправляем все устройства клиенту
-	// отправляем все клиентам изменения в устройстве, если таковые имеются
+	// отправляем всем клиентам изменения в устройстве, если таковые имеются
 	// отправляем всем остальным клиентам только новые устройства
-	detectedBoards, updatedPort, newDevices, deletedDevices, _ := detector.Update()
+
+	detectedBoards, _, _, _, _ := detector.Update()
+
+	updatedPort := detector.GetUpdatedPort()
 	if !sendToAll {
 		for deviceID, device := range detectedBoards {
 			Device(deviceID, device, false, c)
@@ -207,6 +210,8 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			DeviceUpdatePort(deviceID, device, c)
 		}
 	}
+
+	newDevices := detector.GetNewDevices()
 	for deviceID, device := range newDevices {
 		if sendToAll {
 			m.sendMessageToAll(DeviceMsg, newDeviceMessage(device, deviceID))
@@ -214,6 +219,8 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			Device(deviceID, device, true, c)
 		}
 	}
+
+	deletedDevices := detector.GetDeletedDevices()
 	for deviceID := range deletedDevices {
 		if sendToAll {
 			m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
@@ -221,4 +228,6 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			DeviceUpdateDelete(deviceID, c)
 		}
 	}
+
+	detector.ClearStatusDevices()
 }

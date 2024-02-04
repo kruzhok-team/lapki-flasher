@@ -118,6 +118,10 @@ type Detector struct {
 	// Список ID типов плат, которые не нужно добавлять, при обновлении.
 	// Старые устройства, если они не отсоединялись, останутся в списке, даже если их typeID находится в списке
 	dontAddTypes map[int]void
+
+	updatedPort    map[string]*BoardToFlash
+	newDevices     map[string]*BoardToFlash
+	deletedDevices map[string]*BoardToFlash
 }
 
 //go:embed device_list.JSON
@@ -130,6 +134,9 @@ func NewDetector() *Detector {
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
 	d.dontAddTypes = make(map[int]void)
+	d.updatedPort = make(map[string]*BoardToFlash)
+	d.newDevices = make(map[string]*BoardToFlash)
+	d.deletedDevices = make(map[string]*BoardToFlash)
 	return &d
 }
 
@@ -180,8 +187,8 @@ func (d *Detector) Update() (
 			}
 		}
 	}
-	// удаление
 	d.mu.Lock()
+	// удаление
 	for deviceID := range d.boards {
 		board, exists := detectedBoards[deviceID]
 		if !exists {
@@ -189,9 +196,47 @@ func (d *Detector) Update() (
 			delete(d.boards, deviceID)
 		}
 	}
+
+	// обновление словарей с платами
+	for ID, board := range newDevices {
+		d.newDevices[ID] = board
+	}
+	for ID, board := range deletedDevices {
+		d.deletedDevices[ID] = board
+	}
+	for ID, board := range updatedPort {
+		d.updatedPort[ID] = board
+	}
 	d.mu.Unlock()
 
 	return
+}
+
+func (d *Detector) GetDeletedDevices() map[string]*BoardToFlash {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.deletedDevices
+}
+
+func (d *Detector) GetNewDevices() map[string]*BoardToFlash {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.newDevices
+}
+
+func (d *Detector) GetUpdatedPort() map[string]*BoardToFlash {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.updatedPort
+}
+
+// сброс значений newDevices, deletedDevices, updatedDevices
+func (d *Detector) ClearStatusDevices() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.deletedDevices = make(map[string]*BoardToFlash)
+	d.newDevices = make(map[string]*BoardToFlash)
+	d.updatedPort = make(map[string]*BoardToFlash)
 }
 
 // попросить дектектора, чтобы он не добавлял новые устройства с данным typeID в список (старые устройства с этим typeID останутся в списке)
