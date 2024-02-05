@@ -140,9 +140,9 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
-		properties, err = findProperty(board.getPort(), USEC_INITIALIZED)
+		properties, err = findProperty(board.getPortSync(), USEC_INITIALIZED)
 	} else {
-		properties, err = findProperty(board.getPort(), ID_SERIAL)
+		properties, err = findProperty(board.getPortSync(), ID_SERIAL)
 	}
 	printLog(board.Type.ProductID, board.Type.ProductID)
 	if err == nil && properties[0] == ID {
@@ -166,7 +166,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		}
 		return false
 	})
-	board.setPort(newPortName)
+	board.setPortSync(newPortName)
 	return true
 }
 
