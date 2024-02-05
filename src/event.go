@@ -141,7 +141,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if msg.FileSize > maxFileSize {
 		return ErrFlashLargeFile
 	}
-	board, exists := detector.GetBoard(msg.ID)
+	board, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		return ErrFlashWrongID
 	}

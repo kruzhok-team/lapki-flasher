@@ -195,41 +195,75 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	// отправляем всем клиентам изменения в устройстве, если таковые имеются
 	// отправляем всем остальным клиентам только новые устройства
 
-	detectedBoards, _, _, _, notAddedDevices := detector.Update()
+	_, _, devicesInList := detector.Update()
 
-	updatedPort := detector.GetUpdatedPort()
 	if !sendToAll {
-		for deviceID, device := range detectedBoards {
-			if _, ok := notAddedDevices[deviceID]; !ok {
-				Device(deviceID, device, false, c)
+		for deviceID, device := range devicesInList {
+			Device(deviceID, device, false, c)
+		}
+	}
+	for {
+		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
+			if sendToAll {
+				switch boardWithAction.action {
+				case PORT_UPDATE:
+					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
+				case ADD:
+					m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithAction.board, boardWithAction.boardID))
+				case DELETE:
+					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
+				default:
+					printLog("Warning! Unknown action with board!", boardWithAction.action)
+				}
+			} else {
+				switch boardWithAction.action {
+				case PORT_UPDATE:
+					DeviceUpdatePort(boardWithAction.boardID, boardWithAction.board, c)
+				case ADD:
+					Device(boardWithAction.boardID, boardWithAction.board, true, c)
+				case DELETE:
+					DeviceUpdateDelete(boardWithAction.boardID, c)
+				default:
+					printLog("Warning! Unknown action with board!", boardWithAction.action)
+				}
 			}
+		} else {
+			break
 		}
 	}
-	for deviceID, device := range updatedPort {
-		if sendToAll {
-			m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(device, deviceID))
+	/*for {
+		if boardWithID, exists := detector.popStack(detector.updatedPort); exists {
+			if sendToAll {
+				m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithID.board, boardWithID.ID))
+			} else {
+				DeviceUpdatePort(boardWithID.ID, boardWithID.board, c)
+			}
 		} else {
-			DeviceUpdatePort(deviceID, device, c)
+			break
 		}
 	}
 
-	newDevices := detector.GetNewDevices()
-	for deviceID, device := range newDevices {
-		if sendToAll {
-			m.sendMessageToAll(DeviceMsg, newDeviceMessage(device, deviceID))
+	for {
+		if boardWithID, exists := detector.popStack(detector.newDevices); exists {
+			if sendToAll {
+				m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithID.board, boardWithID.ID))
+			} else {
+				Device(boardWithID.ID, boardWithID.board, true, c)
+			}
 		} else {
-			Device(deviceID, device, true, c)
+			break
 		}
 	}
 
-	deletedDevices := detector.GetDeletedDevices()
-	for deviceID := range deletedDevices {
-		if sendToAll {
-			m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
+	for {
+		if boardWithID, exists := detector.popStack(detector.deletedDevices); exists {
+			if sendToAll {
+				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithID.ID))
+			} else {
+				DeviceUpdateDelete(boardWithID.ID, c)
+			}
 		} else {
-			DeviceUpdateDelete(deviceID, c)
+			break
 		}
-	}
-
-	detector.ClearStatusDevices()
+	}*/
 }

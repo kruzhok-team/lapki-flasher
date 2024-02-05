@@ -43,13 +43,12 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 }
 
 // находит все подключённые платы
-func detectBoards() map[string]*BoardToFlash {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	// start := time.Now()
 	// defer fmt.Println("detection time: ", time.Now().Sub(start))
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
-	boardTemplates := detector.boardList()
 	boards := make(map[string]*BoardToFlash)
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {

@@ -56,7 +56,7 @@ func getInstanceId(substring string) []string {
 }
 
 // находит все подключённые платы
-func detectBoards() map[string]*BoardToFlash {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	//startTime := time.Now()
 	boards := make(map[string]*BoardToFlash)
 	presentUSBDevices := getInstanceId("usb")
@@ -64,7 +64,6 @@ func detectBoards() map[string]*BoardToFlash {
 	if presentUSBDevices == nil {
 		return nil
 	}
-	boardTemplates := detector.boardList()
 	//fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
@@ -150,8 +149,8 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		return false
 	}
 	portName := findPortName(&ID)
-	if board.getPort() != portName {
-		board.setPort(portName)
+	if board.getPortSync() != portName {
+		board.setPortSync(portName)
 		return true
 	}
 	return false

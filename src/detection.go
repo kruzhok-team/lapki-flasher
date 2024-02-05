@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -119,9 +120,7 @@ type Detector struct {
 	// Старые устройства, если они не отсоединялись, останутся в списке, даже если их typeID находится в списке
 	dontAddTypes map[int]void
 
-	updatedPort    map[string]*BoardToFlash
-	newDevices     map[string]*BoardToFlash
-	deletedDevices map[string]*BoardToFlash
+	boardActions *list.List
 }
 
 //go:embed device_list.JSON
@@ -134,109 +133,79 @@ func NewDetector() *Detector {
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
 	d.dontAddTypes = make(map[int]void)
-	d.updatedPort = make(map[string]*BoardToFlash)
-	d.newDevices = make(map[string]*BoardToFlash)
-	d.deletedDevices = make(map[string]*BoardToFlash)
+	d.boardActions = list.New()
 	return &d
 }
 
 // Обновление текущего списка устройств.
 // Вовращает:
 // detectedBoards - все платы, которые удалось обнаружить;
-// updatedPort - список устройств с новыми значениями портов;
-// newDevices - список устройств, которых не было в старом списке;
-// deletedDevices - спискок устройств, которые были в старом списке, но которых нет в обновлённом;
-// notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes
+// notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes;
+// devicesInList - текущий список плат, без учёта notAddedDevices
 func (d *Detector) Update() (
 	detectedBoards map[string]*BoardToFlash,
-	updatedPort map[string]*BoardToFlash,
-	newDevices map[string]*BoardToFlash,
-	deletedDevices map[string]*BoardToFlash,
-	notAddedDevices map[string]*BoardToFlash) {
-	detectedBoards = detectBoards()
+	notAddedDevices map[string]*BoardToFlash,
+	devicesInList map[string]*BoardToFlash) {
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	detectedBoards = detectBoards(d.boardTemplates)
 
 	// добавление фальшивых плат к действительно обнаруженным
 	if fakeBoardsNum > 0 {
 		if detectedBoards == nil {
 			detectedBoards = make(map[string]*BoardToFlash)
 		}
-		for ID, board := range detector.fakeBoards {
+		for ID, board := range d.fakeBoards {
 			detectedBoards[ID] = board
 		}
 	}
 
 	// обновление информации о старых устройствах и добавление новых
-	updatedPort = make(map[string]*BoardToFlash)
-	newDevices = make(map[string]*BoardToFlash)
-	deletedDevices = make(map[string]*BoardToFlash)
+
 	notAddedDevices = make(map[string]*BoardToFlash)
 
 	for deviceID, newBoard := range detectedBoards {
-		oldBoard, exists := detector.GetBoard(deviceID)
+		oldBoard, exists := d.boards[deviceID]
 		if exists {
-			if oldBoard.getPort() != newBoard.PortName {
-				oldBoard.setPort(newBoard.PortName)
-				updatedPort[deviceID] = newBoard
+			if oldBoard.getPortSync() != newBoard.PortName {
+				oldBoard.setPortSync(newBoard.PortName)
+				d.boardActions.PushBack(ActionWithBoard{board: oldBoard, boardID: deviceID, action: PORT_UPDATE})
 			}
 		} else {
 			if _, ok := d.dontAddTypes[newBoard.Type.typeID]; ok {
 				notAddedDevices[deviceID] = newBoard
 			} else {
-				d.AddBoard(deviceID, newBoard)
-				newDevices[deviceID] = newBoard
+				d.boards[deviceID] = newBoard
+				d.boardActions.PushBack(ActionWithBoard{board: newBoard, boardID: deviceID, action: ADD})
 			}
 		}
 	}
-	d.mu.Lock()
+
 	// удаление
 	for deviceID := range d.boards {
 		board, exists := detectedBoards[deviceID]
 		if !exists {
-			deletedDevices[deviceID] = board
+			d.boardActions.PushBack(ActionWithBoard{board: board, boardID: deviceID, action: DELETE})
 			delete(d.boards, deviceID)
 		}
 	}
-
-	// обновление словарей с платами
-	for ID, board := range newDevices {
-		d.newDevices[ID] = board
-	}
-	for ID, board := range deletedDevices {
-		d.deletedDevices[ID] = board
-	}
-	for ID, board := range updatedPort {
-		d.updatedPort[ID] = board
-	}
-	d.mu.Unlock()
-
+	devicesInList = d.boards
 	return
 }
 
-func (d *Detector) GetDeletedDevices() map[string]*BoardToFlash {
+// Возвращает и удаляет первое действие в очереди.
+// Если список действий пуст, то возвращает пустое действие и ложь в качестве второй переменной.
+// Иначе вовращает действие с платой и истину.
+func (d *Detector) PopFrontActionSync() (action ActionWithBoard, exists bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.deletedDevices
-}
-
-func (d *Detector) GetNewDevices() map[string]*BoardToFlash {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.newDevices
-}
-
-func (d *Detector) GetUpdatedPort() map[string]*BoardToFlash {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.updatedPort
-}
-
-// сброс значений newDevices, deletedDevices, updatedDevices
-func (d *Detector) ClearStatusDevices() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.deletedDevices = make(map[string]*BoardToFlash)
-	d.newDevices = make(map[string]*BoardToFlash)
-	d.updatedPort = make(map[string]*BoardToFlash)
+	if d.boardActions.Len() > 0 {
+		return d.boardActions.Remove(d.boardActions.Front()).(ActionWithBoard), true
+	} else {
+		return ActionWithBoard{}, false
+	}
 }
 
 // попросить дектектора, чтобы он не добавлял новые устройства с данным typeID в список (старые устройства с этим typeID останутся в списке)
@@ -253,14 +222,14 @@ func (d *Detector) AddThisType(typeID int) {
 }
 
 // возвращает устройство, соответствующее ID, существует ли устройство в списке
-func (d *Detector) GetBoard(ID string) (*BoardToFlash, bool) {
+func (d *Detector) GetBoardSync(ID string) (*BoardToFlash, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	value, exists := d.boards[ID]
 	return value, exists
 }
 
-func (d *Detector) AddBoard(ID string, board *BoardToFlash) {
+func (d *Detector) AddBoardSync(ID string, board *BoardToFlash) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.boards[ID] = board
@@ -305,13 +274,13 @@ func (board *BoardToFlash) SetLock(lock bool) {
 	board.flashing = lock
 }
 
-func (board *BoardToFlash) getPort() string {
+func (board *BoardToFlash) getPortSync() string {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.PortName
 }
 
-func (board *BoardToFlash) setPort(newPortName string) {
+func (board *BoardToFlash) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.PortName = newPortName

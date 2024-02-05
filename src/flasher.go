@@ -28,7 +28,7 @@ func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, 
 			// TODO: возможно стоит добавить количество необходимого времени в параметры сервера
 			time.Sleep(500 * time.Millisecond)
 			printLog("Попытка найти подходящее устройство", i+1)
-			_, _, _, _, notAddedDevices = detector.Update()
+			_, notAddedDevices, _ = detector.Update()
 			sameTypeCnt := 0
 			for _, dev := range notAddedDevices {
 				if dev.Type.typeID == bootloaderType {
