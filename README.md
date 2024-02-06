@@ -5,6 +5,7 @@
 ## Поддерживаемые устройства
 
 - Arduino Uno (ATmega328P)
+- Arduino Micro (ATmega32U4)
 
 ## Зависимости
 
