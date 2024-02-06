@@ -42,13 +42,13 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
-func detectBoards() map[string]*BoardToFlash {
+// находит все подключённые платы
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	// start := time.Now()
 	// defer fmt.Println("detection time: ", time.Now().Sub(start))
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
-	boardTemplates := detector.boardList()
 	boards := make(map[string]*BoardToFlash)
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
@@ -60,8 +60,16 @@ func detectBoards() map[string]*BoardToFlash {
 					//fmt.Println(len(cur_group), v)
 					for _, pid := range boardTemplate.ProductIDs {
 						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
-							detectedBoard := NewBoardToFlash(BoardType{pid, vid, boardTemplate.Name, boardTemplate.Controller, boardTemplate.Programmer, boardTemplate.BootloaderName, ""},
-								findPortName(desc))
+							boardType := BoardType{
+								boardTemplate.ID,
+								pid,
+								vid,
+								boardTemplate.Name,
+								boardTemplate.Controller,
+								boardTemplate.Programmer,
+								boardTemplate.BootloaderID,
+							}
+							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
 							if detectedBoard.PortName == NOT_FOUND {
 								continue
 							}
@@ -132,9 +140,9 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
-		properties, err = findProperty(board.getPort(), USEC_INITIALIZED)
+		properties, err = findProperty(board.getPortSync(), USEC_INITIALIZED)
 	} else {
-		properties, err = findProperty(board.getPort(), ID_SERIAL)
+		properties, err = findProperty(board.getPortSync(), ID_SERIAL)
 	}
 	printLog(board.Type.ProductID, board.Type.ProductID)
 	if err == nil && properties[0] == ID {
@@ -158,7 +166,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		}
 		return false
 	})
-	board.setPort(newPortName)
+	board.setPortSync(newPortName)
 	return true
 }
 
@@ -196,4 +204,13 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 	}
 	//fmt.Println(id)
 	return answers, nil
+}
+
+// TODO: перезагрузка порта
+func rebootPort(portName string) (err error) {
+	// stty 115200 -F /dev/ttyUSB0 raw -echo
+	cmd := exec.Command("stty", "1200", "-F", portName, "raw", "-echo")
+	_, err = cmd.CombinedOutput()
+	printLog(cmd.Args, err)
+	return err
 }

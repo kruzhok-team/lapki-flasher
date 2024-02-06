@@ -1,20 +1,29 @@
 [
-    {
-        "name":"Arduino Micro",
-        "productIDs":["8037"],
-        "vendorIDs":["2a03", "2341"],
-        "controller":"ATmega32U4",
-        "programmer":"avr109",
-        "bootloaderName":"Arduino Micro (bootloader)",
-        "bootloaderIDs":["0037"]
-    },
-    {
-        "name":"Arduino Uno",
-        "productIDs":["0043"],
-        "vendorIDs":["2a03", "2341"],
-        "controller":"ATmega328P",
-        "programmer":"arduino",
-        "bootloaderName":"",
-        "bootloaderIDs":[]
-    }
+  {
+    "ID": 0,
+    "name": "Arduino Micro",
+    "productIDs": ["8037"],
+    "vendorIDs": ["2a03", "2341"],
+    "controller": "ATmega32U4",
+    "programmer": "avr109",
+    "bootloaderID": 1
+  },
+  {
+    "ID": 1,
+    "name": "Arduino Micro (bootloader)",
+    "productIDs": ["0037"],
+    "vendorIDs": ["2a03", "2341"],
+    "controller": "ATmega32U4",
+    "programmer": "avr109",
+    "bootloaderID": -1
+  },
+  {
+    "ID": 2,
+    "name": "Arduino Uno",
+    "productIDs": ["0043"],
+    "vendorIDs": ["2a03", "2341"],
+    "controller": "ATmega328P",
+    "programmer": "arduino",
+    "bootloaderID": -1
+  }
 ]

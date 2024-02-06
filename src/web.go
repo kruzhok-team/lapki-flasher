@@ -191,54 +191,79 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			c.getListCooldown.start()
 		}
 	}()
-	newBoards := detectBoards()
-	// добавление фальшивых плат к действительно обнаруженным
-	if fakeBoardsNum > 0 {
-		if newBoards == nil {
-			newBoards = make(map[string]*BoardToFlash)
-		}
-		for ID, board := range detector.fakeBoards {
-			newBoards[ID] = board
+	// отправляем все устройства клиенту
+	// отправляем всем клиентам изменения в устройстве, если таковые имеются
+	// отправляем всем остальным клиентам только новые устройства
+
+	_, _, devicesInList := detector.Update()
+
+	if !sendToAll {
+		for deviceID, device := range devicesInList {
+			Device(deviceID, device, false, c)
 		}
 	}
-	// отправляем все устройства клиенту
-	// отправляем все клиентам об изменениях в устройстве, если таковые имеются
-	// отправляем всем остальным клиентам только новые устройства
-	for deviceID, newBoard := range newBoards {
-		oldBoard, exists := detector.GetBoard(deviceID)
-		if exists {
-			if oldBoard.getPort() != newBoard.PortName {
-				oldBoard.setPort(newBoard.PortName)
-				if sendToAll {
-					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(newBoard, deviceID))
-				} else {
-					DeviceUpdatePort(deviceID, newBoard, c)
+	for {
+		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
+			if sendToAll {
+				switch boardWithAction.action {
+				case PORT_UPDATE:
+					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
+				case ADD:
+					m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithAction.board, boardWithAction.boardID))
+				case DELETE:
+					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
+				default:
+					printLog("Warning! Unknown action with board!", boardWithAction.action)
+				}
+			} else {
+				switch boardWithAction.action {
+				case PORT_UPDATE:
+					DeviceUpdatePort(boardWithAction.boardID, boardWithAction.board, c)
+				case ADD:
+					Device(boardWithAction.boardID, boardWithAction.board, true, c)
+				case DELETE:
+					DeviceUpdateDelete(boardWithAction.boardID, c)
+				default:
+					printLog("Warning! Unknown action with board!", boardWithAction.action)
 				}
 			}
-			if !sendToAll {
-				Device(deviceID, newBoard, false, c)
+		} else {
+			break
+		}
+	}
+	/*for {
+		if boardWithID, exists := detector.popStack(detector.updatedPort); exists {
+			if sendToAll {
+				m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithID.board, boardWithID.ID))
+			} else {
+				DeviceUpdatePort(boardWithID.ID, boardWithID.board, c)
 			}
 		} else {
-			detector.AddBoard(deviceID, newBoard)
-			if sendToAll {
-				m.sendMessageToAll(DeviceMsg, newDeviceMessage(newBoard, deviceID))
-			} else {
-				Device(deviceID, newBoard, true, c)
-			}
+			break
 		}
 	}
-	detector.mu.Lock()
-	for deviceID := range detector.boards {
-		_, exists := newBoards[deviceID]
-		if !exists {
-			//deletedMsgs = append(deletedMsgs, *newDeviceUpdateDeleteMessage(deviceID))
+
+	for {
+		if boardWithID, exists := detector.popStack(detector.newDevices); exists {
 			if sendToAll {
-				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(deviceID))
+				m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithID.board, boardWithID.ID))
 			} else {
-				DeviceUpdateDelete(deviceID, c)
+				Device(boardWithID.ID, boardWithID.board, true, c)
 			}
-			delete(detector.boards, deviceID)
+		} else {
+			break
 		}
 	}
-	detector.mu.Unlock()
+
+	for {
+		if boardWithID, exists := detector.popStack(detector.deletedDevices); exists {
+			if sendToAll {
+				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithID.ID))
+			} else {
+				DeviceUpdateDelete(boardWithID.ID, c)
+			}
+		} else {
+			break
+		}
+	}*/
 }

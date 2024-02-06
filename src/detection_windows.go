@@ -6,12 +6,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
 )
 
-// настройка ОС (для Windows она не требуется, поэтому функция пустая)
+// настройка ОС (для Windows она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
 func setupOS() {
 
 }
@@ -21,7 +22,11 @@ func getInstanceId(substring string) []string {
 	//start := time.Now()
 	keyPath := "SYSTEM\\CurrentControlSet\\Services\\usbser\\Enum"
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-	defer key.Close()
+	defer func() {
+		if err := key.Close(); err != nil {
+			printLog("Error on closing registry key:", err.Error())
+		}
+	}()
 	if err != nil {
 		printLog("No devices are connected or drivers are not installed", err)
 		return nil
@@ -51,7 +56,7 @@ func getInstanceId(substring string) []string {
 }
 
 // находит все подключённые платы
-func detectBoards() map[string]*BoardToFlash {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	//startTime := time.Now()
 	boards := make(map[string]*BoardToFlash)
 	presentUSBDevices := getInstanceId("usb")
@@ -59,7 +64,6 @@ func detectBoards() map[string]*BoardToFlash {
 	if presentUSBDevices == nil {
 		return nil
 	}
-	boardTemplates := detector.boardList()
 	//fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
@@ -71,20 +75,20 @@ func detectBoards() map[string]*BoardToFlash {
 					pathLen := len(pathPattern)
 					// нашли подходящее устройство
 					//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
-					if pathLen <= deviceLen && strings.ToLower(device[:pathLen]) == strings.ToLower(pathPattern) {
+					if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
 						portName := findPortName(&device)
 						if portName == NOT_FOUND {
 							printLog(device)
 							continue
 						}
 						boardType := BoardType{
+							boardTemplate.ID,
 							productID,
 							vendorID,
 							boardTemplate.Name,
 							boardTemplate.Controller,
 							boardTemplate.Programmer,
-							boardTemplate.BootloaderName,
-							"",
+							boardTemplate.BootloaderID,
 						}
 						detectedBoard := NewBoardToFlash(boardType, portName)
 						serialIndex := strings.LastIndex(device, "\\")
@@ -93,7 +97,7 @@ func detectBoards() map[string]*BoardToFlash {
 							detectedBoard.SerialID = device[serialIndex+1:]
 						}
 						boards[device] = detectedBoard
-						printLog("Device was found:", detectedBoard)
+						printLog("Device was found:", detectedBoard, device)
 					}
 				}
 			}
@@ -101,6 +105,7 @@ func detectBoards() map[string]*BoardToFlash {
 	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
+	printLog(boards)
 	return boards
 }
 
@@ -108,7 +113,11 @@ func detectBoards() map[string]*BoardToFlash {
 func findPortName(instanceId *string) string {
 	keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", *instanceId)
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-	defer key.Close()
+	defer func() {
+		if err := key.Close(); err != nil {
+			printLog("Error on closing registry key:", err.Error())
+		}
+	}()
 	if err != nil {
 		printLog("Registry error:", err)
 		return NOT_FOUND
@@ -140,9 +149,17 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 		return false
 	}
 	portName := findPortName(&ID)
-	if board.getPort() != portName {
-		board.setPort(portName)
+	if board.getPortSync() != portName {
+		board.setPortSync(portName)
 		return true
 	}
 	return false
+}
+
+// перезагрузка порта
+func rebootPort(portName string) (err error) {
+	cmd := exec.Command("MODE", portName, "BAUD=1200")
+	_, err = cmd.CombinedOutput()
+	printLog(cmd.Args, err)
+	return err
 }

@@ -116,6 +116,9 @@ func (c *WebSocketConnection) closeChan() {
 func (c *WebSocketConnection) StartFlashing(board *BoardToFlash, fileSize int) {
 	c.FlashingBoard = board
 	c.FlashingBoard.SetLock(true)
+	if board.refToBoot != nil {
+		board.refToBoot.SetLock(true)
+	}
 	c.FileWriter.Start(fileSize)
 }
 

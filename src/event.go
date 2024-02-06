@@ -141,7 +141,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if msg.FileSize > maxFileSize {
 		return ErrFlashLargeFile
 	}
-	board, exists := detector.GetBoard(msg.ID)
+	board, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		return ErrFlashWrongID
 	}
@@ -193,7 +193,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		if detector.isFake(c.FlashingBoard.SerialID) {
 			avrMsg, err = fakeFlash(c.FlashingBoard, c.FileWriter.GetFilePath())
 		} else {
-			avrMsg, err = flash(c.FlashingBoard, c.FileWriter.GetFilePath())
+			avrMsg, err = autoFlash(c.FlashingBoard, c.FileWriter.GetFilePath())
 		}
 		c.avrMsg = avrMsg
 		if err != nil {
