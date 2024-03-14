@@ -70,6 +70,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 							}
 							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
 							if detectedBoard.PortName == NOT_FOUND {
+								printLog("can't find port")
 								continue
 							}
 							properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
