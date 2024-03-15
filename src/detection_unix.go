@@ -126,6 +126,7 @@ func findPortName(desc *gousb.DeviceDesc) string {
 				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
 				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
 			}
+			printLog(dir, "doesn't exists")
 		}
 
 	}
