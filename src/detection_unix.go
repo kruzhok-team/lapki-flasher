@@ -58,6 +58,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 					//fmt.Println(v, desc.Product)
 					//fmt.Println(len(cur_group), v)
 					for _, pid := range boardTemplate.ProductIDs {
+						printLog(desc.iSerial, desc.iProduct, desc.iManufacturer)
 						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
 							boardType := BoardType{
 								boardTemplate.ID,
