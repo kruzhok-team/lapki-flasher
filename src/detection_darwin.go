@@ -3,87 +3,117 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
-
-	"github.com/google/gousb"
 )
 
-func findPortName(desc *gousb.DeviceDesc) string {
-	pid := desc.Product.String()
-	vid := desc.Vendor.String()
+// настройка ОС (для Darwin она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
+func setupOS() {}
 
+// находит все подключённые платы
+// TODO: добавить поиск сериного номера
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
+	boards := make(map[string]*BoardToFlash)
 	cmd := exec.Command("system_profiler", "SPUSBDataType")
-	stdout, err := cmd.CombinedOutput()
+	jsonData, err := cmd.CombinedOutput()
 	if err != nil {
-		printLog(string(stdout), err.Error())
-		return NOT_FOUND
+		printLog("system_profiler error", string(jsonData), err.Error())
+		return nil
 	}
-	lines := strings.Split(string(stdout), "\n")
-
-	var ttyPort, deviceName string
-
-	for _, line := range lines {
-		if strings.Contains(line, fmt.Sprintf("Product ID: %d", pid)) && strings.Contains(line, fmt.Sprintf("Vendor ID: %d", vid)) {
-			// Extract the device name
-			deviceName = strings.TrimSpace(strings.Split(line, "Location ID:")[0])
-			break
-		}
+	jsonArr := USBJSONARRAY{}
+	err = json.Unmarshal([]byte(jsonData), &jsonArr)
+	if err != nil {
+		printLog("JSON unmarshal error:", err.Error())
+		return nil
 	}
-
-	if deviceName != "" {
-		cmd = exec.Command("ioreg", "-p", "IOUSB", "-l")
-		stdout, err = cmd.Output()
-		if err != nil {
-			printLog(string(stdout), err.Error())
-			return NOT_FOUND
-		}
-
-		lines = strings.Split(string(stdout), "\n")
-
-		for _, line := range lines {
-			if strings.Contains(line, deviceName) {
-				ttyPort = strings.TrimSpace(strings.Split(line, "IODialinDevice")[1])
-				return ttyPort
+	for _, boardTemplate := range boardTemplates {
+		for _, vid := range boardTemplate.VendorIDs {
+			for _, pid := range boardTemplate.ProductIDs {
+				deviceID, err := searchNameLocationID(jsonArr.SPUSBDataType, pid, vid)
+				if err != nil || deviceID == "" {
+					continue
+				}
+				boardType := BoardType{
+					typeID:           boardTemplate.ID,
+					ProductID:        pid,
+					VendorID:         vid,
+					Name:             boardTemplate.Name,
+					Controller:       boardTemplate.Controller,
+					Programmer:       boardTemplate.Programmer,
+					BootloaderTypeID: boardTemplate.BootloaderID,
+				}
+				detectedBoard := NewBoardToFlash(boardType, NOT_FOUND)
+				detectedBoard.updatePortName(deviceID)
+				if detectedBoard.getPortSync() == NOT_FOUND {
+					printLog("Failed to find port")
+					continue
+				}
+				boards[deviceID] = detectedBoard
+				printLog("Device was found:", detectedBoard, deviceID)
 			}
 		}
 	}
-	return NOT_FOUND
+	return boards
 }
 
-// возвращает значение указанных параметров устройства, подключённого к порту portName,
-// можно использовать для того, чтобы получить серийный номер устройства (если есть) или для получения времени, когда устройство было подключено (используется как ID)
-//
-//	см. "udevadm info --query=propery" для большей информации об параметрах
-func findProperty(portName string, properties ...string) ([]string, error) {
-	numProperties := len(properties)
-	if numProperties == 0 {
-		return nil, nil
-	}
-	cmd := exec.Command("udevadm", "info", "--query=property", "--name="+portName)
-	stdout, err := cmd.CombinedOutput()
+// true - если порт изменился или не найден, иначе false
+// назначает порту значение NOT_FOUND, если не удалось найти порт
+// TODO: переделать интерфейс функции для все платформ, сделать, чтобы функция возвращала error
+func (board *BoardToFlash) updatePortName(ID string) bool {
+	// ioreg -r -c IOUSBHostDevice -l -n 'QT2040 Trinkey' | grep -Ei 'class.IO|ttydevice|tty.usbmodem|@'
+	cmd := exec.Command("ioreg", "-r", "c", "IOUSBHostDevice", "-l", "-n", ID, "| grep IODialinDevice")
+	res, err := cmd.CombinedOutput()
 	if err != nil {
-		printLog(string(stdout), err.Error())
-		return nil, err
+		printLog("Failed to find a port name. Error:", err.Error())
+		board.setPortSync(NOT_FOUND)
+		return true
 	}
-	lines := strings.Split(string(stdout), "\n")
-	var answers = make([]string, numProperties)
-	for _, line := range lines {
-		lineSize := len(line)
-		for i, property := range properties {
-			if answers[i] != "" {
-				continue
-			}
-			propertySize := len(property)
-			if propertySize > lineSize {
-				continue
-			}
-			if line[:propertySize] == property {
-				answers[i] = line[propertySize+1:]
+	strRes := string(res)
+	fields := strings.Fields(strRes)
+	if len(fields) != 3 {
+		printLog("Unable to extract port name from:", strRes)
+		board.setPortSync(NOT_FOUND)
+		return true
+	}
+	oldPortName := board.getPortSync()
+	newPortName := strings.Trim(fields[2], "\"")
+	if oldPortName != newPortName {
+		board.setPortSync(newPortName)
+		return true
+	}
+	return false
+}
+
+// возращает имя устройства и location_id: name@location_id. Является ключом устройства для загрузчика
+func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, error) {
+	for _, dev := range devices {
+		println(dev.Name, len(dev.Items), dev.PID, dev.VID)
+		if dev.Items != nil {
+			rec, err := search(dev.Items, PID, VID)
+			if err == nil {
+				return rec, nil
 			}
 		}
+		if dev.PID == "" || dev.VID == "" {
+			continue
+		}
+		pid, err := extractID(dev.PID)
+		if err != nil {
+			continue
+		}
+		vid, err := extractID(dev.VID)
+		if err != nil {
+			continue
+		}
+		if PID == pid && VID == vid {
+			lid, err := extractID(dev.LID)
+			if err != nil {
+				continue
+			}
+			return dev.Name + "@" + lid, nil
+		}
 	}
-	//fmt.Println(id)
-	return answers, nil
+	return "", fmt.Errorf("location_id is not found")
 }
