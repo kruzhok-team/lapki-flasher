@@ -82,13 +82,13 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 							continue
 						}
 						boardType := BoardType{
-							boardTemplate.ID,
-							productID,
-							vendorID,
-							boardTemplate.Name,
-							boardTemplate.Controller,
-							boardTemplate.Programmer,
-							boardTemplate.BootloaderID,
+							typeID:           boardTemplate.ID,
+							ProductID:        productID,
+							VendorID:         vendorID,
+							Name:             boardTemplate.Name,
+							Controller:       boardTemplate.Controller,
+							Programmer:       boardTemplate.Programmer,
+							BootloaderTypeID: boardTemplate.BootloaderID,
 						}
 						detectedBoard := NewBoardToFlash(boardType, portName)
 						serialIndex := strings.LastIndex(device, "\\")
