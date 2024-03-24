@@ -110,7 +110,7 @@ func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, 
 	for _, dev := range devices {
 		println(dev.Name, len(dev.Items), dev.PID, dev.VID)
 		if dev.Items != nil {
-			rec, err := search(dev.Items, PID, VID)
+			rec, err := searchNameLocationID(dev.Items, PID, VID)
 			if err == nil {
 				return rec, nil
 			}
