@@ -9,6 +9,25 @@ import (
 	"strings"
 )
 
+type USBdevice struct {
+	Name  string      `json:"_name"`
+	PID   string      `json:"product_id"`
+	VID   string      `json:"vendor_id"`
+	LID   string      `json:"location_id"`
+	Items []USBdevice `json:"_items"`
+}
+type USBJSONARRAY struct {
+	SPUSBDataType []USBdevice `json:"SPUSBDataType"`
+}
+
+func extractID(input string) (string, error) {
+	id := strings.Fields(input)[0]
+	if !strings.Contains(id, "0x") {
+		return "", fmt.Errorf("Failed to extract ID")
+	}
+	return id[2:], nil
+}
+
 // настройка ОС (для Darwin она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
 func setupOS() {}
 
