@@ -144,3 +144,14 @@ func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, 
 	}
 	return "", fmt.Errorf("location_id is not found")
 }
+
+// перезагрузка порта
+func rebootPort(portName string) (err error) {
+	// stty 115200 -F /dev/ttyUSB0 raw -echo
+	cmd := exec.Command("stty", "-f", portName)
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		printLog(cmd.Args, err)
+	}
+	return err
+}
