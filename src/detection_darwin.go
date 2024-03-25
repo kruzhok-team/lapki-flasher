@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -35,7 +36,7 @@ func setupOS() {}
 // TODO: добавить поиск сериного номера
 func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	boards := make(map[string]*BoardToFlash)
-	cmd := exec.Command("system_profiler", "SPUSBDataType")
+	cmd := exec.Command("system_profiler", "SPUSBDataType", "-JSON")
 	jsonData, err := cmd.CombinedOutput()
 	if err != nil {
 		printLog("system_profiler error", string(jsonData), err.Error())
@@ -44,7 +45,8 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	jsonArr := USBJSONARRAY{}
 	err = json.Unmarshal([]byte(jsonData), &jsonArr)
 	if err != nil {
-		printLog("JSON unmarshal error:", err.Error())
+		printLog("JSON unmarshal error:", err.Error(), cmd.String())
+		printLog(string(jsonData))
 		return nil
 	}
 	for _, boardTemplate := range boardTemplates {
@@ -82,16 +84,22 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 // TODO: переделать интерфейс функции для все платформ, сделать, чтобы функция возвращала error
 func (board *BoardToFlash) updatePortName(ID string) bool {
 	// ioreg -r -c IOUSBHostDevice -l -n 'QT2040 Trinkey' | grep -Ei 'class.IO|ttydevice|tty.usbmodem|@'
-	cmd := exec.Command("ioreg", "-r", "c", "IOUSBHostDevice", "-l", "-n", ID, "| grep IODialinDevice")
-	res, err := cmd.CombinedOutput()
+	ultimate := "ioreg -r -c IOUSBHostDevice -l -n " + "\"" + ID + "\"" + " | grep IODialinDevice"
+	cmd := exec.Command("/bin/sh", "-c", ultimate)
+	//cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-n", ID, "grep IODialinDevice")
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	err := cmd.Run()
 	if err != nil {
-		printLog("Failed to find a port name. Error:", err.Error())
+		printLog("Failed to run cmd", cmd.String())
+		printLog("Error:", err.Error())
 		board.setPortSync(NOT_FOUND)
 		return true
 	}
-	strRes := string(res)
+	strRes := output.String()
 	fields := strings.Fields(strRes)
 	if len(fields) != 3 {
+		printLog("CMD:", cmd.String())
 		printLog("Unable to extract port name from:", strRes)
 		board.setPortSync(NOT_FOUND)
 		return true
@@ -108,7 +116,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 // возращает имя устройства и location_id: name@location_id. Является ключом устройства для загрузчика
 func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, error) {
 	for _, dev := range devices {
-		println(dev.Name, len(dev.Items), dev.PID, dev.VID)
+		//println(dev.Name, len(dev.Items), dev.PID, dev.VID)
 		if dev.Items != nil {
 			rec, err := searchNameLocationID(dev.Items, PID, VID)
 			if err == nil {
