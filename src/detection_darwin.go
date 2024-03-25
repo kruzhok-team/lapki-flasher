@@ -148,8 +148,9 @@ func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, 
 // перезагрузка порта
 func rebootPort(portName string) (err error) {
 	// stty 115200 -F /dev/ttyUSB0 raw -echo
-	cmd := exec.Command("stty", "-f", portName)
+	cmd := exec.Command("stty", "-f", portName, "1200")
 	_, err = cmd.CombinedOutput()
+	printLog(cmd.Args)
 	if err != nil {
 		printLog(cmd.Args, err)
 	}
