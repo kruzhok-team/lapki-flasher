@@ -64,7 +64,6 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	if presentUSBDevices == nil {
 		return nil
 	}
-	//fmt.Println(boardTemplates)
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
 		deviceLen := len(device)
@@ -123,7 +122,6 @@ func findPortName(instanceId *string) string {
 		return NOT_FOUND
 	}
 	portName, _, err := key.GetStringValue("PortName")
-	//fmt.Println("PORT NAME", portName)
 	if err == registry.ErrNotExist {
 		printLog("Port name doesn't exists")
 		return NOT_FOUND

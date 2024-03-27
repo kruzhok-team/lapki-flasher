@@ -6,6 +6,7 @@
 
 - Arduino Uno (ATmega328P)
 - Arduino Micro (ATmega32U4)
+- Arduino Mega (ATmega2560)
 
 ## Зависимости
 
