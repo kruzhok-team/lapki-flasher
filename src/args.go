@@ -81,5 +81,16 @@ func printArgsDesc() {
 	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
 	avrdudePathStr := fmt.Sprintf("путь к avrdude (напишите avrdude, если нужно, чтобы использовался системный путь): %s", avrdudePath)
 	configPathStr := fmt.Sprintf("путь к файлу конфигурации avrdude: %s", configPath)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n", webAddressStr, maxFileSizeStr, maxMsgSizeStr, maxThreadsPerClientStr, getListCooldownDurationStr, updateListTimeStr, verboseStr, alwaysUpdateStr, fakeBoardsNumStr, avrdudePathStr, configPathStr)
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
+		webAddressStr,
+		maxFileSizeStr,
+		maxMsgSizeStr,
+		maxThreadsPerClientStr,
+		getListCooldownDurationStr,
+		updateListTimeStr,
+		verboseStr,
+		alwaysUpdateStr,
+		fakeBoardsNumStr,
+		avrdudePathStr,
+		configPathStr)
 }
