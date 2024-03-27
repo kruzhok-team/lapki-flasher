@@ -57,9 +57,7 @@ func setArgs() {
 	flag.BoolVar(&alwaysUpdate, "alwaysUpdate", false, "всегда искать устройства и обновлять их список, даже когда ни один клиент не подключён (используется для тестирования)")
 	getListCooldownSeconds := flag.Int("listCooldown", 2, "минимальное время (в секундах), через которое клиент может снова запросить список устройств, игнорируется, если количество клиентов меньше чем 2")
 	updateListTimeSeconds := flag.Int("updateList", 15, "количество секунд между автоматическими обновлениями, не может быть меньше единицы, если получено значение меньше единицы, то оно заменяется на 1")
-	fmt.Println(*updateListTimeSeconds, fakeBoardsNum, verbose)
 	flag.Parse()
-	fmt.Println(*updateListTimeSeconds, fakeBoardsNum, verbose)
 	if fakeBoardsNum < 0 {
 		fakeBoardsNum = 0
 	}
