@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"sync"
 	"time"
@@ -55,11 +56,11 @@ func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, 
 		args = append(args, "-C", configPath)
 	}
 	printLog(avrdudePath, args)
-	return flash(board, args)
+	return flash(args)
 }
 
 // прошивка через avrdude с аргументами, указанными в avrdudeArgs
-func flash(board *BoardToFlash, avrdudeArgs []string) (avrdudeMessage string, err error) {
+func flash(avrdudeArgs []string) (avrdudeMessage string, err error) {
 	cmd := exec.Command(avrdudePath, avrdudeArgs...)
 	stdout, err := cmd.CombinedOutput()
 	outputString := string(stdout)
@@ -77,6 +78,7 @@ func flash(board *BoardToFlash, avrdudeArgs []string) (avrdudeMessage string, er
 // симуляция процесса прошивки, вместо неё, программа просто ждёт определённо время
 func fakeFlash(board *BoardToFlash, filePath string) (avrdudeMessage string, err error) {
 	time.Sleep(3 * time.Second)
+	printLog(fmt.Sprintf("Fake uploading of file %s in board %v is completed", filePath, board))
 	avrdudeMessage = "Fake flashing is completed"
 	return
 }
