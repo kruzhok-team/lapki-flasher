@@ -50,7 +50,6 @@ func (ff *FlashFileWriter) AddBlock(data []byte) (bool, error) {
 	}
 	// получены все блоки
 	ff.tempFile.Close()
-	//fmt.Println("File:", ff.tempFile.Name())
 	return true, nil
 }
 

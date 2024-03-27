@@ -44,8 +44,6 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 
 // находит все подключённые платы
 func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
-	// start := time.Now()
-	// defer fmt.Println("detection time: ", time.Now().Sub(start))
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
@@ -56,8 +54,6 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 		for _, boardTemplate := range boardTemplates {
 			for _, vid := range boardTemplate.VendorIDs {
 				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) {
-					//fmt.Println(v, desc.Product)
-					//fmt.Println(len(cur_group), v)
 					for _, pid := range boardTemplate.ProductIDs {
 						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
 							boardType := BoardType{
@@ -124,7 +120,6 @@ func findPortName(desc *gousb.DeviceDesc) string {
 				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
 				dirs, _ := os.ReadDir(dir)
 				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
-				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
 			}
 		}
 
@@ -135,8 +130,6 @@ func findPortName(desc *gousb.DeviceDesc) string {
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
 func (board *BoardToFlash) updatePortName(ID string) bool {
-	// start := time.Now()
-	// defer fmt.Println("update port time", time.Now().Sub(start))
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
@@ -202,7 +195,6 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 			}
 		}
 	}
-	//fmt.Println(id)
 	return answers, nil
 }
 
