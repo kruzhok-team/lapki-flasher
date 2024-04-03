@@ -3,30 +3,19 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"os/exec"
-	"strings"
+	"strconv"
+
+	"howett.net/plist"
 )
 
-type USBdevice struct {
-	Name  string      `json:"_name"`
-	PID   string      `json:"product_id"`
-	VID   string      `json:"vendor_id"`
-	LID   string      `json:"location_id"`
-	Items []USBdevice `json:"_items"`
-}
-type USBJSONARRAY struct {
-	SPUSBDataType []USBdevice `json:"SPUSBDataType"`
-}
-
-func extractID(input string) (string, error) {
-	id := strings.Fields(input)[0]
-	if !strings.Contains(id, "0x") {
-		return "", fmt.Errorf("Failed to extract ID")
-	}
-	return id[2:], nil
+type IOREG struct {
+	VendorID     int64   `plist:"idVendor"`
+	ProductID    int64   `plist:"idProduct"`
+	LocationID   int64   `plist:"locationID"`
+	SerialNumber string  `plist:"USB Serial Number"`
+	Port         string  `plist:"IODialinDevice"`
+	Children     []IOREG `plist:"IORegistryEntryChildren"`
 }
 
 // настройка ОС (для Darwin она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
@@ -36,113 +25,87 @@ func setupOS() {}
 // TODO: добавить поиск сериного номера
 func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	boards := make(map[string]*BoardToFlash)
-	cmd := exec.Command("system_profiler", "SPUSBDataType", "-JSON")
-	jsonData, err := cmd.CombinedOutput()
+	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
+	plistData, err := cmd.CombinedOutput()
 	if err != nil {
-		printLog("system_profiler error", string(jsonData), err.Error())
+		printLog("plist error", string(plistData), err.Error())
 		return nil
 	}
-	jsonArr := USBJSONARRAY{}
-	err = json.Unmarshal([]byte(jsonData), &jsonArr)
+	plistArr := []IOREG{}
+	format, err := plist.Unmarshal(plistData, &plistArr)
 	if err != nil {
-		printLog("JSON unmarshal error:", err.Error(), cmd.String())
-		printLog(string(jsonData))
+		printLog("unmarshal error:", err.Error(), cmd.String())
+		printLog("plint format:", format)
+		//printLog(string(plistData))
 		return nil
 	}
-	for _, boardTemplate := range boardTemplates {
-		for _, vid := range boardTemplate.VendorIDs {
-			for _, pid := range boardTemplate.ProductIDs {
-				deviceID, err := searchNameLocationID(jsonArr.SPUSBDataType, pid, vid)
-				if err != nil || deviceID == "" {
-					continue
-				}
-				boardType := BoardType{
-					typeID:           boardTemplate.ID,
-					ProductID:        pid,
-					VendorID:         vid,
-					Name:             boardTemplate.Name,
-					Controller:       boardTemplate.Controller,
-					Programmer:       boardTemplate.Programmer,
-					BootloaderTypeID: boardTemplate.BootloaderID,
-				}
-				detectedBoard := NewBoardToFlash(boardType, NOT_FOUND)
-				detectedBoard.updatePortName(deviceID)
-				if detectedBoard.getPortSync() == NOT_FOUND {
-					printLog("Failed to find port")
-					continue
-				}
-				boards[deviceID] = detectedBoard
-				printLog("Device was found:", detectedBoard, deviceID)
-			}
-		}
-	}
+	IOREGscan(plistArr, boardTemplates, boards)
 	return boards
 }
 
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
-// TODO: переделать интерфейс функции для все платформ, сделать, чтобы функция возвращала error
+// TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
 func (board *BoardToFlash) updatePortName(ID string) bool {
-	// ioreg -r -c IOUSBHostDevice -l -n 'QT2040 Trinkey' | grep -Ei 'class.IO|ttydevice|tty.usbmodem|@'
-	ultimate := "ioreg -r -c IOUSBHostDevice -l -n " + "\"" + ID + "\"" + " | grep IODialinDevice"
-	cmd := exec.Command("/bin/sh", "-c", ultimate)
-	//cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-n", ID, "grep IODialinDevice")
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	err := cmd.Run()
+	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
+	plistData, err := cmd.CombinedOutput()
 	if err != nil {
-		printLog("Failed to run cmd", cmd.String())
-		printLog("Error:", err.Error())
+		printLog("plist error", string(plistData), err.Error())
 		board.setPortSync(NOT_FOUND)
 		return true
 	}
-	strRes := output.String()
-	fields := strings.Fields(strRes)
-	if len(fields) != 3 {
-		printLog("CMD:", cmd.String())
-		printLog("Unable to extract port name from:", strRes)
+	plistArr := []IOREG{}
+	format, err := plist.Unmarshal(plistData, &plistArr)
+	if err != nil {
+		printLog("unmarshal error:", err.Error(), cmd.String())
+		printLog("plint format:", format)
+		//printLog(string(plistData))
 		board.setPortSync(NOT_FOUND)
 		return true
 	}
-	oldPortName := board.getPortSync()
-	newPortName := strings.Trim(fields[2], "\"")
-	if oldPortName != newPortName {
-		board.setPortSync(newPortName)
+	portName, _ := IOREGport(plistArr, ID, board)
+	if portName == NOT_FOUND {
+		board.setPortSync(NOT_FOUND)
+		return true
+	}
+	if portName != board.getPortSync() {
+		board.setPortSync(portName)
 		return true
 	}
 	return false
 }
 
-// возращает имя устройства и location_id: name@location_id. Является ключом устройства для загрузчика
-func searchNameLocationID(devices []USBdevice, PID string, VID string) (string, error) {
-	for _, dev := range devices {
-		//println(dev.Name, len(dev.Items), dev.PID, dev.VID)
-		if dev.Items != nil {
-			rec, err := searchNameLocationID(dev.Items, PID, VID)
-			if err == nil {
-				return rec, nil
+func IOREGport(plistArr []IOREG, ID string, board *BoardToFlash) (portName string, foundID bool) {
+	decimalVID, err := strconv.ParseInt(board.Type.VendorID, 16, 64)
+	if err != nil {
+		printLog(err.Error())
+	}
+	decimalPID, err := strconv.ParseInt(board.Type.ProductID, 16, 64)
+	if err != nil {
+		printLog(err.Error())
+	}
+	for _, entry := range plistArr {
+		if strconv.FormatInt(entry.LocationID, 10) == ID || entry.SerialNumber == ID {
+			if entry.ProductID != decimalPID || entry.VendorID != decimalVID {
+				return NOT_FOUND, true
 			}
-		}
-		if dev.PID == "" || dev.VID == "" {
-			continue
-		}
-		pid, err := extractID(dev.PID)
-		if err != nil {
-			continue
-		}
-		vid, err := extractID(dev.VID)
-		if err != nil {
-			continue
-		}
-		if PID == pid && VID == vid {
-			lid, err := extractID(dev.LID)
-			if err != nil {
-				continue
+			detectedBoard := NewBoardToFlash(board.Type, NOT_FOUND)
+			collectBoardInfo(entry, detectedBoard)
+			if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
+				printLog("can't find port name!")
+				detectedBoard.setPortSync(NOT_FOUND)
+				return NOT_FOUND, true
 			}
-			return dev.Name + "@" + lid, nil
+			return detectedBoard.PortName, true
 		}
 	}
-	return "", fmt.Errorf("location_id is not found")
+	for _, entry := range plistArr {
+		port, found := IOREGport(entry.Children, ID, board)
+		if found {
+			return port, found
+		}
+	}
+	return NOT_FOUND, false
 }
 
 // перезагрузка порта
@@ -155,4 +118,73 @@ func rebootPort(portName string) (err error) {
 		printLog(cmd.Args, err)
 	}
 	return err
+}
+
+func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[string]*BoardToFlash) {
+	for _, entry := range plistArr {
+		isFound := false
+		for _, boardTemplate := range boardTemplates {
+			for _, productID := range boardTemplate.ProductIDs {
+				PID, err := strconv.ParseInt(productID, 16, 64)
+				if err != nil {
+					printLog("conv of product id to decimal is failed: ", err.Error())
+					continue
+				}
+				for _, vendorID := range boardTemplate.VendorIDs {
+					VID, err := strconv.ParseInt(vendorID, 16, 64)
+					if err != nil {
+						printLog("conv of vendor id to decimal is failed: ", err.Error())
+						continue
+					}
+					if entry.ProductID == PID && entry.VendorID == VID {
+						boardType := BoardType{
+							typeID:           boardTemplate.ID,
+							ProductID:        productID,
+							VendorID:         vendorID,
+							Name:             boardTemplate.Name,
+							Controller:       boardTemplate.Controller,
+							Programmer:       boardTemplate.Programmer,
+							BootloaderTypeID: boardTemplate.BootloaderID,
+						}
+						detectedBoard := NewBoardToFlash(boardType, NOT_FOUND)
+						ID := strconv.FormatInt(collectBoardInfo(entry, detectedBoard), 10)
+						if detectedBoard.SerialID != "" {
+							ID = detectedBoard.SerialID
+						}
+						if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
+							printLog("can't find port name!")
+							goto SKIP
+						}
+						boards[ID] = detectedBoard
+						printLog("Found device", ID, detectedBoard)
+						isFound = true
+						goto SKIP
+					}
+				}
+			}
+		}
+	SKIP:
+		if !isFound {
+			IOREGscan(entry.Children, boardTemplates, boards)
+		}
+	}
+}
+
+func collectBoardInfo(reg IOREG, board *BoardToFlash) (locationID int64) {
+	if reg.SerialNumber != "" {
+		board.SerialID = reg.SerialNumber
+	}
+	if reg.Port != "" {
+		board.setPortSync(reg.Port)
+	}
+	if reg.LocationID != 0 {
+		locationID = reg.LocationID
+	}
+	for _, child := range reg.Children {
+		res := collectBoardInfo(child, board)
+		if res != 0 {
+			locationID = res
+		}
+	}
+	return locationID
 }
