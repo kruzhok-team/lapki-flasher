@@ -10,9 +10,11 @@ import (
 )
 
 type IOREG struct {
-	VendorID     int64   `plist:"idVendor"`
-	ProductID    int64   `plist:"idProduct"`
-	LocationID   int64   `plist:"locationID"`
+	VendorID  int64 `plist:"idVendor"`
+	ProductID int64 `plist:"idProduct"`
+	// Время с момента последнего запуска ОС.
+	// Используется для идентификации устройства, в случае отсутствия серийного номера
+	SessionID    int64   `plist:"sessionID"`
 	SerialNumber string  `plist:"USB Serial Number"`
 	Port         string  `plist:"IODialinDevice"`
 	Children     []IOREG `plist:"IORegistryEntryChildren"`
@@ -76,19 +78,8 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 }
 
 func IOREGport(plistArr []IOREG, ID string, board *BoardToFlash) (portName string, foundID bool) {
-	decimalVID, err := strconv.ParseInt(board.Type.VendorID, 16, 64)
-	if err != nil {
-		printLog(err.Error())
-	}
-	decimalPID, err := strconv.ParseInt(board.Type.ProductID, 16, 64)
-	if err != nil {
-		printLog(err.Error())
-	}
 	for _, entry := range plistArr {
-		if strconv.FormatInt(entry.LocationID, 10) == ID || entry.SerialNumber == ID {
-			if entry.ProductID != decimalPID || entry.VendorID != decimalVID {
-				return NOT_FOUND, true
-			}
+		if (entry.SerialNumber == "" && strconv.FormatInt(entry.SessionID, 10) == ID) || entry.SerialNumber == ID {
 			detectedBoard := NewBoardToFlash(board.Type, NOT_FOUND)
 			collectBoardInfo(entry, detectedBoard)
 			if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
@@ -151,6 +142,10 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 						if detectedBoard.SerialID != "" {
 							ID = detectedBoard.SerialID
 						}
+						if ID == "" || ID == "0" {
+							printLog("can't find ID!")
+							goto SKIP
+						}
 						if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
 							printLog("can't find port name!")
 							goto SKIP
@@ -170,21 +165,21 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 	}
 }
 
-func collectBoardInfo(reg IOREG, board *BoardToFlash) (locationID int64) {
+func collectBoardInfo(reg IOREG, board *BoardToFlash) (sessionID int64) {
 	if reg.SerialNumber != "" {
 		board.SerialID = reg.SerialNumber
 	}
 	if reg.Port != "" {
 		board.setPortSync(reg.Port)
 	}
-	if reg.LocationID != 0 {
-		locationID = reg.LocationID
+	if reg.SessionID != 0 {
+		sessionID = reg.SessionID
 	}
 	for _, child := range reg.Children {
 		res := collectBoardInfo(child, board)
 		if res != 0 {
-			locationID = res
+			sessionID = res
 		}
 	}
-	return locationID
+	return sessionID
 }
