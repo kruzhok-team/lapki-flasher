@@ -134,6 +134,7 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 		}
 
 		// некоторые сообщения нужно отправить всем клиентам
+		/// TODO: действительно ли это хорошее решение? Отправять все сообщения через одного клиента? Может быть лучше реализовать отдельный метод для такого рода сообщений?
 		if outgoing.toAll {
 			m.connections.Range(func(conn *WebSocketConnection, value bool) {
 				if conn != c {
@@ -202,8 +203,12 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			Device(deviceID, device, false, c)
 		}
 	}
+	/*
+		отправка информации о новых устройства, об изменение старых устройств и удалении устройств
+	*/
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
+			//TODO: в обоих случаях происходит тоже самое, просто используется разный синтаксис, следует придумать как это объединить
 			if sendToAll {
 				switch boardWithAction.action {
 				case PORT_UPDATE:
@@ -231,39 +236,4 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 			break
 		}
 	}
-	/*for {
-		if boardWithID, exists := detector.popStack(detector.updatedPort); exists {
-			if sendToAll {
-				m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithID.board, boardWithID.ID))
-			} else {
-				DeviceUpdatePort(boardWithID.ID, boardWithID.board, c)
-			}
-		} else {
-			break
-		}
-	}
-
-	for {
-		if boardWithID, exists := detector.popStack(detector.newDevices); exists {
-			if sendToAll {
-				m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithID.board, boardWithID.ID))
-			} else {
-				Device(boardWithID.ID, boardWithID.board, true, c)
-			}
-		} else {
-			break
-		}
-	}
-
-	for {
-		if boardWithID, exists := detector.popStack(detector.deletedDevices); exists {
-			if sendToAll {
-				m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithID.ID))
-			} else {
-				DeviceUpdateDelete(boardWithID.ID, c)
-			}
-		} else {
-			break
-		}
-	}*/
 }

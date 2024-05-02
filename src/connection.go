@@ -53,6 +53,7 @@ func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
 	}
 	go func() {
 		// откладываем таймер, так как обновление все равно произойдёт для всех
+		// TODO: почему это действие не входит в handlers?
 		if event.Type == GetListMsg {
 			m.updateTicker.Stop()
 			defer m.updateTicker.Start()
