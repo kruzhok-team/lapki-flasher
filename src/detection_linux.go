@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package main
 
@@ -67,6 +66,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 							}
 							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
 							if detectedBoard.PortName == NOT_FOUND {
+								printLog("can't find port")
 								continue
 							}
 							properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
@@ -163,6 +163,39 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 	return true
 }
 
+func findPortName(desc *gousb.DeviceDesc) string {
+	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
+
+	// в каком порядке идут порты? Надо проверить
+	ports := strconv.Itoa(desc.Path[0])
+	num_ports := len(desc.Path)
+	for i := 1; i < num_ports; i++ {
+		ports += "." + strconv.Itoa(desc.Path[i])
+	}
+
+	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
+
+	//
+	dir_prefix := "/sys/bus/usb/devices"
+	tty := "tty"
+	for _, conf := range desc.Configs {
+		for _, inter := range conf.Interfaces {
+			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
+			printLog("DIR", dir)
+			existance, _ := exists(dir)
+			if existance {
+				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
+				dirs, _ := os.ReadDir(dir)
+				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
+				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
+			}
+			printLog(dir, "doesn't exists")
+		}
+
+	}
+	return NOT_FOUND
+}
+
 // возвращает значение указанных параметров устройства, подключённого к порту portName,
 // можно использовать для того, чтобы получить серийный номер устройства (если есть) или для получения времени, когда устройство было подключено (используется как ID)
 //
@@ -198,11 +231,13 @@ func findProperty(portName string, properties ...string) ([]string, error) {
 	return answers, nil
 }
 
-// TODO: перезагрузка порта
+// перезагрузка порта
 func rebootPort(portName string) (err error) {
 	// stty 115200 -F /dev/ttyUSB0 raw -echo
 	cmd := exec.Command("stty", "1200", "-F", portName, "raw", "-echo")
 	_, err = cmd.CombinedOutput()
-	printLog(cmd.Args, err)
+	if err != nil {
+		printLog(cmd.Args, err)
+	}
 	return err
 }
