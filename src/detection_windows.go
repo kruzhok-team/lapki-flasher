@@ -81,13 +81,13 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 							continue
 						}
 						boardType := BoardType{
-							boardTemplate.ID,
-							productID,
-							vendorID,
-							boardTemplate.Name,
-							boardTemplate.Controller,
-							boardTemplate.Programmer,
-							boardTemplate.BootloaderID,
+							typeID:           boardTemplate.ID,
+							ProductID:        productID,
+							VendorID:         vendorID,
+							Name:             boardTemplate.Name,
+							Controller:       boardTemplate.Controller,
+							Programmer:       boardTemplate.Programmer,
+							BootloaderTypeID: boardTemplate.BootloaderID,
 						}
 						detectedBoard := NewBoardToFlash(boardType, portName)
 						serialIndex := strings.LastIndex(device, "\\")
@@ -158,6 +158,8 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 func rebootPort(portName string) (err error) {
 	cmd := exec.Command("MODE", portName, "BAUD=1200")
 	_, err = cmd.CombinedOutput()
-	printLog(cmd.Args, err)
+	if err != nil {
+		printLog(cmd.Args, err)
+	}
 	return err
 }
