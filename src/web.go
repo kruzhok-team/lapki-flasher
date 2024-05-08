@@ -204,7 +204,8 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 		}
 	}
 	/*
-		отправка информации о новых устройства, об изменение старых устройств и удалении устройств
+	Отправка информации о новых устройствах,
+	об изменении старых и их удалении.
 	*/
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
