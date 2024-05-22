@@ -70,6 +70,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 		for _, boardTemplate := range boardTemplates {
 			for _, vendorID := range boardTemplate.VendorIDs {
 				for _, productID := range boardTemplate.ProductIDs {
+					printLog("VIDPID", vendorID, productID)
 					pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
 					pathLen := len(pathPattern)
 					// нашли подходящее устройство
@@ -104,7 +105,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
-	printLog(boards)
+	printLog("found boards", boards)
 	return boards
 }
 
