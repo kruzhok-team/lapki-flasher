@@ -3,7 +3,6 @@ package main
 import (
 	"container/list"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"sync"
 )
@@ -94,7 +93,7 @@ func NewDetector() *Detector {
 	d.boards = make(map[string]*BoardToFlash)
 	// добавление фальшивых плат
 	d.generateFakeBoards()
-	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	d.boardTemplates = loadTemplatesFromRaw(mainBoardTemplatesRaw)
 	d.dontAddTypes = make(map[int]void)
 	d.boardActions = list.New()
 	return &d
