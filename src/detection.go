@@ -337,3 +337,15 @@ func (d *Detector) isFake(ID string) bool {
 	}
 	return false
 }
+
+func (board *BoardFlashAndSerial) setSerialMonitor(isOpen bool) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.serialMonitorOpen = isOpen
+}
+
+func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.serialMonitorOpen
+}
