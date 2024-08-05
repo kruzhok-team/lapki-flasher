@@ -71,17 +71,13 @@ type SerialDisconnectMessage struct {
 	ID string `json:"deviceID"`
 }
 
-type SerialSendMessage struct {
-	ID  string `json:"deviceID"`
-	Msg string `json:"msg"`
-}
-
 type SerialSentStatusMessage struct {
 	ID      string `json:"deviceID"`
 	HasSent bool   `json:"hasSent"`
 }
 
-type SerialDeviceReadMessage struct {
+// тип данных для serial-device-read и serial-send
+type SerialMessage struct {
 	ID  string `json:"deviceID"`
 	Msg string `json:"msg"`
 }
