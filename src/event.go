@@ -348,7 +348,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	err = openSerialPort(board.PortName, msg.Baud)
+	serialPort, err := openSerialPort(board.PortName, msg.Baud)
 	if err != nil {
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:      msg.ID,
@@ -357,6 +357,11 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
+	SerialConnectionStatus(SerialStatusMessage{
+		ID:   msg.ID,
+		Code: 0,
+	}, c)
+	go readFromSerial(serialPort, msg.ID, c)
 	return nil
 }
 
