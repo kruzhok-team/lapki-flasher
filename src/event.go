@@ -74,12 +74,22 @@ const (
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
 	DeviceUpdatePortMsg = "device-update-port"
-	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
-	binaryBloMsg      = "binaryMsg"
-	GetMaxFileSizeMsg = "get-max-file-size"
-	MaxFileSizeMsg    = "max-file-size"
+	GetMaxFileSizeMsg   = "get-max-file-size"
+	MaxFileSizeMsg      = "max-file-size"
 	// устройства не найдены
 	EmptyListMsg = "empty-list"
+	// запрос на запуск монитора порта
+	SerialConnectMsg = "serial-connect"
+	// статус соединения с устройством (монитора порта)
+	SerialConnectionStatusMsg = "serial-connection-status"
+	// закрыть монитор порта
+	SerialDisconnectMsg = "serial-disconnect"
+	// запрос на отправку сообщения на устройство
+	SerialSendMsg = "serial-send"
+	// статус отправленного сообщения на устройство (удалось ли его отправить или нет)
+	SerialSentStatusMsg = "serial-sent-status"
+	// сообщение от устройства
+	SerialDeviceReadMsg = "serial-device-read"
 )
 
 // отправить клиенту список всех устройств
