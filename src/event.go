@@ -61,19 +61,15 @@ type SerialConnectMessage struct {
 	Baud int    `json:"baud"`
 }
 
-type SerialConnectionStatusMessage struct {
-	ID          string `json:"deviceID"`
-	IsConnected bool   `json:"isConnected"`
-	Comment     string `json:"comment"`
-}
-
 type SerialDisconnectMessage struct {
 	ID string `json:"deviceID"`
 }
 
-type SerialSentStatusMessage struct {
+// тип данных для serial-sent-status и serial-connection-status
+type SerialStatusMessage struct {
 	ID      string `json:"deviceID"`
-	HasSent bool   `json:"hasSent"`
+	Code    int    `json:"code"`
+	Comment string `json:"comment"`
 }
 
 // тип данных для serial-device-read и serial-send
