@@ -37,7 +37,7 @@ func (board BoardType) hasBootloader() bool {
 	return board.BootloaderTypeID > -1
 }
 
-type BoardToFlash struct {
+type BoardFlashAndSerial struct {
 	Type     BoardType
 	PortName string
 	SerialID string
@@ -45,17 +45,19 @@ type BoardToFlash struct {
 	// устройство прошивается
 	flashing bool
 	// bootloader, связанный с платой, nil - если не найден, или отсутствует вообще
-	refToBoot *BoardToFlash
+	refToBoot *BoardFlashAndSerial
+	// true = открыт монитор порта
+	serialMonitorOpen bool
 }
 
-func NewBoardToFlash(Type BoardType, PortName string) *BoardToFlash {
-	var board BoardToFlash
+func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
+	var board BoardFlashAndSerial
 	board.Type = Type
 	board.PortName = PortName
 	board.flashing = false
 
 	if board.Type.hasBootloader() {
-		var bootloader BoardToFlash
+		var bootloader BoardFlashAndSerial
 		board.refToBoot = &bootloader
 		board.refToBoot.flashing = false
 		bootTemplate := findTemplateByID(board.Type.BootloaderTypeID)
@@ -98,23 +100,23 @@ func findTemplateByID(boardID int) *BoardTemplate {
 }
 
 // подключено ли устройство
-func (board *BoardToFlash) IsConnected() bool {
+func (board *BoardFlashAndSerial) IsConnected() bool {
 	return board.PortName != NOT_FOUND
 }
 
 // найдено ли устройство
-func (board *BoardToFlash) IsIdentified() bool {
+func (board *BoardFlashAndSerial) IsIdentified() bool {
 	return board.SerialID != ""
 }
 
 type Detector struct {
 	// список доступных для прошивки устройств
-	boards         map[string]*BoardToFlash
+	boards         map[string]*BoardFlashAndSerial
 	boardTemplates []BoardTemplate
 	mu             sync.Mutex
 
 	// симуляция плат
-	fakeBoards map[string]*BoardToFlash
+	fakeBoards map[string]*BoardFlashAndSerial
 
 	// Список ID типов плат, которые не нужно добавлять, при обновлении.
 	// Старые устройства, если они не отсоединялись, останутся в списке, даже если их typeID находится в списке
@@ -128,7 +130,7 @@ var boardTemplatesRaw []byte
 
 func NewDetector() *Detector {
 	var d Detector
-	d.boards = make(map[string]*BoardToFlash)
+	d.boards = make(map[string]*BoardFlashAndSerial)
 	// добавление фальшивых плат
 	d.generateFakeBoards()
 	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
@@ -143,9 +145,9 @@ func NewDetector() *Detector {
 // notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes;
 // devicesInList - текущий список плат, без учёта notAddedDevices
 func (d *Detector) Update() (
-	detectedBoards map[string]*BoardToFlash,
-	notAddedDevices map[string]*BoardToFlash,
-	devicesInList map[string]*BoardToFlash) {
+	detectedBoards map[string]*BoardFlashAndSerial,
+	notAddedDevices map[string]*BoardFlashAndSerial,
+	devicesInList map[string]*BoardFlashAndSerial) {
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -155,7 +157,7 @@ func (d *Detector) Update() (
 	// добавление фальшивых плат к действительно обнаруженным
 	if fakeBoardsNum > 0 {
 		if detectedBoards == nil {
-			detectedBoards = make(map[string]*BoardToFlash)
+			detectedBoards = make(map[string]*BoardFlashAndSerial)
 		}
 		for ID, board := range d.fakeBoards {
 			detectedBoards[ID] = board
@@ -164,7 +166,7 @@ func (d *Detector) Update() (
 
 	// обновление информации о старых устройствах и добавление новых
 
-	notAddedDevices = make(map[string]*BoardToFlash)
+	notAddedDevices = make(map[string]*BoardFlashAndSerial)
 
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := d.boards[deviceID]
@@ -222,14 +224,14 @@ func (d *Detector) AddThisType(typeID int) {
 }
 
 // возвращает устройство, соответствующее ID, существует ли устройство в списке
-func (d *Detector) GetBoardSync(ID string) (*BoardToFlash, bool) {
+func (d *Detector) GetBoardSync(ID string) (*BoardFlashAndSerial, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	value, exists := d.boards[ID]
 	return value, exists
 }
 
-func (d *Detector) AddBoardSync(ID string, board *BoardToFlash) {
+func (d *Detector) AddBoardSync(ID string, board *BoardFlashAndSerial) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.boards[ID] = board
@@ -248,7 +250,7 @@ func (d *Detector) boardsNum() int {
 }
 
 // удаляем устройства, которых больше нет и уведомляем об этом всех клиентов
-func (d *Detector) DeleteAndAlert(newBoards map[string]*BoardToFlash, c *WebSocketConnection) {
+func (d *Detector) DeleteAndAlert(newBoards map[string]*BoardFlashAndSerial, c *WebSocketConnection) {
 	d.mu.Lock()
 	for deviceID := range detector.boards {
 		_, exists := newBoards[deviceID]
@@ -261,26 +263,26 @@ func (d *Detector) DeleteAndAlert(newBoards map[string]*BoardToFlash, c *WebSock
 }
 
 // true = устройство заблокировано для прошивки
-func (board *BoardToFlash) IsFlashBlocked() bool {
+func (board *BoardFlashAndSerial) IsFlashBlocked() bool {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.flashing
 }
 
 // true = заблокировать устройство, false = разблокировать устройство
-func (board *BoardToFlash) SetLock(lock bool) {
+func (board *BoardFlashAndSerial) SetLock(lock bool) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.flashing = lock
 }
 
-func (board *BoardToFlash) getPortSync() string {
+func (board *BoardFlashAndSerial) getPortSync() string {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.PortName
 }
 
-func (board *BoardToFlash) setPortSync(newPortName string) {
+func (board *BoardFlashAndSerial) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.PortName = newPortName
@@ -292,7 +294,7 @@ func (d *Detector) boardList() []BoardTemplate {
 
 // генерация фальшивых плат, которые будут восприниматься программой как настоящие
 func (d *Detector) generateFakeBoards() {
-	d.fakeBoards = make(map[string]*BoardToFlash)
+	d.fakeBoards = make(map[string]*BoardFlashAndSerial)
 
 	// фальшивые параметры для фальшивых плат
 	id := -1

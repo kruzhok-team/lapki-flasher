@@ -20,7 +20,7 @@ type WebSocketConnection struct {
 	wsc        *websocket.Conn
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
-	FlashingBoard *BoardToFlash
+	FlashingBoard *BoardFlashAndSerial
 	// сообщение от avrdude
 	avrMsg          string
 	outgoingMsg     chan OutgoingEventMessage
@@ -114,7 +114,7 @@ func (c *WebSocketConnection) closeChan() {
 }
 
 // блокирует устройство и запрещает клиенту прошивать другие устройства, также запускает или перезапускает FileWriter для записи данных в файл прошивки
-func (c *WebSocketConnection) StartFlashing(board *BoardToFlash, fileSize int) {
+func (c *WebSocketConnection) StartFlashing(board *BoardFlashAndSerial, fileSize int) {
 	c.FlashingBoard = board
 	c.FlashingBoard.SetLock(true)
 	if board.refToBoot != nil {

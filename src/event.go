@@ -133,7 +133,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnection) error {
+func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
 	//printLog("device")
 	boardMessage := DeviceMessage{
 		deviceID,
@@ -151,7 +151,7 @@ func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnec
 }
 
 // сообщение о том, что порт обновлён
-func DeviceUpdatePort(deviceID string, board *BoardToFlash, c *WebSocketConnection) {
+func DeviceUpdatePort(deviceID string, board *BoardFlashAndSerial, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
 }
 
@@ -255,7 +255,7 @@ func FlashNextBlock(c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
 }
 
-func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+func newDeviceMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
 	boardMessage := DeviceMessage{
 		deviceID,
 		board.Type.Name,
@@ -267,7 +267,7 @@ func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
 	return &boardMessage
 }
 
-func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+func newUpdatedMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
 	boardMessage := DeviceMessage{
 		deviceID,
 		board.Type.Name,
@@ -279,7 +279,7 @@ func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
 	return &boardMessage
 }
 
-func newDeviceUpdatePortMessage(board *BoardToFlash, deviceID string) *DeviceUpdatePortMessage {
+func newDeviceUpdatePortMessage(board *BoardFlashAndSerial, deviceID string) *DeviceUpdatePortMessage {
 	boardMessage := DeviceUpdatePortMessage{
 		deviceID,
 		board.PortName,
