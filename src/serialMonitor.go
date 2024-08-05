@@ -53,3 +53,9 @@ func readFromSerial(serialPort *serial.Port, deviceID string, client *WebSocketC
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+// Отправление сообщения от клиента в последовательный порт
+func writeToSerial(serialPort *serial.Port, msg string) error {
+	_, err := serialPort.Write([]byte(msg))
+	return err
+}

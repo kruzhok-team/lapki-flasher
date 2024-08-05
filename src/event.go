@@ -299,8 +299,9 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
 		SerialConnectionStatus(SerialStatusMessage{
-			ID:   msg.ID,
-			Code: 4,
+			ID:      msg.ID,
+			Code:    4,
+			Comment: err.Error(),
 		}, c)
 		return err
 	}
@@ -391,4 +392,65 @@ func SerialDisconnect(event Event, c *WebSocketConnection) error {
 		}, c)
 	}
 	return nil
+}
+
+func SerialSend(event Event, c *WebSocketConnection) error {
+	var msg SerialMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		SerialSentStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    4,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		return nil
+	}
+	if !board.isSerialMonitorOpen() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 3,
+		}, c)
+		return nil
+	}
+	updated := board.updatePortName(msg.ID)
+	if updated {
+		if board.IsConnected() {
+			DeviceUpdatePort(msg.ID, board, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			SerialSentStatus(SerialStatusMessage{
+				ID:   msg.ID,
+				Code: 2,
+			}, c)
+			return nil
+		}
+	}
+	err = writeToSerial(board.serialPortMonitor, msg.Msg)
+	if err != nil {
+		SerialSentStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    1,
+			Comment: err.Error(),
+		}, c)
+		return nil
+	}
+	SerialSentStatus(SerialStatusMessage{
+		ID:   msg.ID,
+		Code: 0,
+	}, c)
+	return nil
+}
+
+func SerialSentStatus(status SerialStatusMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(SerialSentStatusMsg, status, false)
 }
