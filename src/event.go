@@ -56,6 +56,36 @@ type MaxFileSizeMessage struct {
 	Size int `json:"size"`
 }
 
+type SerialConnectMessage struct {
+	ID   string `json:"deviceID"`
+	Baud int    `json:"baud"`
+}
+
+type SerialConnectionStatusMessage struct {
+	ID          string `json:"deviceID"`
+	IsConnected bool   `json:"isConnected"`
+	Comment     string `json:"comment"`
+}
+
+type SerialDisconnectMessage struct {
+	ID string `json:"deviceID"`
+}
+
+type SerialSendMessage struct {
+	ID  string `json:"deviceID"`
+	Msg string `json:"msg"`
+}
+
+type SerialSentStatusMessage struct {
+	ID      string `json:"deviceID"`
+	HasSent bool   `json:"hasSent"`
+}
+
+type SerialDeviceReadMessage struct {
+	ID  string `json:"deviceID"`
+	Msg string `json:"msg"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
