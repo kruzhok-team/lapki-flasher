@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+
+	"github.com/tarm/serial"
 )
 
 const NOT_FOUND = ""
@@ -46,8 +48,8 @@ type BoardFlashAndSerial struct {
 	flashing bool
 	// bootloader, связанный с платой, nil - если не найден, или отсутствует вообще
 	refToBoot *BoardFlashAndSerial
-	// true = открыт монитор порта
-	serialMonitorOpen bool
+	// монитор порта, nil значит, что монитор порта закрыт
+	serialPortMonitor *serial.Port
 }
 
 func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
@@ -338,14 +340,21 @@ func (d *Detector) isFake(ID string) bool {
 	return false
 }
 
-func (board *BoardFlashAndSerial) setSerialMonitor(isOpen bool) {
+func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	board.serialMonitorOpen = isOpen
+	board.serialPortMonitor = serialPort
 }
 
 func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	return board.serialMonitorOpen
+	return board.serialPortMonitor != nil
+}
+
+func (board *BoardFlashAndSerial) closeSerialMonitor() error {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.serialPortMonitor = nil
+	return board.serialPortMonitor.Close()
 }

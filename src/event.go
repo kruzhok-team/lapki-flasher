@@ -361,10 +361,34 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		ID:   msg.ID,
 		Code: 0,
 	}, c)
+	board.setSerialPortMonitor(serialPort)
 	go readFromSerial(serialPort, msg.ID, c)
 	return nil
 }
 
 func SerialConnectionStatus(status SerialStatusMessage, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(SerialConnectionStatusMsg, status, false)
+}
+
+func SerialDisconnect(event Event, c *WebSocketConnection) error {
+	var msg SerialDisconnectMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if exists {
+		board.closeSerialMonitor()
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 8,
+		}, c)
+	} else {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+	}
+	return nil
 }
