@@ -192,6 +192,9 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
 	}
+	if board.isSerialMonitorOpen() {
+		return ErrFlashOpenSerialMonitor
+	}
 	boardToFlashName := strings.ToLower(board.Type.Name)
 	for _, boardName := range notSupportedBoards {
 		if boardToFlashName == strings.ToLower(boardName) {

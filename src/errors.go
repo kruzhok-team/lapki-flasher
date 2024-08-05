@@ -35,6 +35,8 @@ var (
 	ErrWaitingBinaryMessagesLimit = errors.New("waiting-binary-message-limit")
 	// плата ${name} не поддерживается для прошивки
 	ErrNotSupported = errors.New("flash-not-supported")
+	// нельзя начать прошивку, пока открыт монитор порта этого устройства
+	ErrFlashOpenSerialMonitor = errors.New("flash-open-serial-monitor")
 )
 
 func errorHandler(err error, c *WebSocketConnection) {
@@ -44,7 +46,7 @@ func errorHandler(err error, c *WebSocketConnection) {
 	msgType := err.Error()
 	var payload any
 	switch err {
-	case ErrFlashWrongID, ErrFlashDisconnected, ErrFlashBlocked, ErrFlashLargeFile, ErrFlashLargeBlock:
+	case ErrFlashWrongID, ErrFlashDisconnected, ErrFlashBlocked, ErrFlashLargeFile, ErrFlashLargeBlock, ErrFlashOpenSerialMonitor:
 		c.StopFlashing()
 	case ErrAvrdude:
 		c.StopFlashing()
