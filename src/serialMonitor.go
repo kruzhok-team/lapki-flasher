@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"strings"
 	"time"
 
 	"github.com/tarm/serial"
@@ -10,7 +8,7 @@ import (
 
 // Открываем порт заново, если он был закрыт
 func openSerialPort(port string, baudRate int) (*serial.Port, error) {
-	c := &serial.Config{Name: port, Baud: baudRate}
+	c := &serial.Config{Name: port, Baud: baudRate, ReadTimeout: 5 * time.Second}
 	var err error
 	serialPort, err := serial.OpenPort(c)
 	if err != nil {
@@ -22,11 +20,29 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 }
 
 // Получаем ответ из последовательного порта
-func readFromSerial(serialPort *serial.Port, deviceID string, client *WebSocketConnection) error {
-	reader := bufio.NewReader(serialPort)
+func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
+	//reader := bufio.NewReader(board.getSerialMonitor())
+	readData := ""
+	// если сообщение достигает заданного количества символов, то оно отправляется
+	const MESSSAGE_LIMIT = 256
 	for {
 		// Читаем до символа новой строки
-		receivedMsg, err := reader.ReadString('\n')
+		if client.isClosedChan() {
+			break
+		}
+		if !detector.boardExists(deviceID) {
+			DeviceUpdateDelete(deviceID, client)
+			SerialConnectionStatus(SerialStatusMessage{
+				ID:   deviceID,
+				Code: 2,
+			}, client)
+			break
+		}
+		buf := make([]byte, 128)
+		bytes, err := board.serialPortMonitor.Read(buf)
+		if bytes == 0 {
+			continue
+		}
 		if err != nil {
 			// Ошибка при чтении из последовательного порта
 			SerialConnectionStatus(SerialStatusMessage{
@@ -34,24 +50,35 @@ func readFromSerial(serialPort *serial.Port, deviceID string, client *WebSocketC
 				Code:    7,
 				Comment: err.Error(),
 			}, client)
-			return err
+			break
 		}
 		// Удаляем пробельные символы
-		receivedMsg = strings.TrimSpace(receivedMsg)
-		if receivedMsg != "" {
-			// Отправляем сообщение клиенту
-			client.sendOutgoingEventMessage(
-				SerialDeviceReadMsg,
-				SerialMessage{
-					ID:  deviceID,
-					Msg: receivedMsg,
-				},
-				false,
-			)
+		receivedBlock := string(buf[:bytes])
+		for _, symbol := range receivedBlock {
+			readData += string(symbol)
+			if symbol == '\n' || len(readData) >= MESSSAGE_LIMIT {
+				if readData != "" {
+					// Отправляем сообщение клиенту
+					err = client.sendOutgoingEventMessage(
+						SerialDeviceReadMsg,
+						SerialMessage{
+							ID:  deviceID,
+							Msg: readData,
+						},
+						false,
+					)
+					if err != nil {
+						break
+					}
+				}
+				readData = ""
+			}
 		}
 		// Добавляем небольшую задержку перед чтением нового сообщения
 		time.Sleep(100 * time.Millisecond)
 	}
+	printLog("Serial monitor is closed")
+	board.closeSerialMonitor()
 }
 
 // Отправление сообщения от клиента в последовательный порт

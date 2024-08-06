@@ -366,7 +366,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		Code: 0,
 	}, c)
 	board.setSerialPortMonitor(serialPort)
-	go readFromSerial(serialPort, msg.ID, c)
+	go readFromSerial(board, msg.ID, c)
 	return nil
 }
 

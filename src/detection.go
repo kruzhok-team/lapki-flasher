@@ -352,9 +352,27 @@ func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
 	return board.serialPortMonitor != nil
 }
 
-func (board *BoardFlashAndSerial) closeSerialMonitor() error {
+func (board *BoardFlashAndSerial) closeSerialMonitor() {
 	board.mu.Lock()
 	defer board.mu.Unlock()
+	if board.serialPortMonitor == nil {
+		return
+	}
+	if err := board.serialPortMonitor.Close(); err != nil {
+		printLog(err.Error())
+	}
 	board.serialPortMonitor = nil
-	return board.serialPortMonitor.Close()
+}
+
+func (board *BoardFlashAndSerial) getSerialMonitor() *serial.Port {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.serialPortMonitor
+}
+
+func (d *Detector) boardExists(deviceID string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, exists := d.boards[deviceID]
+	return exists
 }

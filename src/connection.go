@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -137,7 +138,7 @@ func (c *WebSocketConnection) StopFlashing() {
 // startCooldown[0] = true, если нужно запустить cooldown
 func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
 	if c.isClosedChan() {
-		return
+		return errors.New("can't send message because the client is closed.")
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
