@@ -50,6 +50,10 @@ type BoardFlashAndSerial struct {
 	refToBoot *BoardFlashAndSerial
 	// монитор порта, nil значит, что монитор порта закрыт
 	serialPortMonitor *serial.Port
+	// канал для оповещения о том, что следует сменить бод
+	serialMonitorChangeBaud chan int
+	// клиент, который открыл монитор порта этого устройства
+	serialMonitorClient *WebSocketConnection
 }
 
 func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
@@ -340,10 +344,12 @@ func (d *Detector) isFake(ID string) bool {
 	return false
 }
 
-func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port) {
+func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port, serialClient *WebSocketConnection) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.serialPortMonitor = serialPort
+	board.serialMonitorClient = serialClient
+	board.serialMonitorChangeBaud = make(chan int)
 }
 
 func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
@@ -375,4 +381,11 @@ func (d *Detector) boardExists(deviceID string) bool {
 	defer d.mu.Unlock()
 	_, exists := d.boards[deviceID]
 	return exists
+}
+
+// получить клиента, который занял монитор порта
+func (board *BoardFlashAndSerial) getSerialMonitorClient() *WebSocketConnection {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.serialMonitorClient
 }

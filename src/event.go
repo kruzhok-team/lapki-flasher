@@ -56,7 +56,8 @@ type MaxFileSizeMessage struct {
 	Size int `json:"size"`
 }
 
-type SerialConnectMessage struct {
+// тип данных для serial-connect и serial-change-baud
+type SerialBaudMessage struct {
 	ID   string `json:"deviceID"`
 	Baud int    `json:"baud"`
 }
@@ -112,6 +113,8 @@ const (
 	SerialSentStatusMsg = "serial-sent-status"
 	// сообщение от устройства
 	SerialDeviceReadMsg = "serial-device-read"
+	// сменить бод
+	SerialChangeBaudMsg = "serial-change-baud"
 )
 
 // отправить клиенту список всех устройств
@@ -298,7 +301,7 @@ func GetMaxFileSize(event Event, c *WebSocketConnection) error {
 }
 
 func SerialConnect(event Event, c *WebSocketConnection) error {
-	var msg SerialConnectMessage
+	var msg SerialBaudMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
 		SerialConnectionStatus(SerialStatusMessage{
@@ -365,7 +368,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		ID:   msg.ID,
 		Code: 0,
 	}, c)
-	board.setSerialPortMonitor(serialPort)
+	board.setSerialPortMonitor(serialPort, c)
 	go readFromSerial(board, msg.ID, c)
 	return nil
 }
@@ -456,4 +459,43 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 
 func SerialSentStatus(status SerialStatusMessage, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(SerialSentStatusMsg, status, false)
+}
+
+func SerialChangeBaud(event Event, c *WebSocketConnection) error {
+	var msg SerialBaudMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    11,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		return nil
+	}
+	if !board.isSerialMonitorOpen() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 12,
+		}, c)
+		return nil
+	}
+	if board.getSerialMonitorClient() == c {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 13,
+		}, c)
+		return nil
+	}
+	// см. readFromSerial в serialMonitor.go
+	board.serialMonitorChangeBaud <- msg.Baud
+	return nil
 }
