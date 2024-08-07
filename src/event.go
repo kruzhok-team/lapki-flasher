@@ -385,6 +385,13 @@ func SerialDisconnect(event Event, c *WebSocketConnection) error {
 	}
 	board, exists := detector.GetBoardSync(msg.ID)
 	if exists {
+		if board.getSerialMonitorClient() != c {
+			SerialConnectionStatus(SerialStatusMessage{
+				ID:   msg.ID,
+				Code: 14,
+			}, c)
+			return nil
+		}
 		board.closeSerialMonitor()
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
