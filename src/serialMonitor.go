@@ -27,7 +27,7 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 	const MESSSAGE_LIMIT = 256
 	for {
 		// Читаем до символа новой строки
-		if client.isClosedChan() {
+		if client.isClosedChan() || !board.isSerialMonitorOpen() {
 			break
 		}
 		if !detector.boardExists(deviceID) {
