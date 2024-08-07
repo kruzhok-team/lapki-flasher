@@ -21,10 +21,6 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 
 // Получаем ответ из последовательного порта
 func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
-	//reader := bufio.NewReader(board.getSerialMonitor())
-	readData := ""
-	// если сообщение достигает заданного количества символов, то оно отправляется
-	const MESSSAGE_LIMIT = 256
 	for {
 		// Читаем до символа новой строки
 		if client.isClosedChan() || !board.isSerialMonitorOpen() {
@@ -52,27 +48,19 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 			}, client)
 			break
 		}
-		// Удаляем пробельные символы
-		receivedBlock := string(buf[:bytes])
-		for _, symbol := range receivedBlock {
-			readData += string(symbol)
-			if symbol == '\n' || len(readData) >= MESSSAGE_LIMIT {
-				if readData != "" {
-					// Отправляем сообщение клиенту
-					err = client.sendOutgoingEventMessage(
-						SerialDeviceReadMsg,
-						SerialMessage{
-							ID:  deviceID,
-							Msg: readData,
-						},
-						false,
-					)
-					if err != nil {
-						break
-					}
-				}
-				readData = ""
-			}
+		// printLog(len(buf[:bytes]), len(string(buf[:bytes])))
+		str := string(buf[:bytes])
+		printLog(buf[bytes-1], str[bytes-1])
+		err = client.sendOutgoingEventMessage(
+			SerialDeviceReadMsg,
+			SerialMessage{
+				ID:  deviceID,
+				Msg: string(buf[:bytes]),
+			},
+			false,
+		)
+		if err != nil {
+			break
 		}
 		// Добавляем небольшую задержку перед чтением нового сообщения
 		time.Sleep(100 * time.Millisecond)
