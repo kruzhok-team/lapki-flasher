@@ -73,9 +73,6 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 				}, client)
 				return
 			}
-			// printLog(len(buf[:bytes]), len(string(buf[:bytes])))
-			str := string(buf[:bytes])
-			printLog(buf[bytes-1], str[bytes-1])
 			err = client.sendOutgoingEventMessage(
 				SerialDeviceReadMsg,
 				SerialMessage{
