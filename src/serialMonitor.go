@@ -9,7 +9,8 @@ import (
 
 // Открываем порт заново, если он был закрыт
 func openSerialPort(port string, baudRate int) (*serial.Port, error) {
-	c := &serial.Config{Name: port, Baud: baudRate, ReadTimeout: 5 * time.Second}
+	// TODO: вынести настройку ReadTimeout во флаги
+	c := &serial.Config{Name: port, Baud: baudRate, ReadTimeout: 100 * time.Millisecond}
 	var err error
 	serialPort, err := serial.OpenPort(c)
 	if err != nil {
