@@ -499,7 +499,7 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	if board.getSerialMonitorClient() == c {
+	if board.getSerialMonitorClient() != c {
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 13,
