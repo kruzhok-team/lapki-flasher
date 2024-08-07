@@ -42,11 +42,11 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 }
 
 // находит все подключённые платы
-func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
-	boards := make(map[string]*BoardToFlash)
+	boards := make(map[string]*BoardFlashAndSerial)
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
@@ -96,40 +96,9 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 	return boards
 }
 
-func findPortName(desc *gousb.DeviceDesc) string {
-	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
-
-	// в каком порядке идут порты? Надо проверить
-	ports := strconv.Itoa(desc.Path[0])
-	num_ports := len(desc.Path)
-	for i := 1; i < num_ports; i++ {
-		ports += "." + strconv.Itoa(desc.Path[i])
-	}
-
-	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
-
-	//
-	dir_prefix := "/sys/bus/usb/devices"
-	tty := "tty"
-	for _, conf := range desc.Configs {
-		for _, inter := range conf.Interfaces {
-			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
-			printLog("DIR", dir)
-			existance, _ := exists(dir)
-			if existance {
-				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
-				dirs, _ := os.ReadDir(dir)
-				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
-			}
-		}
-
-	}
-	return NOT_FOUND
-}
-
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
-func (board *BoardToFlash) updatePortName(ID string) bool {
+func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
