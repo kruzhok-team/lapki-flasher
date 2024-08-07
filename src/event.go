@@ -421,6 +421,10 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 	board, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
+		SerialSentStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 2,
@@ -428,7 +432,7 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 		return nil
 	}
 	if !board.isSerialMonitorOpen() {
-		SerialConnectionStatus(SerialStatusMessage{
+		SerialSentStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 3,
 		}, c)
