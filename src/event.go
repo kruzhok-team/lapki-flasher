@@ -452,6 +452,12 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
+	if board.getSerialMonitorClient() != c {
+		SerialSentStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 5,
+		}, c)
+	}
 	err = writeToSerial(board.serialPortMonitor, msg.Msg)
 	if err != nil {
 		SerialSentStatus(SerialStatusMessage{
