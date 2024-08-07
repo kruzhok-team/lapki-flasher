@@ -368,7 +368,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		ID:   msg.ID,
 		Code: 0,
 	}, c)
-	board.setSerialPortMonitor(serialPort, c)
+	board.setSerialPortMonitor(serialPort, c, msg.Baud)
 	go readFromSerial(board, msg.ID, c)
 	return nil
 }
@@ -503,6 +503,13 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 13,
+		}, c)
+		return nil
+	}
+	if msg.Baud == board.getBaud() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 15,
 		}, c)
 		return nil
 	}

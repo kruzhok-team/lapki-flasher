@@ -40,7 +40,7 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 				}, client)
 				return
 			}
-			board.setSerialPortMonitor(newSerialPort, client)
+			board.setSerialPortMonitor(newSerialPort, client, baud)
 			SerialConnectionStatus(SerialStatusMessage{
 				ID:      deviceID,
 				Code:    10,
