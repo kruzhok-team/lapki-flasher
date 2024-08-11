@@ -46,6 +46,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		}
 		select {
 		case baud := <-board.serialMonitorChangeBaud:
+			// TODO: можно заменить на configure, но нужно дополнительно протестить, так как при использовании configure в прошлый раз возникла проблема с тем, что не получалось осуществить повторное подключение
 			err := board.serialPortMonitor.Close()
 			if err != nil {
 				SerialConnectionStatus(SerialStatusMessage{
@@ -53,6 +54,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 					Code:    9,
 					Comment: err.Error(),
 				}, client)
+				return
 			}
 			//time.Sleep(time.Second)
 			newSerialPort, err := openSerialPort(board.PortName, baud)
@@ -91,10 +93,6 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		default:
 			buf := make([]byte, 128)
 			bytes, err := board.serialPortMonitor.Read(buf)
-			printLog(err)
-			if bytes == 0 {
-				continue
-			}
 			if err != nil {
 				// Ошибка при чтении из последовательного порта
 				SerialConnectionStatus(SerialStatusMessage{
@@ -103,6 +101,9 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 					Comment: err.Error(),
 				}, client)
 				return
+			}
+			if bytes == 0 {
+				continue
 			}
 			err = client.sendOutgoingEventMessage(
 				SerialDeviceReadMsg,
