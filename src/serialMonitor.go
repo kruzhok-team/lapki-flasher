@@ -94,6 +94,11 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 			buf := make([]byte, 128)
 			bytes, err := board.serialPortMonitor.Read(buf)
 			if err != nil {
+				// если ошибка произошла из-за того, монитор порта закрылся, то
+				// игнорируем ошибку
+				if !board.isSerialMonitorOpen() {
+					return
+				}
 				// Ошибка при чтении из последовательного порта
 				SerialConnectionStatus(SerialStatusMessage{
 					ID:      deviceID,
