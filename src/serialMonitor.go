@@ -4,15 +4,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/tarm/serial"
+	"github.com/albenik/go-serial/v2"
 )
 
 // Открываем порт заново, если он был закрыт
 func openSerialPort(port string, baudRate int) (*serial.Port, error) {
-	// TODO: вынести настройку ReadTimeout во флаги
-	c := &serial.Config{Name: port, Baud: baudRate, ReadTimeout: 100 * time.Millisecond}
-	var err error
-	serialPort, err := serial.OpenPort(c)
+	// TODO: вынести настройку ReadTimeout/WriteTimeout во флаги
+	// время для таймаутов указано в мс
+	// не стоит задавать слишком большой таймаут, чтение, запись и смена скорости передачи происходит в одном потоке, слишком большой таймаут может замедлить работу с портом
+	serialPort, err := serial.Open(
+		port,
+		serial.WithBaudrate(baudRate),
+		serial.WithReadTimeout(100),
+		serial.WithWriteTimeout(100),
+	)
 	if err != nil {
 		// Ошибка: не удалось открыть последовательный порт. Проверьте настройки и переподключитесь к порту.
 		return nil, err
@@ -41,7 +46,14 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		}
 		select {
 		case baud := <-board.serialMonitorChangeBaud:
-			board.serialPortMonitor.Close()
+			err := board.serialPortMonitor.Close()
+			if err != nil {
+				SerialConnectionStatus(SerialStatusMessage{
+					ID:      deviceID,
+					Code:    9,
+					Comment: err.Error(),
+				}, client)
+			}
 			//time.Sleep(time.Second)
 			newSerialPort, err := openSerialPort(board.PortName, baud)
 			if err != nil {
@@ -59,14 +71,16 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 				Comment: strconv.Itoa(baud),
 			}, client)
 		case writeMsg := <-board.serialMonitorWrite:
-			printLog("writing in serial port")
 			_, err := board.serialPortMonitor.Write([]byte(writeMsg))
-			printLog("wrote in serial port")
 			if err != nil {
 				SerialSentStatus(SerialStatusMessage{
 					ID:      deviceID,
 					Code:    1,
 					Comment: err.Error(),
+				}, client)
+				SerialConnectionStatus(SerialStatusMessage{
+					ID:   deviceID,
+					Code: 1,
 				}, client)
 				return
 			}
@@ -77,6 +91,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		default:
 			buf := make([]byte, 128)
 			bytes, err := board.serialPortMonitor.Read(buf)
+			printLog(err)
 			if bytes == 0 {
 				continue
 			}

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tarm/serial"
+	"github.com/albenik/go-serial/v2"
 )
 
 const NOT_FOUND = ""
@@ -370,11 +370,9 @@ func (board *BoardFlashAndSerial) closeSerialMonitor() {
 	if board.serialPortMonitor == nil {
 		return
 	}
-	printLog("closing serial port")
 	if err := board.serialPortMonitor.Close(); err != nil {
 		printLog(err.Error())
 	}
-	printLog("closed serial port")
 	board.serialMonitorOpen = false
 }
 

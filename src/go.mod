@@ -14,7 +14,12 @@ require (
 )
 
 require (
-	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3 // indirect
-	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
-	howett.net/plist v1.0.1 // indirect
+	github.com/albenik/go-serial/v2 v2.6.1
+	github.com/creack/goselect v0.1.2 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
+)
+
+require (
+	howett.net/plist v1.0.1
 )
