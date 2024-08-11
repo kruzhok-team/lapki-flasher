@@ -21,13 +21,24 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 	return serialPort, nil
 }
 
-// Получаем ответ из последовательного порта
-func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
+// Чтение, отправка сообщений и изменение скорости передачи последовательного порта
+func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
 	defer func() {
 		printLog("Serial monitor is closed")
 		board.closeSerialMonitor()
 	}()
 	for {
+		if client.isClosedChan() || !board.isSerialMonitorOpen() {
+			return
+		}
+		if !detector.boardExists(deviceID) {
+			DeviceUpdateDelete(deviceID, client)
+			SerialConnectionStatus(SerialStatusMessage{
+				ID:   deviceID,
+				Code: 2,
+			}, client)
+			return
+		}
 		select {
 		case baud := <-board.serialMonitorChangeBaud:
 			board.serialPortMonitor.Close()
@@ -47,19 +58,23 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 				Code:    10,
 				Comment: strconv.Itoa(baud),
 			}, client)
-		default:
-			// Читаем до символа новой строки
-			if client.isClosedChan() || !board.isSerialMonitorOpen() {
-				return
-			}
-			if !detector.boardExists(deviceID) {
-				DeviceUpdateDelete(deviceID, client)
-				SerialConnectionStatus(SerialStatusMessage{
-					ID:   deviceID,
-					Code: 2,
+		case writeMsg := <-board.serialMonitorWrite:
+			printLog("writing in serial port")
+			_, err := board.serialPortMonitor.Write([]byte(writeMsg))
+			printLog("wrote in serial port")
+			if err != nil {
+				SerialSentStatus(SerialStatusMessage{
+					ID:      deviceID,
+					Code:    1,
+					Comment: err.Error(),
 				}, client)
 				return
 			}
+			SerialSentStatus(SerialStatusMessage{
+				ID:   deviceID,
+				Code: 0,
+			}, client)
+		default:
 			buf := make([]byte, 128)
 			bytes, err := board.serialPortMonitor.Read(buf)
 			if bytes == 0 {
@@ -89,10 +104,4 @@ func readFromSerial(board *BoardFlashAndSerial, deviceID string, client *WebSock
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-}
-
-// Отправление сообщения от клиента в последовательный порт
-func writeToSerial(serialPort *serial.Port, msg string) error {
-	_, err := serialPort.Write([]byte(msg))
-	return err
 }
