@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -20,7 +21,7 @@ type WebSocketConnection struct {
 	wsc        *websocket.Conn
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
-	FlashingBoard *BoardToFlash
+	FlashingBoard *BoardFlashAndSerial
 	// сообщение от avrdude
 	avrMsg          string
 	outgoingMsg     chan OutgoingEventMessage
@@ -114,7 +115,7 @@ func (c *WebSocketConnection) closeChan() {
 }
 
 // блокирует устройство и запрещает клиенту прошивать другие устройства, также запускает или перезапускает FileWriter для записи данных в файл прошивки
-func (c *WebSocketConnection) StartFlashing(board *BoardToFlash, fileSize int) {
+func (c *WebSocketConnection) StartFlashing(board *BoardFlashAndSerial, fileSize int) {
 	c.FlashingBoard = board
 	c.FlashingBoard.SetLock(true)
 	if board.refToBoot != nil {
@@ -137,7 +138,7 @@ func (c *WebSocketConnection) StopFlashing() {
 // startCooldown[0] = true, если нужно запустить cooldown
 func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload any, toAll bool, startCooldown ...bool) (err error) {
 	if c.isClosedChan() {
-		return
+		return errors.New("can't send message because the client is closed.")
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {

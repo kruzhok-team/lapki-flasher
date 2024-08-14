@@ -56,6 +56,29 @@ type MaxFileSizeMessage struct {
 	Size int `json:"size"`
 }
 
+// тип данных для serial-connect и serial-change-baud
+type SerialBaudMessage struct {
+	ID   string `json:"deviceID"`
+	Baud int    `json:"baud"`
+}
+
+type SerialDisconnectMessage struct {
+	ID string `json:"deviceID"`
+}
+
+// тип данных для serial-sent-status и serial-connection-status
+type SerialStatusMessage struct {
+	ID      string `json:"deviceID"`
+	Code    int    `json:"code"`
+	Comment string `json:"comment"`
+}
+
+// тип данных для serial-device-read и serial-send
+type SerialMessage struct {
+	ID  string `json:"deviceID"`
+	Msg string `json:"msg"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -74,12 +97,24 @@ const (
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
 	DeviceUpdatePortMsg = "device-update-port"
-	// сообщение, содержащее бинарные данные для загружаемого файла прошивки, прикрепляется сервером к сообщению после получения бинарных данных
-	binaryBloMsg      = "binaryMsg"
-	GetMaxFileSizeMsg = "get-max-file-size"
-	MaxFileSizeMsg    = "max-file-size"
+	GetMaxFileSizeMsg   = "get-max-file-size"
+	MaxFileSizeMsg      = "max-file-size"
 	// устройства не найдены
 	EmptyListMsg = "empty-list"
+	// запрос на запуск монитора порта
+	SerialConnectMsg = "serial-connect"
+	// статус соединения с устройством (монитора порта)
+	SerialConnectionStatusMsg = "serial-connection-status"
+	// закрыть монитор порта
+	SerialDisconnectMsg = "serial-disconnect"
+	// запрос на отправку сообщения на устройство
+	SerialSendMsg = "serial-send"
+	// статус отправленного сообщения на устройство (удалось ли его отправить или нет)
+	SerialSentStatusMsg = "serial-sent-status"
+	// сообщение от устройства
+	SerialDeviceReadMsg = "serial-device-read"
+	// сменить бод
+	SerialChangeBaudMsg = "serial-change-baud"
 )
 
 // отправить клиенту список всех устройств
@@ -97,7 +132,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnection) error {
+func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
 	//printLog("device")
 	boardMessage := DeviceMessage{
 		deviceID,
@@ -115,7 +150,7 @@ func Device(deviceID string, board *BoardToFlash, toAll bool, c *WebSocketConnec
 }
 
 // сообщение о том, что порт обновлён
-func DeviceUpdatePort(deviceID string, board *BoardToFlash, c *WebSocketConnection) {
+func DeviceUpdatePort(deviceID string, board *BoardFlashAndSerial, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
 }
 
@@ -159,6 +194,9 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
+	}
+	if board.isSerialMonitorOpen() {
+		return ErrFlashOpenSerialMonitor
 	}
 	boardToFlashName := strings.ToLower(board.Type.Name)
 	for _, boardName := range notSupportedBoards {
@@ -219,7 +257,7 @@ func FlashNextBlock(c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
 }
 
-func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+func newDeviceMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
 	boardMessage := DeviceMessage{
 		deviceID,
 		board.Type.Name,
@@ -231,7 +269,7 @@ func newDeviceMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
 	return &boardMessage
 }
 
-func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
+func newUpdatedMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
 	boardMessage := DeviceMessage{
 		deviceID,
 		board.Type.Name,
@@ -243,7 +281,7 @@ func newUpdatedMessage(board *BoardToFlash, deviceID string) *DeviceMessage {
 	return &boardMessage
 }
 
-func newDeviceUpdatePortMessage(board *BoardToFlash, deviceID string) *DeviceUpdatePortMessage {
+func newDeviceUpdatePortMessage(board *BoardFlashAndSerial, deviceID string) *DeviceUpdatePortMessage {
 	boardMessage := DeviceUpdatePortMessage{
 		deviceID,
 		board.PortName,
@@ -260,4 +298,216 @@ func newDeviceUpdateDeleteMessage(deviceID string) *DeviceUpdateDeleteMessage {
 
 func GetMaxFileSize(event Event, c *WebSocketConnection) error {
 	return c.sendOutgoingEventMessage(MaxFileSizeMsg, MaxFileSizeMessage{maxFileSize}, false)
+}
+
+func SerialConnect(event Event, c *WebSocketConnection) error {
+	var msg SerialBaudMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    4,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		return nil
+	}
+	if detector.isFake(msg.ID) {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 3,
+		}, c)
+		return nil
+	}
+	updated := board.updatePortName(msg.ID)
+	if updated {
+		if board.IsConnected() {
+			DeviceUpdatePort(msg.ID, board, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			SerialConnectionStatus(SerialStatusMessage{
+				ID:   msg.ID,
+				Code: 2,
+			}, c)
+			return nil
+		}
+	}
+	if board.IsFlashBlocked() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 5,
+		}, c)
+		return nil
+	}
+	if board.isSerialMonitorOpen() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 6,
+		}, c)
+		return nil
+	}
+	serialPort, err := openSerialPort(board.PortName, msg.Baud)
+	if err != nil {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    1,
+			Comment: err.Error(),
+		}, c)
+		return nil
+	}
+	SerialConnectionStatus(SerialStatusMessage{
+		ID:   msg.ID,
+		Code: 0,
+	}, c)
+	board.setSerialPortMonitor(serialPort, c, msg.Baud)
+	go handleSerial(board, msg.ID, c)
+	return nil
+}
+
+func SerialConnectionStatus(status SerialStatusMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(SerialConnectionStatusMsg, status, false)
+}
+
+func SerialDisconnect(event Event, c *WebSocketConnection) error {
+	var msg SerialDisconnectMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if exists {
+		if board.getSerialMonitorClient() != c {
+			SerialConnectionStatus(SerialStatusMessage{
+				ID:   msg.ID,
+				Code: 14,
+			}, c)
+			return nil
+		}
+		board.closeSerialMonitor()
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 8,
+		}, c)
+	} else {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+	}
+	return nil
+}
+
+func SerialSend(event Event, c *WebSocketConnection) error {
+	var msg SerialMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		SerialSentStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    4,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialSentStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		return nil
+	}
+	if !board.isSerialMonitorOpen() {
+		SerialSentStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 3,
+		}, c)
+		return nil
+	}
+	updated := board.updatePortName(msg.ID)
+	if updated {
+		if board.IsConnected() {
+			DeviceUpdatePort(msg.ID, board, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			SerialSentStatus(SerialStatusMessage{
+				ID:   msg.ID,
+				Code: 2,
+			}, c)
+			return nil
+		}
+	}
+	if board.getSerialMonitorClient() != c {
+		SerialSentStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 5,
+		}, c)
+	}
+	board.serialMonitorWrite <- msg.Msg
+	return nil
+}
+
+func SerialSentStatus(status SerialStatusMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(SerialSentStatusMsg, status, false)
+}
+
+func SerialChangeBaud(event Event, c *WebSocketConnection) error {
+	var msg SerialBaudMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:      msg.ID,
+			Code:    11,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 2,
+		}, c)
+		return nil
+	}
+	if !board.isSerialMonitorOpen() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 12,
+		}, c)
+		return nil
+	}
+	if board.getSerialMonitorClient() != c {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 13,
+		}, c)
+		return nil
+	}
+	if msg.Baud == board.getBaud() {
+		SerialConnectionStatus(SerialStatusMessage{
+			ID:   msg.ID,
+			Code: 15,
+		}, c)
+		return nil
+	}
+	// см. readFromSerial в serialMonitor.go
+	board.serialMonitorChangeBaud <- msg.Baud
+	return nil
 }
