@@ -50,6 +50,10 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[FlashStartMsg] = FlashStart
 	m.handlers[FlashBinaryBlockMsg] = FlashBinaryBlock
 	m.handlers[GetMaxFileSizeMsg] = GetMaxFileSize
+	m.handlers[SerialConnectMsg] = SerialConnect
+	m.handlers[SerialDisconnectMsg] = SerialDisconnect
+	m.handlers[SerialSendMsg] = SerialSend
+	m.handlers[SerialChangeBaudMsg] = SerialChangeBaud
 }
 
 // обработка нового соединения
@@ -204,8 +208,8 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 		}
 	}
 	/*
-	Отправка информации о новых устройствах,
-	об изменении старых и их удалении.
+		Отправка информации о новых устройствах,
+		об изменении старых и их удалении.
 	*/
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {

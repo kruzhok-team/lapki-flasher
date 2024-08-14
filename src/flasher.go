@@ -12,7 +12,7 @@ var flasherSync sync.Mutex
 
 // прошивка, с автоматическим прописыванием необходимых параметров для avrdude
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
-func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, err error) {
+func autoFlash(board *BoardFlashAndSerial, hexFilePath string) (avrdudeMessage string, err error) {
 	if board.Type.hasBootloader() {
 		flasherSync.Lock()
 		defer flasherSync.Unlock()
@@ -23,7 +23,7 @@ func autoFlash(board *BoardToFlash, hexFilePath string) (avrdudeMessage string, 
 		detector.DontAddThisType(bootloaderType)
 		defer detector.AddThisType(bootloaderType)
 		defer time.Sleep(500 * time.Millisecond)
-		var notAddedDevices map[string]*BoardToFlash
+		var notAddedDevices map[string]*BoardFlashAndSerial
 		found := false
 		for i := 0; i < 25; i++ {
 			// TODO: возможно стоит добавить количество необходимого времени в параметры сервера
@@ -76,7 +76,7 @@ func flash(avrdudeArgs []string) (avrdudeMessage string, err error) {
 }
 
 // симуляция процесса прошивки, вместо неё, программа просто ждёт определённо время
-func fakeFlash(board *BoardToFlash, filePath string) (avrdudeMessage string, err error) {
+func fakeFlash(board *BoardFlashAndSerial, filePath string) (avrdudeMessage string, err error) {
 	time.Sleep(3 * time.Second)
 	printLog(fmt.Sprintf("Fake uploading of file %s in board %v is completed", filePath, board))
 	avrdudeMessage = "Fake flashing is completed"

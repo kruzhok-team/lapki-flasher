@@ -10,7 +10,7 @@ const (
 )
 
 type ActionWithBoard struct {
-	board   *BoardToFlash
+	board   *BoardFlashAndSerial
 	boardID string
 	action  BoardAction
 }

@@ -25,8 +25,8 @@ func setupOS() {}
 
 // находит все подключённые платы
 // TODO: добавить поиск сериного номера
-func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
-	boards := make(map[string]*BoardToFlash)
+func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
+	boards := make(map[string]*BoardFlashAndSerial)
 	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
 	plistData, err := cmd.CombinedOutput()
 	if err != nil {
@@ -48,7 +48,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardToFlash {
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
 // TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
-func (board *BoardToFlash) updatePortName(ID string) bool {
+func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
 	plistData, err := cmd.CombinedOutput()
 	if err != nil {
@@ -77,7 +77,7 @@ func (board *BoardToFlash) updatePortName(ID string) bool {
 	return false
 }
 
-func IOREGport(plistArr []IOREG, ID string, board *BoardToFlash) (portName string, foundID bool) {
+func IOREGport(plistArr []IOREG, ID string, board *BoardFlashAndSerial) (portName string, foundID bool) {
 	for _, entry := range plistArr {
 		if (entry.SerialNumber == "" && strconv.FormatInt(entry.SessionID, 10) == ID) || entry.SerialNumber == ID {
 			detectedBoard := NewBoardToFlash(board.Type, NOT_FOUND)
@@ -111,7 +111,7 @@ func rebootPort(portName string) (err error) {
 	return err
 }
 
-func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[string]*BoardToFlash) {
+func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[string]*BoardFlashAndSerial) {
 	for _, entry := range plistArr {
 		isFound := false
 		for _, boardTemplate := range boardTemplates {
@@ -165,7 +165,7 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 	}
 }
 
-func collectBoardInfo(reg IOREG, board *BoardToFlash) (sessionID int64) {
+func collectBoardInfo(reg IOREG, board *BoardFlashAndSerial) (sessionID int64) {
 	if reg.SerialNumber != "" {
 		board.SerialID = reg.SerialNumber
 	}
