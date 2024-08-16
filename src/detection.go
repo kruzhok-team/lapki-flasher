@@ -3,7 +3,6 @@ package main
 import (
 	"container/list"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -23,16 +22,6 @@ type BoardType struct {
 	Controller       string
 	Programmer       string
 	BootloaderTypeID int
-}
-
-type BoardTemplate struct {
-	ID           int      `json:"ID"`
-	VendorIDs    []string `json:"vendorIDs"`
-	ProductIDs   []string `json:"productIDs"`
-	Name         string   `json:"name"`
-	Controller   string   `json:"controller"`
-	Programmer   string   `json:"programmer"`
-	BootloaderID int      `json:"bootloaderID"`
 }
 
 func (board BoardType) hasBootloader() bool {
@@ -84,30 +73,6 @@ func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
 	return &board
 }
 
-// находит шаблон платы по его id
-func findTemplateByID(boardID int) *BoardTemplate {
-	var template BoardTemplate
-	if boardID < len(detector.boardTemplates) {
-		template = detector.boardTemplates[boardID]
-		// ожидается, что в файле с шаблонами прошивок (device_list.JSON) нумеровка индексов будет идти по порядку, но если это не так, то придётся перебать все шаблоны
-		if template.ID != boardID {
-			foundCorrectBootloader := false
-			for _, templ := range detector.boardTemplates {
-				if templ.ID == boardID {
-					template = templ
-					foundCorrectBootloader = true
-					break
-				}
-			}
-			if foundCorrectBootloader {
-				printLog("Не найден шаблон для устройства")
-				return nil
-			}
-		}
-	}
-	return &template
-}
-
 // подключено ли устройство
 func (board *BoardFlashAndSerial) IsConnected() bool {
 	return board.PortName != NOT_FOUND
@@ -134,15 +99,12 @@ type Detector struct {
 	boardActions *list.List
 }
 
-//go:embed device_list.JSON
-var boardTemplatesRaw []byte
-
 func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardFlashAndSerial)
 	// добавление фальшивых плат
 	d.generateFakeBoards()
-	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	d.boardTemplates = loadTemplatesFromRaw(mainBoardTemplatesRaw)
 	d.dontAddTypes = make(map[int]void)
 	d.boardActions = list.New()
 	return &d
@@ -295,10 +257,6 @@ func (board *BoardFlashAndSerial) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.PortName = newPortName
-}
-
-func (d *Detector) boardList() []BoardTemplate {
-	return d.boardTemplates
 }
 
 // генерация фальшивых плат, которые будут восприниматься программой как настоящие
