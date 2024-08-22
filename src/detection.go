@@ -8,8 +8,6 @@ import (
 	"sync"
 )
 
-const NOT_FOUND = ""
-
 type Detector struct {
 	// список доступных для прошивки устройств
 	boards         map[string]*BoardFlashAndSerial
