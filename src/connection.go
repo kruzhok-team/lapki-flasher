@@ -117,9 +117,9 @@ func (c *WebSocketConnection) closeChan() {
 // блокирует устройство и запрещает клиенту прошивать другие устройства, также запускает или перезапускает FileWriter для записи данных в файл прошивки
 func (c *WebSocketConnection) StartFlashing(board *BoardFlashAndSerial, fileSize int) {
 	c.FlashingBoard = board
-	c.FlashingBoard.SetLock(true)
+	c.FlashingBoard.SetLockSync(true)
 	if board.refToBoot != nil {
-		board.refToBoot.SetLock(true)
+		board.refToBoot.SetLockSync(true)
 	}
 	c.FileWriter.Start(fileSize)
 }
@@ -127,7 +127,7 @@ func (c *WebSocketConnection) StartFlashing(board *BoardFlashAndSerial, fileSize
 // разблокирует устройство и разрешает клиенту прошивать другие устройства, удаляет файл и другие данные FileWriter
 func (c *WebSocketConnection) StopFlashing() {
 	if c.FlashingBoard != nil {
-		c.FlashingBoard.SetLock(false)
+		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
 		c.FileWriter.Clear()
 	}
