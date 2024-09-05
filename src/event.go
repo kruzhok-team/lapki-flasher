@@ -192,10 +192,12 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			}
 		}
 	}
-	if board.IsFlashBlockedSync() {
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
 	}
-	if board.isSerialMonitorOpenSync() {
+	if board.isSerialMonitorOpen() {
 		return ErrFlashOpenSerialMonitor
 	}
 	boardToFlashName := strings.ToLower(board.Type.Name)
@@ -205,11 +207,16 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
+
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-	c.StartFlashing(board, msg.FileSize)
+	c.FlashingBoard = board
+	c.FlashingBoard.SetLockSync(true)
+	if board.refToBoot != nil {
+		board.refToBoot.SetLockSync(true)
+	}
+	c.FileWriter.Start(msg.FileSize)
+
 	FlashNextBlock(c)
-	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-	c.StartFlashing(board, msg.FileSize)
 	return nil
 }
 
@@ -341,14 +348,18 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	if board.IsFlashBlockedSync() {
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	if board.IsFlashBlocked() {
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 5,
 		}, c)
 		return nil
 	}
-	if board.isSerialMonitorOpenSync() {
+	if board.isSerialMonitorOpen() {
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 6,
@@ -368,7 +379,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		ID:   msg.ID,
 		Code: 0,
 	}, c)
-	board.setSerialPortMonitorSync(serialPort, c, msg.Baud)
+	board.setSerialPortMonitor(serialPort, c, msg.Baud)
 	go handleSerial(board, msg.ID, c)
 	return nil
 }
@@ -384,15 +395,19 @@ func SerialDisconnect(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	board, exists := detector.GetBoardSync(msg.ID)
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	board.mu.Lock()
+	defer board.mu.Unlock()
 	if exists {
-		if board.getSerialMonitorClientSync() != c {
+		if board.getSerialMonitorClient() != c {
 			SerialConnectionStatus(SerialStatusMessage{
 				ID:   msg.ID,
 				Code: 14,
 			}, c)
 			return nil
 		}
-		board.closeSerialMonitorSync()
+		board.closeSerialMonitor()
 		SerialConnectionStatus(SerialStatusMessage{
 			ID:   msg.ID,
 			Code: 8,
@@ -458,6 +473,7 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			Code: 5,
 		}, c)
 	}
+	// см. handleSerial в serialMonitor.go
 	board.serialMonitorWrite <- msg.Msg
 	return nil
 }
@@ -507,7 +523,7 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	// см. readFromSerial в serialMonitor.go
+	// см. handleSerial в serialMonitor.go
 	board.serialMonitorChangeBaud <- msg.Baud
 	return nil
 }
