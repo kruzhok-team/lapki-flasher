@@ -27,6 +27,7 @@ type BoardTemplate struct {
 	Controller   string   `json:"controller"`
 	Programmer   string   `json:"programmer"`
 	BootloaderID int      `json:"bootloaderID"`
+	IsMSDevice   bool     `json:"isMSDevice"`
 }
 
 func (board BoardType) hasBootloader() bool {

@@ -6,7 +6,8 @@
     "vendorIDs": ["2a03", "2341"],
     "controller": "ATmega32U4",
     "programmer": "avr109",
-    "bootloaderID": 1
+    "bootloaderID": 1,
+    "isMSDevice": false
   },
   {
     "ID": 1,
@@ -15,7 +16,8 @@
     "vendorIDs": ["2a03", "2341"],
     "controller": "ATmega32U4",
     "programmer": "avr109",
-    "bootloaderID": -1
+    "bootloaderID": -1,
+    "isMSDevice": false
   },
   {
     "ID": 2,
@@ -24,7 +26,8 @@
     "vendorIDs": ["2a03", "2341"],
     "controller": "ATmega328P",
     "programmer": "arduino",
-    "bootloaderID": -1
+    "bootloaderID": -1,
+    "isMSDevice": false
   },
   {
     "ID": 3,
@@ -33,6 +36,17 @@
     "vendorIDs": ["2341"],
     "controller": "ATmega2560",
     "programmer": "wiring",
-    "bootloaderID": -1
+    "bootloaderID": -1,
+    "isMSDevice": false
+  },
+  {
+    "ID": 4,
+    "name": "МС-ТЮК",
+    "productIDs": ["55D5"],
+    "vendorIDs": ["1A86"],
+    "controller": "",
+    "programmer": "",
+    "bootloaderID": -1,
+    "isMSDevice": true
   }
 ]
