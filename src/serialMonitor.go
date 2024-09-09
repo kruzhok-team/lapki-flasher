@@ -30,13 +30,13 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
 	defer func() {
 		printLog("Serial monitor is closed")
-		board.closeSerialMonitor()
+		board.closeSerialMonitorSync()
 	}()
 	for {
-		if client.isClosedChan() || !board.isSerialMonitorOpen() {
+		if client.isClosedChan() || !board.isSerialMonitorOpenSync() {
 			return
 		}
-		if !detector.boardExists(deviceID) {
+		if !detector.boardExistsSync(deviceID) {
 			DeviceUpdateDelete(deviceID, client)
 			SerialConnectionStatus(SerialStatusMessage{
 				ID:   deviceID,
@@ -66,7 +66,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 				}, client)
 				return
 			}
-			board.setSerialPortMonitor(newSerialPort, client, baud)
+			board.setSerialPortMonitorSync(newSerialPort, client, baud)
 			SerialConnectionStatus(SerialStatusMessage{
 				ID:      deviceID,
 				Code:    10,
@@ -96,7 +96,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 			if err != nil {
 				// если ошибка произошла из-за того, монитор порта закрылся, то
 				// игнорируем ошибку
-				if !board.isSerialMonitorOpen() {
+				if !board.isSerialMonitorOpenSync() {
 					return
 				}
 				// Ошибка при чтении из последовательного порта

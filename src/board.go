@@ -107,40 +107,68 @@ func (board *BoardFlashAndSerial) IsConnected() bool {
 	return board.PortName != NOT_FOUND
 }
 
+// подключено ли устройство
+func (board *BoardFlashAndSerial) IsConnectedSync() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.IsConnected()
+}
+
 // найдено ли устройство
 func (board *BoardFlashAndSerial) IsIdentified() bool {
 	return board.SerialID != ""
 }
 
-// true = устройство заблокировано для прошивки
-func (board *BoardFlashAndSerial) IsFlashBlocked() bool {
+// найдено ли устройство
+func (board *BoardFlashAndSerial) IsIdentifiedSync() bool {
 	board.mu.Lock()
 	defer board.mu.Unlock()
+	return board.IsIdentified()
+}
+
+// true = устройство заблокировано для прошивки
+func (board *BoardFlashAndSerial) IsFlashBlocked() bool {
 	return board.flashing
+}
+
+// true = устройство заблокировано для прошивки
+func (board *BoardFlashAndSerial) IsFlashBlockedSync() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.IsFlashBlocked()
 }
 
 // true = заблокировать устройство, false = разблокировать устройство
 func (board *BoardFlashAndSerial) SetLock(lock bool) {
-	board.mu.Lock()
-	defer board.mu.Unlock()
 	board.flashing = lock
 }
 
+// true = заблокировать устройство, false = разблокировать устройство
+func (board *BoardFlashAndSerial) SetLockSync(lock bool) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.SetLock(lock)
+}
+
+func (board *BoardFlashAndSerial) getPort() string {
+	return board.PortName
+}
 func (board *BoardFlashAndSerial) getPortSync() string {
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	return board.PortName
+	return board.getPort()
 }
 
+func (board *BoardFlashAndSerial) setPort(newPortName string) {
+	board.PortName = newPortName
+}
 func (board *BoardFlashAndSerial) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	board.PortName = newPortName
+	board.setPort(newPortName)
 }
 
 func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {
-	board.mu.Lock()
-	defer board.mu.Unlock()
 	board.serialPortMonitor = serialPort
 	board.serialMonitorClient = serialClient
 	board.serialMonitorChangeBaud = make(chan int)
@@ -148,16 +176,22 @@ func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port, 
 	board.serialMonitorOpen = true
 	board.serialMonitorWrite = make(chan string)
 }
-
-func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
+func (board *BoardFlashAndSerial) setSerialPortMonitorSync(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
+	board.setSerialPortMonitor(serialPort, serialClient, baud)
+}
+
+func (board *BoardFlashAndSerial) isSerialMonitorOpen() bool {
 	return board.serialPortMonitor != nil && board.serialMonitorOpen
+}
+func (board *BoardFlashAndSerial) isSerialMonitorOpenSync() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.isSerialMonitorOpen()
 }
 
 func (board *BoardFlashAndSerial) closeSerialMonitor() {
-	board.mu.Lock()
-	defer board.mu.Unlock()
 	if board.serialPortMonitor == nil {
 		return
 	}
@@ -166,29 +200,48 @@ func (board *BoardFlashAndSerial) closeSerialMonitor() {
 	}
 	board.serialMonitorOpen = false
 }
-
-func (board *BoardFlashAndSerial) getSerialMonitor() *serial.Port {
+func (board *BoardFlashAndSerial) closeSerialMonitorSync() {
 	board.mu.Lock()
 	defer board.mu.Unlock()
+	board.closeSerialMonitor()
+}
+
+func (board *BoardFlashAndSerial) getSerialMonitor() *serial.Port {
 	return board.serialPortMonitor
+}
+func (board *BoardFlashAndSerial) getSerialMonitorSync() *serial.Port {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.getSerialMonitor()
 }
 
 func (d *Detector) boardExists(deviceID string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 	_, exists := d.boards[deviceID]
 	return exists
+}
+func (d *Detector) boardExistsSync(deviceID string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.boardExists(deviceID)
 }
 
 // получить клиента, который занял монитор порта
 func (board *BoardFlashAndSerial) getSerialMonitorClient() *WebSocketConnection {
-	board.mu.Lock()
-	defer board.mu.Unlock()
 	return board.serialMonitorClient
 }
 
-func (board *BoardFlashAndSerial) getBaud() int {
+// получить клиента, который занял монитор порта
+func (board *BoardFlashAndSerial) getSerialMonitorClientSync() *WebSocketConnection {
 	board.mu.Lock()
 	defer board.mu.Unlock()
+	return board.getSerialMonitorClient()
+}
+
+func (board *BoardFlashAndSerial) getBaud() int {
 	return board.serialMonitorBaud
+}
+func (board *BoardFlashAndSerial) getBaudSync() int {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.getBaud()
 }
