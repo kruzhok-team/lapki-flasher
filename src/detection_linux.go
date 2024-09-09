@@ -63,6 +63,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 								boardTemplate.Controller,
 								boardTemplate.Programmer,
 								boardTemplate.BootloaderID,
+								boardTemplate.IsMSDevice,
 							}
 							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
 							if detectedBoard.PortName == NOT_FOUND {
@@ -76,7 +77,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 							}
 							detectedBoard.SerialID = properties[1]
 							var id string
-							if detectedBoard.SerialID != NOT_FOUND {
+							if detectedBoard.SerialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
 								id = detectedBoard.SerialID
 							} else {
 								id = properties[0]

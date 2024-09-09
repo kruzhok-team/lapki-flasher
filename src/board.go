@@ -17,6 +17,7 @@ type BoardType struct {
 	Controller       string
 	Programmer       string
 	BootloaderTypeID int
+	IsMSDevice       bool
 }
 
 type BoardTemplate struct {
