@@ -194,6 +194,8 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
+	board.mu.Lock()
+	defer board.mu.Unlock()
 	if board.IsFlashBlocked() {
 		return ErrFlashBlocked
 	}
@@ -210,9 +212,9 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = board
-	c.FlashingBoard.SetLockSync(true)
+	c.FlashingBoard.SetLock(true)
 	if board.refToBoot != nil {
-		board.refToBoot.SetLockSync(true)
+		board.refToBoot.SetLock(true)
 	}
 	c.FileWriter.Start(msg.FileSize)
 
