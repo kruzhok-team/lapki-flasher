@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
@@ -17,49 +18,141 @@ func setupOS() {
 
 }
 
-// возвращает пути к устройствам, согласно заданному шаблону, если они есть, иначе возвращает nil
-func getInstanceId(substring string) []string {
-	//start := time.Now()
-	keyPath := "SYSTEM\\CurrentControlSet\\Services\\usbser\\Enum"
-	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+func getAllRegistryValues(path string) ([]string, error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
 	defer func() {
 		if err := key.Close(); err != nil {
 			printLog("Error on closing registry key:", err.Error())
 		}
 	}()
 	if err != nil {
-		printLog("No devices are connected or drivers are not installed", err)
-		return nil
+		return nil, err
 	}
 	registryValues, err := key.ReadValueNames(0)
 	if err != nil {
-		printLog("Error on getting registry value names:", err.Error())
+		return nil, err
+	}
+	return registryValues, nil
+	// var result = make([]string, len(registryValues))
+	// for i, valueName := range registryValues {
+	// 	value, _, err := key.GetStringValue(valueName)
+	// 	if err != nil {
+	// 		if err == registry.ErrUnexpectedType {
+	// 			continue
+	// 		}
+	// 		printLog("Error on getting registry values:", err.Error())
+	// 		continue
+	// 	}
+	// 	result[i] = value
+	// }
+	// return result, err
+}
+func handleCloseRegistryKey(key registry.Key, path string) {
+	if err := key.Close(); err != nil {
+		printLog(fmt.Sprintf("Error on closing registry key in %s: %s", path, err.Error()))
+	}
+}
+func getRegistryValues(path string) (registry.Key, []string, error) {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
+	if err != nil {
+		printLog(fmt.Sprintf("Can't open %s registry key. %s", path, err.Error()))
+		return key, nil, err
+	}
+	registryValues, err := key.ReadValueNames(0)
+	if err != nil {
+		printLog(fmt.Sprintf("Can't read values names in %s. %s", path, err.Error()))
+		return key, nil, err
+	}
+	return key, registryValues, nil
+}
+
+/*
+Возвращает пути к подключенным устройствам.
+
+Если substring - не пустая строка, то возращает пути к устройствам, которые содержат substring.
+
+Если ничего не удалось найти, то возвращает nil
+*/
+func getInstanceId(substring string) []string {
+	// для сравнения строк в одном регистре
+	substringUP := strings.ToUpper(substring)
+	// получаем список, подключенных COM-портов
+	const SERIALCOMM_PATH = "HARDWARE\\DEVICEMAP\\SERIALCOMM"
+	serialCommKey, serialCommRegistryValues, err := getRegistryValues(SERIALCOMM_PATH)
+	defer handleCloseRegistryKey(serialCommKey, SERIALCOMM_PATH)
+	if err != nil {
 		return nil
 	}
-	var possiblePathes []string
-	substring = strings.ToLower(substring)
-	for _, valueName := range registryValues {
-		value, _, err := key.GetStringValue(valueName)
+	numOfActivePorts := len(serialCommRegistryValues)
+	var currentPorts = make([]string, numOfActivePorts)
+	for i, valueName := range serialCommRegistryValues {
+		value, _, err := serialCommKey.GetStringValue(valueName)
 		if err != nil {
 			if err == registry.ErrUnexpectedType {
 				continue
 			}
-			printLog("Error on getting registry values:", err.Error())
+			printLog(fmt.Sprintf("Error on getting registry values in %s. %s", SERIALCOMM_PATH, err.Error()))
 			continue
 		}
-		if strings.Contains(strings.ToLower(value), substring) {
-			possiblePathes = append(possiblePathes, value)
+		currentPorts[i] = value
+	}
+
+	// получаем пути к устройствам, соотносим их со списком активным COM портов
+	const DEVICE_PATHES = "SYSTEM\\CurrentControlSet\\Control\\COM Name Arbiter\\Devices"
+	deviceKey, deviceRegistryValues, err := getRegistryValues(DEVICE_PATHES)
+	defer handleCloseRegistryKey(deviceKey, DEVICE_PATHES)
+	if err != nil {
+		return nil
+	}
+	deviceRegistryValuesLen := len(deviceRegistryValues)
+	sort.Strings(currentPorts)
+	sort.Strings(deviceRegistryValues)
+	currentPortsIndex := 0
+	deviceRegistryValuesIndex := 0
+	var pathesToDevices []string
+	for currentPortsIndex < numOfActivePorts && deviceRegistryValuesIndex < deviceRegistryValuesLen {
+		if currentPorts[currentPortsIndex] < deviceRegistryValues[deviceRegistryValuesIndex] {
+			currentPortsIndex++
+			continue
+		}
+		if currentPorts[currentPortsIndex] > deviceRegistryValues[deviceRegistryValuesIndex] {
+			deviceRegistryValuesIndex++
+			continue
+		}
+		if currentPorts[currentPortsIndex] == deviceRegistryValues[deviceRegistryValuesIndex] {
+			pathToDevice, _, err := deviceKey.GetStringValue(currentPorts[currentPortsIndex])
+			currentPortsIndex++
+			deviceRegistryValuesIndex++
+			if err != nil {
+				if err == registry.ErrUnexpectedType {
+					continue
+				}
+				printLog(fmt.Sprintf("Error on getting registry values in %s. %s", DEVICE_PATHES, err.Error()))
+				continue
+			}
+			// здесь идёт преобразование переменной в путь к устройству
+			pathToDevice = strings.ToUpper(pathToDevice)
+			startIndex := strings.Index(pathToDevice, "USB")
+			endIndex := strings.Index(pathToDevice, "#{")
+			if startIndex < 0 || endIndex < 0 {
+				printLog("Error, can't parse path!")
+				continue
+			}
+			pathToDevice = pathToDevice[startIndex:endIndex]
+			pathToDevice = strings.ReplaceAll(pathToDevice, "#", "\\")
+			if substring == "" || strings.Contains(pathToDevice, substringUP) {
+				pathesToDevices = append(pathesToDevices, pathToDevice)
+			}
 		}
 	}
-	//printLog("get instance:", time.Now().Sub(start))
-	return possiblePathes
+	return pathesToDevices
 }
 
 // находит все подключённые платы
 func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
 	//startTime := time.Now()
 	boards := make(map[string]*BoardFlashAndSerial)
-	presentUSBDevices := getInstanceId("usb")
+	presentUSBDevices := getInstanceId("")
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
