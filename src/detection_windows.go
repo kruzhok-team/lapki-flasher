@@ -196,6 +196,8 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 			}
 		}
 	}
+	// windows распознает один МС-ТЮК как 4 разных устройства, поэтому их нужно отфильтровать
+	filterMS(boards)
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
 	printLog(boards)

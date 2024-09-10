@@ -247,3 +247,12 @@ func (board *BoardFlashAndSerial) getBaudSync() int {
 	defer board.mu.Unlock()
 	return board.getBaud()
 }
+
+func (board *BoardFlashAndSerial) isMSDevice() bool {
+	return board.Type.IsMSDevice
+}
+func (board *BoardFlashAndSerial) isMSDeviceSync() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.isMSDevice()
+}
