@@ -79,6 +79,17 @@ type SerialMessage struct {
 	Msg string `json:"msg"`
 }
 
+type MSBinStartMessage struct {
+	ID       string `json:"deviceID"`
+	FileSize int    `json:"fileSize"`
+	Address  string `json:"address"`
+}
+
+type MSPingMessage struct {
+	ID      string `json:"deviceID"`
+	Address string `json:"address"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -115,6 +126,10 @@ const (
 	SerialDeviceReadMsg = "serial-device-read"
 	// сменить бод
 	SerialChangeBaudMsg = "serial-change-baud"
+	// запрос на прошивку МС-ТЮК по адресу
+	MSBinStartMsg = "ms-bin-start"
+	// пинг МС-ТЮК по адресу
+	MSPingMsg = "ms-ping"
 )
 
 // отправить клиенту список всех устройств
@@ -527,5 +542,16 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 	}
 	// см. handleSerial в serialMonitor.go
 	board.serialMonitorChangeBaud <- msg.Baud
+	return nil
+}
+
+func MSPing(event Event, c *WebSocketConnection) error {
+	var msg MSPingMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	// TODO: отправка пинга
+	// возможно стоит блокировать устройство во время пинга?
 	return nil
 }
