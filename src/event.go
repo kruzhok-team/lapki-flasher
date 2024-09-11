@@ -90,6 +90,10 @@ type MSPingMessage struct {
 	Address string `json:"address"`
 }
 
+type MSGetAddressMessage struct {
+	ID string `json:"deviceID"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -130,6 +134,8 @@ const (
 	MSBinStartMsg = "ms-bin-start"
 	// пинг МС-ТЮК по адресу
 	MSPingMsg = "ms-ping"
+	// получение адреса из МС-ТЮК
+	MSGetAddressMsg = "ms-get-address"
 )
 
 // отправить клиенту список всех устройств
@@ -553,5 +559,28 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	}
 	// TODO: отправка пинга
 	// возможно стоит блокировать устройство во время пинга?
+	printLog(msg, "ping")
+	return nil
+}
+
+func MSGetAddress(event Event, c *WebSocketConnection) error {
+	var msg MSGetAddressMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	// TODO: получение адреса
+	printLog(msg, "address")
+	return nil
+}
+
+func MSBinStart(event Event, c *WebSocketConnection) error {
+	var msg MSBinStartMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		return err
+	}
+	// TODO: отправка прошивки в МС-ТЮК
+	printLog(msg, "bin")
 	return nil
 }

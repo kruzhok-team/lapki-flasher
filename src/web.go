@@ -54,6 +54,9 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[SerialDisconnectMsg] = SerialDisconnect
 	m.handlers[SerialSendMsg] = SerialSend
 	m.handlers[SerialChangeBaudMsg] = SerialChangeBaud
+	m.handlers[MSBinStartMsg] = MSBinStart
+	m.handlers[MSGetAddressMsg] = MSGetAddress
+	m.handlers[MSPingMsg] = MSPing
 }
 
 // обработка нового соединения
