@@ -12,6 +12,8 @@ type FlashFileWriter struct {
 	// необходимый размер файла, указывается в байтах
 	maxSize  int
 	tempFile *os.File
+	// расширение файла
+	extension string
 }
 
 func newFlashFileWriter() *FlashFileWriter {
@@ -21,9 +23,10 @@ func newFlashFileWriter() *FlashFileWriter {
 }
 
 // начать новую запись
-func (ff *FlashFileWriter) Start(fileSize int) {
+func (ff *FlashFileWriter) Start(fileSize int, extension string) {
 	ff.Clear()
 	ff.maxSize = fileSize
+	ff.extension = extension
 }
 
 // сохраняет блоки с данными, создаёт временный файл и записывает туда данные
@@ -37,7 +40,7 @@ func (ff *FlashFileWriter) AddBlock(data []byte) (bool, error) {
 	}
 	if ff.tempFile == nil {
 		// временный файл для хранения прошивки
-		tempFile, err := ioutil.TempFile("", "upload-*.hex")
+		tempFile, err := ioutil.TempFile("", "upload-*."+ff.extension)
 		if err != nil {
 			return false, err
 		}

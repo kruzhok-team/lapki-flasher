@@ -237,7 +237,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if board.refToBoot != nil {
 		board.refToBoot.SetLock(true)
 	}
-	c.FileWriter.Start(msg.FileSize)
+	c.FileWriter.Start(msg.FileSize, "hex")
 
 	FlashNextBlock(c)
 	return nil
