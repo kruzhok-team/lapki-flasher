@@ -34,6 +34,8 @@ type WebSocketConnection struct {
 	maxQueries int
 	// количество запросов, которые обрабатываются в данный момент
 	numQueries int
+	// адрес МС-ТЮК для загрузки прошивки
+	msAddress string
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int) *WebSocketConnection {
@@ -120,6 +122,7 @@ func (c *WebSocketConnection) StopFlashing() {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
 		c.FileWriter.Clear()
+		c.msAddress = ""
 	}
 }
 

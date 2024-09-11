@@ -242,6 +242,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if event.Type == FlashStartMsg {
 		ext = "hex"
 	} else {
+		c.msAddress = msg.Address
 		ext = "bin"
 	}
 	c.FileWriter.Start(msg.FileSize, ext)
