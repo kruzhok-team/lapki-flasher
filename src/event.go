@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+
+	"github.com/polyus-nt/ms1-go/pkg/ms1"
 )
 
 // обработчик события
@@ -565,9 +567,35 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	if err != nil {
 		return err
 	}
-	// TODO: отправка пинга
-	// возможно стоит блокировать устройство во время пинга?
-	printLog(msg, "ping")
+	board, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		// TODO: отправить сообщение, что не удалось пропинговать устройство
+		return nil
+	}
+	updated := board.updatePortName(msg.ID)
+	if updated {
+		if board.IsConnectedSync() {
+			DeviceUpdatePort(msg.ID, board, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			// TODO: отправить сообщение, что не удалось пропинговать устройство
+			return nil
+		}
+	}
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	portMS := ms1.MkSerial(board.getPort())
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	ping, err := deviceMS.Ping()
+	if err != nil {
+		// TODO
+		return err
+	}
+	printLog("PING", ping)
+	// TODO
 	return nil
 }
 
