@@ -28,9 +28,11 @@ type DeviceMessage struct {
 	SerialID   string `json:"serialID,omitempty"`
 }
 
+// тип данных для flash-start и ms-bin-start
 type FlashStartMessage struct {
 	ID       string `json:"deviceID"`
 	FileSize int    `json:"fileSize"`
+	Address  string `json:"address"` // обязательное поле для ms-bin-start, пустое поле для flash-start
 }
 
 type FlashBlockMessage struct {
@@ -77,12 +79,6 @@ type SerialStatusMessage struct {
 type SerialMessage struct {
 	ID  string `json:"deviceID"`
 	Msg string `json:"msg"`
-}
-
-type MSBinStartMessage struct {
-	ID       string `json:"deviceID"`
-	FileSize int    `json:"fileSize"`
-	Address  string `json:"address"`
 }
 
 type MSPingMessage struct {
@@ -230,14 +226,25 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-
+	if board.isMSDevice() && event.Type != MSBinStartMsg {
+		// TODO
+	}
+	if !board.isMSDevice() && event.Type != FlashStartMsg {
+		// TODO
+	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = board
 	c.FlashingBoard.SetLock(true)
 	if board.refToBoot != nil {
 		board.refToBoot.SetLock(true)
 	}
-	c.FileWriter.Start(msg.FileSize, "hex")
+	var ext string
+	if event.Type == FlashStartMsg {
+		ext = "hex"
+	} else {
+		ext = "bin"
+	}
+	c.FileWriter.Start(msg.FileSize, ext)
 
 	FlashNextBlock(c)
 	return nil
@@ -571,16 +578,5 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	}
 	// TODO: получение адреса
 	printLog(msg, "address")
-	return nil
-}
-
-func MSBinStart(event Event, c *WebSocketConnection) error {
-	var msg MSBinStartMessage
-	err := json.Unmarshal(event.Payload, &msg)
-	if err != nil {
-		return err
-	}
-	// TODO: отправка прошивки в МС-ТЮК
-	printLog(msg, "bin")
 	return nil
 }
