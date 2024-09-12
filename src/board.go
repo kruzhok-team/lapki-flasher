@@ -58,7 +58,7 @@ type BoardFlashAndSerial struct {
 func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
 	var board BoardFlashAndSerial
 	board.Type = Type
-	board.PortName = PortName
+	board.setPort(PortName)
 	board.flashing = false
 
 	if board.Type.hasBootloader() {
@@ -106,7 +106,7 @@ func findTemplateByID(boardID int) *BoardTemplate {
 
 // подключено ли устройство
 func (board *BoardFlashAndSerial) IsConnected() bool {
-	return board.PortName != NOT_FOUND
+	return board.getPort() != NOT_FOUND
 }
 
 // подключено ли устройство

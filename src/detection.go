@@ -71,8 +71,8 @@ func (d *Detector) Update() (
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := d.boards[deviceID]
 		if exists {
-			if oldBoard.getPortSync() != newBoard.PortName {
-				oldBoard.setPortSync(newBoard.PortName)
+			if oldBoard.getPortSync() != newBoard.getPort() {
+				oldBoard.setPortSync(newBoard.getPort())
 				d.boardActions.PushBack(ActionWithBoard{board: oldBoard, boardID: deviceID, action: PORT_UPDATE})
 			}
 		} else {

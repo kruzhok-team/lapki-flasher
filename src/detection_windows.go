@@ -235,7 +235,7 @@ func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	instanceId := getInstanceId(ID)
 	// такого устройства нет
 	if instanceId == nil {
-		board.PortName = NOT_FOUND
+		board.setPort(NOT_FOUND)
 		return true
 	}
 	if len(instanceId) > 1 {

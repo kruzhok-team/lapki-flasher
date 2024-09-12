@@ -165,7 +165,7 @@ func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocke
 		board.Type.Name,
 		board.Type.Controller,
 		board.Type.Programmer,
-		board.PortName,
+		board.getPort(),
 		board.SerialID,
 	}
 	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
@@ -310,7 +310,7 @@ func newDeviceMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessag
 		board.Type.Name,
 		board.Type.Controller,
 		board.Type.Programmer,
-		board.PortName,
+		board.getPort(),
 		board.SerialID,
 	}
 	return &boardMessage
@@ -322,7 +322,7 @@ func newUpdatedMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessa
 		board.Type.Name,
 		board.Type.Controller,
 		board.Type.Programmer,
-		board.PortName,
+		board.getPort(),
 		board.SerialID,
 	}
 	return &boardMessage
@@ -331,7 +331,7 @@ func newUpdatedMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessa
 func newDeviceUpdatePortMessage(board *BoardFlashAndSerial, deviceID string) *DeviceUpdatePortMessage {
 	boardMessage := DeviceUpdatePortMessage{
 		deviceID,
-		board.PortName,
+		board.getPort(),
 	}
 	return &boardMessage
 }
@@ -406,7 +406,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	serialPort, err := openSerialPort(board.PortName, msg.Baud)
+	serialPort, err := openSerialPort(board.getPort(), msg.Baud)
 	if err != nil {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:      msg.ID,

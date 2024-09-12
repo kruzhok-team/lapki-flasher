@@ -57,7 +57,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 				return
 			}
 			//time.Sleep(time.Second)
-			newSerialPort, err := openSerialPort(board.PortName, baud)
+			newSerialPort, err := openSerialPort(board.getPort(), baud)
 			if err != nil {
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
