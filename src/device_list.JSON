@@ -11,8 +11,8 @@
   {
     "ID": 1,
     "name": "Arduino Micro (bootloader)",
-    "productIDs": ["0037"],
-    "vendorIDs": ["2a03", "2341"],
+    "productIDs": ["0037, 7523"],
+    "vendorIDs": ["2a03", "2341, 1A86"],
     "controller": "ATmega32U4",
     "programmer": "avr109",
     "bootloaderID": -1
