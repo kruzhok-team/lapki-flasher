@@ -88,6 +88,11 @@ type MSPingMessage struct {
 	Address string `json:"address"`
 }
 
+type MSPingResultMessage struct {
+	ID   string `json:"deviceID"`
+	Code int    `json:"code"`
+}
+
 type MSGetAddressMessage struct {
 	ID string `json:"deviceID"`
 }
@@ -132,6 +137,8 @@ const (
 	MSBinStartMsg = "ms-bin-start"
 	// пинг МС-ТЮК по адресу
 	MSPingMsg = "ms-ping"
+	// результат выполнения команды пинг
+	MSPingResultMsg = "ms-ping-result"
 	// получение адреса из МС-ТЮК
 	MSGetAddressMsg = "ms-get-address"
 )
@@ -570,7 +577,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	board, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		// TODO: отправить сообщение, что не удалось пропинговать устройство
+		MSPingResult(msg.ID, 1, c)
 		return nil
 	}
 	updated := board.updatePortName(msg.ID)
@@ -580,7 +587,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			// TODO: отправить сообщение, что не удалось пропинговать устройство
+			MSPingResult(msg.ID, 1, c)
 			return nil
 		}
 	}
@@ -589,13 +596,12 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	portMS := ms1.MkSerial(board.getPort())
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
-	ping, err := deviceMS.Ping()
+	_, err = deviceMS.Ping()
 	if err != nil {
-		// TODO
+		MSPingResult(msg.ID, 2, c)
 		return err
 	}
-	printLog("PING", ping)
-	// TODO
+	MSPingResult(msg.ID, 0, c)
 	return nil
 }
 
@@ -608,4 +614,11 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	// TODO: получение адреса
 	printLog(msg, "address")
 	return nil
+}
+
+func MSPingResult(deviceID string, code int, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(MSPingResultMsg, MSPingResultMessage{
+		ID:   deviceID,
+		Code: code,
+	}, false)
 }
