@@ -157,6 +157,15 @@ func findPortName(desc *gousb.DeviceDesc) string {
 				dirs, _ := os.ReadDir(dir)
 				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
 				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
+			} else {
+				// TODO: избавиться от костыля
+				dir = fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, "ttyUSB0")
+				printLog("DIR", dir)
+				existance, _ = exists(dir)
+				if existance {
+					dirs, _ := os.ReadDir(dir)
+					return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
+				}
 			}
 			printLog(dir, "doesn't exists")
 		}
