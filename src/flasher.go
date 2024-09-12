@@ -6,17 +6,22 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/polyus-nt/ms1-go/pkg/ms1"
 )
 
 var flasherSync sync.Mutex
 
 // прошивка, с автоматическим прописыванием необходимых параметров для avrdude
 // ожидается, что плата заблокирована (board.IsFlashBlocked() == true)
-func autoFlash(board *BoardFlashAndSerial, hexFilePath string) (avrdudeMessage string, err error) {
+func autoFlash(board *BoardFlashAndSerial, filePath string) (flashMessage string, err error) {
+	if board.isMSDevice() {
+		return flashMS(board, filePath)
+	}
 	if board.Type.hasBootloader() {
 		flasherSync.Lock()
 		defer flasherSync.Unlock()
-		if e := rebootPort(board.PortName); e != nil {
+		if e := rebootPort(board.getPort()); e != nil {
 			return "Не удалось перезагрузить порт", e
 		}
 		bootloaderType := board.Type.BootloaderTypeID
@@ -49,9 +54,9 @@ func autoFlash(board *BoardFlashAndSerial, hexFilePath string) (avrdudeMessage s
 			return "Не удалось найти Bootloader.", errors.New("bootloader: not found")
 		}
 	}
-	flashFile := "flash:w:" + getAbolutePath(hexFilePath) + ":a"
+	flashFile := "flash:w:" + getAbolutePath(filePath) + ":a"
 	// без опции "-D" не может прошить Arduino Mega
-	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.PortName, "-U", flashFile}
+	args := []string{"-D", "-p", board.Type.Controller, "-c", board.Type.Programmer, "-P", board.getPort(), "-U", flashFile}
 	if configPath != "" {
 		args = append(args, "-C", configPath)
 	}
@@ -63,22 +68,45 @@ func autoFlash(board *BoardFlashAndSerial, hexFilePath string) (avrdudeMessage s
 func flash(avrdudeArgs []string) (avrdudeMessage string, err error) {
 	cmd := exec.Command(avrdudePath, avrdudeArgs...)
 	stdout, err := cmd.CombinedOutput()
-	outputString := string(stdout)
-	if err != nil {
-		avrdudeMessage = err.Error()
-		if outputString != "" {
-			avrdudeMessage += "\n" + outputString
-		}
-	} else {
-		avrdudeMessage = outputString
-	}
+	avrdudeMessage = handleFlashResult(string(stdout), err)
 	return
 }
 
 // симуляция процесса прошивки, вместо неё, программа просто ждёт определённо время
-func fakeFlash(board *BoardFlashAndSerial, filePath string) (avrdudeMessage string, err error) {
+func fakeFlash(board *BoardFlashAndSerial, filePath string) (fakeMessage string, err error) {
 	time.Sleep(3 * time.Second)
 	printLog(fmt.Sprintf("Fake uploading of file %s in board %v is completed", filePath, board))
-	avrdudeMessage = "Fake flashing is completed"
+	fakeMessage = "Fake flashing is completed"
+	return
+}
+
+// прошивка МС-ТЮК
+func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, err error) {
+	//port := ms1.MkSerial(board.getPortSync())
+	port := ms1.MkSerial("COM11")
+	defer port.Close()
+
+	device := ms1.NewDevice(port)
+	_, err, b := device.GetId(true, true)
+	if err != nil || b == false {
+		printLog("ERR1")
+		return err.Error(), err
+	}
+	printLog("DEV", device.String())
+	packs, err := device.WriteFirmware(filePath)
+	printLog("ERR2")
+	flashMessage = handleFlashResult(fmt.Sprint(packs), err)
+	return
+}
+
+func handleFlashResult(flashOutput string, flashError error) (result string) {
+	if flashError != nil {
+		result = flashError.Error()
+		if flashOutput != "" {
+			result += "\n" + flashOutput
+		}
+	} else {
+		result = flashOutput
+	}
 	return
 }
