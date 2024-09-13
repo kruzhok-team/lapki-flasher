@@ -628,8 +628,17 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	// TODO: получение адреса
-	MSAddress(msg.ID, 0, "", c)
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	portMS := ms1.MkSerial(board.getPort())
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	_, err, b := deviceMS.GetId(true, true)
+	if err != nil || b == false {
+		MSAddress(msg.ID, 2, "Не удалось получить ID устройства. "+err.Error(), c)
+		return err
+	}
+	MSAddress(msg.ID, 0, deviceMS.GetAddress(), c)
 	return nil
 }
 
