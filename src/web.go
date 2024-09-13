@@ -222,7 +222,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 				case PORT_UPDATE:
 					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
 				case ADD:
-					m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithAction.board, boardWithAction.boardID))
+					m.sendMessageToAll(DeviceMsg, deviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
 				case DELETE:
 					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
 				default:

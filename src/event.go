@@ -22,12 +22,13 @@ type Event struct {
 }
 
 type DeviceMessage struct {
-	ID         string `json:"deviceID"`
-	Name       string `json:"name,omitempty"`
-	Controller string `json:"controller,omitempty"`
-	Programmer string `json:"programmer,omitempty"`
-	PortName   string `json:"portName,omitempty"`
-	SerialID   string `json:"serialID,omitempty"`
+	ID         string   `json:"deviceID"`
+	Name       string   `json:"name,omitempty"`
+	Controller string   `json:"controller,omitempty"`
+	Programmer string   `json:"programmer,omitempty"`
+	PortName   string   `json:"portName,omitempty"`  // если содержится только один порт
+	PortNames  []string `json:"portNames,omitempty"` // если содержится несколько портов (TODO: не самая рациональное решение, стоит придумать что-то другое)
+	SerialID   string   `json:"serialID,omitempty"`
 }
 
 // тип данных для flash-start и ms-bin-start
@@ -160,14 +161,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
 	//printLog("device")
-	boardMessage := DeviceMessage{
-		deviceID,
-		board.Type.Name,
-		board.Type.Controller,
-		board.Type.Programmer,
-		board.getPort(),
-		board.SerialID,
-	}
+	boardMessage := deviceMessageMakeSync(deviceID, board)
 	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
@@ -302,30 +296,6 @@ func FlashDone(c *WebSocketConnection) {
 // запрос на следующий блок с бинаными данными файла
 func FlashNextBlock(c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
-}
-
-func newDeviceMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
-	boardMessage := DeviceMessage{
-		deviceID,
-		board.Type.Name,
-		board.Type.Controller,
-		board.Type.Programmer,
-		board.getPort(),
-		board.SerialID,
-	}
-	return &boardMessage
-}
-
-func newUpdatedMessage(board *BoardFlashAndSerial, deviceID string) *DeviceMessage {
-	boardMessage := DeviceMessage{
-		deviceID,
-		board.Type.Name,
-		board.Type.Controller,
-		board.Type.Programmer,
-		board.getPort(),
-		board.SerialID,
-	}
-	return &boardMessage
 }
 
 func newDeviceUpdatePortMessage(board *BoardFlashAndSerial, deviceID string) *DeviceUpdatePortMessage {
@@ -659,4 +629,22 @@ func DeviceCommentCode(messageType string, deviceID string, code int, comment st
 
 func MSAddress(deviceID string, code int, comment string, c *WebSocketConnection) {
 	DeviceCommentCode(MSAddressMsg, deviceID, code, comment, c)
+}
+
+func deviceMessageMakeSync(deviceID string, board *BoardFlashAndSerial) *DeviceMessage {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	devMes := DeviceMessage{
+		ID:         deviceID,
+		Name:       board.Type.Name,
+		Controller: board.Type.Controller,
+		Programmer: board.Type.Programmer,
+		SerialID:   board.SerialID,
+	}
+	if board.portsNum() > 1 {
+		devMes.PortNames = board.getPorts()
+	} else {
+		devMes.PortName = board.getPort()
+	}
+	return &devMes
 }

@@ -204,7 +204,13 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 	return boards
 }
 
-// возвращает имя порта, либо константу NOT_FOUND, если не удалось его не удалось найти
+/*
+возвращает имя порта, либо константу NOT_FOUND, если не удалось его не удалось найти
+
+TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
+
+TODO: обновление нескольких портов
+*/
 func findPortName(instanceId *string) string {
 	keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s\\Device Parameters", *instanceId)
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)

@@ -215,22 +215,22 @@ func (d *Detector) isFake(ID string) bool {
 // очистка от лишних портов МС-ТЮК
 func filterMS(boards map[string]*BoardFlashAndSerial) {
 	type BoardID struct {
-		ID       string
-		PortName string
+		ID    string
+		Board *BoardFlashAndSerial
 	}
 	var MSdevices []BoardID
 	for boardID, board := range boards {
 		if board.isMSDevice() {
 			MSdevices = append(MSdevices, BoardID{
-				ID:       boardID,
-				PortName: board.getPort(),
+				ID:    boardID,
+				Board: board,
 			})
 		}
 	}
 	// портом загрузчика является первый по порядковому номеру
 	sort.Slice(MSdevices, func(i, j int) bool {
-		port1 := MSdevices[i].PortName
-		port2 := MSdevices[j].PortName
+		port1 := MSdevices[i].Board.getPort()
+		port2 := MSdevices[j].Board.getPort()
 		len1 := len(port1)
 		len2 := len(port2)
 		if len1 == len2 {
@@ -238,10 +238,12 @@ func filterMS(boards map[string]*BoardFlashAndSerial) {
 		}
 		return len1 < len2
 	})
-	for i, board := range MSdevices {
-		printLog("filter:", board.PortName, i)
+	for i, v := range MSdevices {
+		printLog("filter:", v.Board.getPort(), i)
 		if i%4 != 0 {
-			delete(boards, board.ID)
+			MSdevices[i-i%4].Board.addPort(v.Board.getPort())
+			delete(boards, v.ID)
 		}
 	}
+	//boards[]
 }

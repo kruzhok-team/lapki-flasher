@@ -36,10 +36,11 @@ func (board BoardType) hasBootloader() bool {
 }
 
 type BoardFlashAndSerial struct {
-	Type     BoardType
-	PortName string
-	SerialID string
-	mu       sync.Mutex
+	Type BoardType
+	// список портов, для arduino-подобных устройств он состоит из одного элемента, для МС-ТЮК может состоять из нескольких
+	PortNames []string
+	SerialID  string
+	mu        sync.Mutex
 	// устройство прошивается
 	flashing bool
 	// bootloader, связанный с платой, nil - если не найден, или отсутствует вообще
@@ -152,22 +153,71 @@ func (board *BoardFlashAndSerial) SetLockSync(lock bool) {
 	board.SetLock(lock)
 }
 
+// получить первый в списке порт, возвращает константу NOT_FOUND, если массив пустой
 func (board *BoardFlashAndSerial) getPort() string {
-	return board.PortName
+	if board.PortNames == nil {
+		return NOT_FOUND
+	}
+	return board.PortNames[0]
 }
+
+// получить первый в списке порт, возвращает константу NOT_FOUND, если массив пустой
 func (board *BoardFlashAndSerial) getPortSync() string {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.getPort()
 }
 
+// поменять первый в списке порт, если массив пустой, то создаёт новый массив, где единственным элементом является переданная строка
 func (board *BoardFlashAndSerial) setPort(newPortName string) {
-	board.PortName = newPortName
+	if board.PortNames == nil {
+		board.PortNames = make([]string, 1)
+	}
+	board.PortNames[0] = newPortName
 }
+
+// поменять первый в списке порт, если массив пустой, то создаёт новый массив, где единственным элементом является переданная строка
 func (board *BoardFlashAndSerial) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.setPort(newPortName)
+}
+
+// получить список портов
+func (board *BoardFlashAndSerial) getPorts() []string {
+	return board.PortNames
+}
+
+// получить список портов
+func (board *BoardFlashAndSerial) getPortsSync() []string {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.getPorts()
+}
+
+// поменять список портов, копирует ссылку на переданный массив!
+func (board *BoardFlashAndSerial) setPorts(newPortNames []string) {
+	board.PortNames = newPortNames
+}
+
+// поменять список портов, копирует ссылку на переданный массив!
+func (board *BoardFlashAndSerial) setPortsSync(newPortNames []string) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.setPorts(newPortNames)
+}
+
+// добавить порт в список
+func (board *BoardFlashAndSerial) addPort(newPortName string) {
+	board.PortNames = append(board.PortNames, newPortName)
+}
+
+// количество портов
+func (board *BoardFlashAndSerial) portsNum() int {
+	if board.PortNames == nil {
+		return 0
+	}
+	return len(board.PortNames)
 }
 
 func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {

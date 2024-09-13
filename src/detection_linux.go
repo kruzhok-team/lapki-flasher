@@ -66,11 +66,11 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 								boardTemplate.IsMSDevice,
 							}
 							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
-							if detectedBoard.PortName == NOT_FOUND {
+							if detectedBoard.getPort() == NOT_FOUND {
 								printLog("can't find port")
 								continue
 							}
-							properties, err := findProperty(detectedBoard.PortName, USEC_INITIALIZED, ID_SERIAL)
+							properties, err := findProperty(detectedBoard.getPort(), USEC_INITIALIZED, ID_SERIAL)
 							if err != nil {
 								printLog("can't find ID", err.Error())
 								continue
@@ -97,8 +97,15 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 	return boards
 }
 
-// true - если порт изменился или не найден, иначе false
-// назначает порту значение NOT_FOUND, если не удалось найти порт
+/*
+true - если порт изменился или не найден, иначе false
+
+назначает порту значение NOT_FOUND, если не удалось найти порт
+
+TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
+
+TODO: обновление нескольких портов
+*/
 func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	var properties []string
 	var err error
