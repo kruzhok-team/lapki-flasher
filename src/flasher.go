@@ -82,19 +82,15 @@ func fakeFlash(board *BoardFlashAndSerial, filePath string) (fakeMessage string,
 
 // прошивка МС-ТЮК
 func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, err error) {
-	//port := ms1.MkSerial(board.getPortSync())
-	port := ms1.MkSerial("COM11")
+	port := ms1.MkSerial(board.getPortSync())
 	defer port.Close()
 
 	device := ms1.NewDevice(port)
 	_, err, b := device.GetId(true, true)
 	if err != nil || b == false {
-		printLog("ERR1")
 		return err.Error(), err
 	}
-	printLog("DEV", device.String())
 	packs, err := device.WriteFirmware(filePath)
-	printLog("ERR2")
 	flashMessage = handleFlashResult(fmt.Sprint(packs), err)
 	return
 }
