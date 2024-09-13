@@ -245,5 +245,4 @@ func filterMS(boards map[string]*BoardFlashAndSerial) {
 			delete(boards, v.ID)
 		}
 	}
-	//boards[]
 }
