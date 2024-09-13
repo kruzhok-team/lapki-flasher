@@ -22,8 +22,8 @@
   {
     "ID": 2,
     "name": "Arduino Uno",
-    "productIDs": ["0043"],
-    "vendorIDs": ["2a03", "2341"],
+    "productIDs": ["0043", "7523"],
+    "vendorIDs": ["2a03", "2341", "1a86"],
     "controller": "ATmega328P",
     "programmer": "arduino",
     "bootloaderID": -1,
