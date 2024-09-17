@@ -82,7 +82,10 @@ func fakeFlash(board *BoardFlashAndSerial, filePath string) (fakeMessage string,
 
 // прошивка МС-ТЮК
 func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, err error) {
-	port := ms1.MkSerial(board.getPortSync())
+	port, err := ms1.MkSerial(board.getPortSync())
+	if err != nil {
+		return err.Error(), err
+	}
 	defer port.Close()
 
 	device := ms1.NewDevice(port)
@@ -90,7 +93,10 @@ func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, 
 	if err != nil || b == false {
 		return err.Error(), err
 	}
-	packs, err := device.WriteFirmware(filePath)
+	packs, err := device.WriteFirmware(filePath, true)
+	if err != nil {
+		return err.Error(), err
+	}
 	flashMessage = handleFlashResult(fmt.Sprint(packs), err)
 	return
 }

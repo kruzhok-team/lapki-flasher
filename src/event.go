@@ -563,7 +563,11 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	}
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	portMS := ms1.MkSerial(board.getPort())
+	portMS, err := ms1.MkSerial(board.getPort())
+	if err != nil {
+		MSPingResult(msg.ID, 2, c)
+		return err
+	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	_, err = deviceMS.Ping()
@@ -600,7 +604,11 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	}
 	board.mu.Lock()
 	defer board.mu.Unlock()
-	portMS := ms1.MkSerial(board.getPort())
+	portMS, err := ms1.MkSerial(board.getPort())
+	if err != nil {
+		MSAddress(msg.ID, 2, err.Error(), c)
+		return err
+	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	_, err, b := deviceMS.GetId(true, true)
