@@ -306,3 +306,11 @@ func (board *BoardFlashAndSerial) isMSDeviceSync() bool {
 	defer board.mu.Unlock()
 	return board.isMSDevice()
 }
+
+func (board *BoardFlashAndSerial) getSerialPortName() string {
+	if board.isMSDevice() {
+		return board.PortNames[3]
+	} else {
+		return board.getPort()
+	}
+}

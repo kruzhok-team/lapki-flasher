@@ -376,7 +376,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	serialPort, err := openSerialPort(board.getPort(), msg.Baud)
+	serialPort, err := openSerialPort(board.getSerialPortName(), msg.Baud)
 	if err != nil {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:      msg.ID,
