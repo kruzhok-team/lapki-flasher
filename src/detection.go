@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"sync"
 )
 
@@ -210,39 +209,4 @@ func (d *Detector) isFake(ID string) bool {
 		}
 	}
 	return false
-}
-
-// очистка от лишних портов МС-ТЮК
-func filterMS(boards map[string]*BoardFlashAndSerial) {
-	type BoardID struct {
-		ID    string
-		Board *BoardFlashAndSerial
-	}
-	var MSdevices []BoardID
-	for boardID, board := range boards {
-		if board.isMSDevice() {
-			MSdevices = append(MSdevices, BoardID{
-				ID:    boardID,
-				Board: board,
-			})
-		}
-	}
-	// портом загрузчика является первый по порядковому номеру
-	sort.Slice(MSdevices, func(i, j int) bool {
-		port1 := MSdevices[i].Board.getPort()
-		port2 := MSdevices[j].Board.getPort()
-		len1 := len(port1)
-		len2 := len(port2)
-		if len1 == len2 {
-			return port1 < port2
-		}
-		return len1 < len2
-	})
-	for i, v := range MSdevices {
-		printLog("filter:", v.Board.getPort(), i)
-		if i%4 != 0 {
-			MSdevices[i-i%4].Board.addPort(v.Board.getPort())
-			delete(boards, v.ID)
-		}
-	}
 }

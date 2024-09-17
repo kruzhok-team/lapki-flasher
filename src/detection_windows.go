@@ -8,6 +8,7 @@ import (
 	"log"
 	"os/exec"
 	"sort"
+
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
@@ -197,7 +198,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 		}
 	}
 	// windows распознает один МС-ТЮК как 4 разных устройства, поэтому их нужно отфильтровать
-	filterMS(boards)
+	composeMS(boards)
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
 	printLog(boards)
@@ -238,6 +239,10 @@ func findPortName(instanceId *string) string {
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
 func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
+	// TODO: сделать проверку для МС-ТЮК
+	if board.isMSDevice() {
+		return false
+	}
 	instanceId := getInstanceId(ID)
 	// такого устройства нет
 	if instanceId == nil {
@@ -264,4 +269,73 @@ func rebootPort(portName string) (err error) {
 		printLog(cmd.Args, err)
 	}
 	return err
+}
+
+// собрать части МС-ТЮК в одно устройство
+func composeMS(boards map[string]*BoardFlashAndSerial) {
+	type BoardID struct {
+		ID           string
+		friendlyName string
+		Board        *BoardFlashAndSerial
+	}
+	var MSdevices []BoardID
+	for boardID, board := range boards {
+		if board.isMSDevice() {
+			keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s", boardID)
+			key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+			if err != nil {
+				printLog("can't open key for ms1-device.", err.Error())
+				return
+			}
+			defer func() {
+				err := key.Close()
+				if err != nil {
+					printLog("windows: in function composeMS.", err.Error())
+				}
+			}()
+			friendlyName, _, err := key.GetStringValue("FriendlyName")
+			if err != nil {
+				printLog("can't get FriendlyName property for ms1-device.", err.Error())
+				return
+			}
+			MSdevices = append(MSdevices, BoardID{
+				ID:           boardID,
+				friendlyName: friendlyName,
+				Board:        board,
+			})
+		}
+	}
+	sort.Slice(MSdevices, func(i, j int) bool {
+		port1 := MSdevices[i].Board.getPort()
+		port2 := MSdevices[j].Board.getPort()
+		len1 := len(port1)
+		len2 := len(port2)
+		if len1 == len2 {
+			return port1 < port2
+		}
+		return len1 < len2
+	})
+	for i, v := range MSdevices {
+		if i%4 != 0 {
+			MSdevices[i-i%4].Board.addPort(v.Board.getPort())
+			delete(boards, v.ID)
+		}
+	}
+	for index, value := range MSdevices {
+		if index%4 != 0 {
+			continue
+		}
+		indexMap := make(map[string]int, 4)
+		var stringKeys []string
+		for i := range 4 {
+			indexMap[MSdevices[index+i].friendlyName] = index + i
+			stringKeys = append(stringKeys, MSdevices[index+i].friendlyName)
+		}
+		sort.Strings(stringKeys)
+		var orderedPortNames []string
+		for i := range value.Board.PortNames {
+			orderedPortNames = append(orderedPortNames, MSdevices[indexMap[stringKeys[i]]].Board.getPort())
+		}
+		value.Board.PortNames = orderedPortNames
+	}
 }
