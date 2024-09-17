@@ -107,6 +107,10 @@ TODO: переделать интерфейс функции для всех п�
 TODO: обновление нескольких портов
 */
 func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
+	// TODO: сделать проверку для МС-ТЮК
+	if board.isMSDevice() {
+		return false
+	}
 	var properties []string
 	var err error
 	if board.SerialID == NOT_FOUND {
