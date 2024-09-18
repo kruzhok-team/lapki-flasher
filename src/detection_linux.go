@@ -65,7 +65,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 								boardTemplate.BootloaderID,
 								boardTemplate.IsMSDevice,
 							}
-							detectedBoard := NewBoardToFlash(boardType, findPortName(desc))
+							detectedBoard := NewBoardToFlashPorts(boardType, findPortName(desc))
 							if detectedBoard.getPort() == NOT_FOUND {
 								printLog("can't find port")
 								continue
@@ -77,6 +77,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 							}
 							detectedBoard.SerialID = properties[1]
 							var id string
+							// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
 							if detectedBoard.SerialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
 								id = detectedBoard.SerialID
 							} else {
@@ -122,32 +123,42 @@ func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	if err == nil && properties[0] == ID {
 		return false
 	}
-	newPortName := NOT_FOUND
 	if board.SerialID == NOT_FOUND {
 		return true
 	}
 	ctx := gousb.NewContext()
 	defer ctx.Close()
+	var portNames []string
 	ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		if desc.Product.String() == board.Type.ProductID && desc.Vendor.String() == board.Type.VendorID {
-			portName := findPortName(desc)
-			properties, _ = findProperty(portName, ID_SERIAL)
-			printLog("prop", properties)
-			if properties[0] == board.SerialID {
-				newPortName = portName
+			portNames = findPortName(desc)
+			foundSerialID := false
+			for _, portName := range portNames {
+				properties, _ = findProperty(portName, ID_SERIAL)
+				printLog("prop", properties)
+				if properties[0] == board.SerialID {
+					board.setPortSync(portName)
+					foundSerialID = true
+				}
+			}
+			if foundSerialID {
 				return false
 			}
 		}
 		return false
 	})
-	board.setPortSync(newPortName)
+	board.setPortsSync(portNames)
 	return true
 }
 
-func findPortName(desc *gousb.DeviceDesc) string {
+/*
+Возвращает порты устройства, возвращает nil, если ничего не удалось найти.
+
+Для arduino-подобных устройств должен вернуть один порт, для МС-ТЮК - четыре порта.
+*/
+func findPortName(desc *gousb.DeviceDesc) []string {
 	// <bus>-<port[.port[.port]]>:<config>.<interface> - шаблон папки в которой должен находиться путь к папке tty
 
-	// в каком порядке идут порты? Надо проверить
 	ports := strconv.Itoa(desc.Path[0])
 	num_ports := len(desc.Path)
 	for i := 1; i < num_ports; i++ {
@@ -155,10 +166,9 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	}
 
 	// рекурсивно проходимся по возможным config и interface до тех пор пока не найдём tty папку
-
-	//
 	dir_prefix := "/sys/bus/usb/devices"
 	tty := "tty"
+	var portNames []string
 	for _, conf := range desc.Configs {
 		for _, inter := range conf.Interfaces {
 			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
@@ -167,14 +177,13 @@ func findPortName(desc *gousb.DeviceDesc) string {
 			if existance {
 				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
 				dirs, _ := os.ReadDir(dir)
-				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
-				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
+				portNames = append(portNames, fmt.Sprintf("%s/%s", DEV, dirs[0].Name()))
+			} else {
+				printLog(dir, "doesn't exists")
 			}
-			printLog(dir, "doesn't exists")
 		}
-
 	}
-	return NOT_FOUND
+	return portNames
 }
 
 // возвращает значение указанных параметров устройства, подключённого к порту portName,
