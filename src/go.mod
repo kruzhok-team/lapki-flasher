@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/polyus-nt/ms1-go v0.0.0-20240917073348-5a9e287daecb
+	github.com/polyus-nt/ms1-go v0.0.0-20240918021020-27c77cbfc4a5
 	howett.net/plist v1.0.1
 )
 
