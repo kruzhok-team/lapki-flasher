@@ -75,11 +75,12 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 								printLog("can't find ID", err.Error())
 								continue
 							}
-							detectedBoard.SerialID = properties[1]
+							serialID := properties[1]
 							var id string
 							// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
-							if detectedBoard.SerialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
+							if serialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
 								id = detectedBoard.SerialID
+								detectedBoard.SerialID = serialID
 							} else {
 								id = properties[0]
 							}
@@ -104,8 +105,6 @@ true - если порт изменился или не найден, иначе
 назначает порту значение NOT_FOUND, если не удалось найти порт
 
 TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
-
-TODO: обновление нескольких портов
 */
 func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	// TODO: сделать проверку для МС-ТЮК
@@ -119,7 +118,10 @@ func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 	} else {
 		properties, err = findProperty(board.getPortSync(), ID_SERIAL)
 	}
-	printLog(board.Type.ProductID, board.Type.ProductID)
+	if err != nil {
+		board.setPort(NOT_FOUND)
+		return true
+	}
 	if err == nil && properties[0] == ID {
 		return false
 	}
@@ -137,7 +139,6 @@ func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
 				properties, _ = findProperty(portName, ID_SERIAL)
 				printLog("prop", properties)
 				if properties[0] == board.SerialID {
-					board.setPortSync(portName)
 					foundSerialID = true
 				}
 			}
