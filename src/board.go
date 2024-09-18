@@ -56,10 +56,9 @@ type BoardFlashAndSerial struct {
 	serialMonitorWrite  chan string
 }
 
-func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
+func newBoard(Type BoardType) *BoardFlashAndSerial {
 	var board BoardFlashAndSerial
 	board.Type = Type
-	board.setPort(PortName)
 	board.flashing = false
 
 	if board.Type.hasBootloader() {
@@ -79,6 +78,18 @@ func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
 		}
 	}
 	return &board
+}
+
+func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
+	board := newBoard(Type)
+	board.setPort(PortName)
+	return board
+}
+
+func NewBoardToFlashPorts(Type BoardType, PortNames []string) *BoardFlashAndSerial {
+	board := newBoard(Type)
+	board.setPorts(PortNames)
+	return board
 }
 
 // находит шаблон платы по его id
