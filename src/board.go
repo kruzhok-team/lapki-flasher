@@ -54,6 +54,8 @@ type BoardFlashAndSerial struct {
 	serialMonitorBaud   int
 	serialMonitorOpen   bool
 	serialMonitorWrite  chan string
+	// адрес устройства (для МС-ТЮК), он может не совпадать с реальным адресом МС-ТЮК, используется для запоминания и использования где-то ещё
+	msAddress string
 }
 
 func newBoard(Type BoardType) *BoardFlashAndSerial {
@@ -324,4 +326,14 @@ func (board *BoardFlashAndSerial) getSerialPortName() string {
 	} else {
 		return board.getPort()
 	}
+}
+
+// запомнить адрес устройства МС-ТЮК
+func (board *BoardFlashAndSerial) setAddressMS(address string) {
+	board.msAddress = address
+}
+
+// получить последнее записанное значение адреса МС-ТЮК
+func (board *BoardFlashAndSerial) getAddressMS() string {
+	return board.msAddress
 }

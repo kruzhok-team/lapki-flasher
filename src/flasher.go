@@ -89,9 +89,11 @@ func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, 
 	defer port.Close()
 
 	device := ms1.NewDevice(port)
-	_, err, b := device.GetId(true, true)
-	if err != nil || b == false {
-		return err.Error(), err
+	if board.getAddressMS() != "" {
+		err := device.SetAddress(board.getAddressMS())
+		if err != nil {
+			return "Не удалось использовать адрес устройства. " + err.Error(), err
+		}
 	}
 	packs, err := device.WriteFirmware(filePath, true)
 	if err != nil {

@@ -245,7 +245,11 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if event.Type == FlashStartMsg {
 		ext = "hex"
 	} else {
-		c.msAddress = msg.Address
+		if msg.Address != "" {
+			board.setAddressMS(msg.Address)
+		} else {
+			// TODO: сообщить о том, что МС-ТЮК должен знать адрес для прошивки
+		}
 		ext = "bin"
 	}
 	c.FileWriter.Start(msg.FileSize, ext)
@@ -616,6 +620,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 		MSAddress(msg.ID, 2, "Не удалось получить ID устройства. "+err.Error(), c)
 		return err
 	}
+	board.setAddressMS(deviceMS.GetAddress())
 	MSAddress(msg.ID, 0, deviceMS.GetAddress(), c)
 	return nil
 }
