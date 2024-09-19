@@ -22,13 +22,18 @@ type Event struct {
 }
 
 type DeviceMessage struct {
-	ID         string   `json:"deviceID"`
-	Name       string   `json:"name,omitempty"`
-	Controller string   `json:"controller,omitempty"`
-	Programmer string   `json:"programmer,omitempty"`
-	PortName   string   `json:"portName,omitempty"`  // если содержится только один порт
-	PortNames  []string `json:"portNames,omitempty"` // если содержится несколько портов (TODO: не самая рациональное решение, стоит придумать что-то другое)
-	SerialID   string   `json:"serialID,omitempty"`
+	ID         string `json:"deviceID"`
+	Name       string `json:"name,omitempty"`
+	Controller string `json:"controller,omitempty"`
+	Programmer string `json:"programmer,omitempty"`
+	PortName   string `json:"portName,omitempty"`
+	SerialID   string `json:"serialID,omitempty"`
+}
+
+type MSDeviceMessage struct {
+	ID        string   `json:"deviceID"`
+	Name      string   `json:"name,omitempty"`
+	PortNames []string `json:"portNames,omitempty"`
 }
 
 // тип данных для flash-start и ms-bin-start
@@ -100,8 +105,10 @@ type DeviceIdMessage struct {
 const (
 	// запрос на получение списка всех устройств
 	GetListMsg = "get-list"
-	// описание устройства
+	// описание ардуино подобного устройства
 	DeviceMsg = "device"
+	// описание МС-ТЮК
+	MSDeviceMsg = "ms-device"
 	// запрос на прошивку устройства
 	FlashStartMsg = "flash-start"
 	// прошивка прошла успешна
@@ -161,8 +168,16 @@ func GetList(event Event, c *WebSocketConnection) error {
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
 	//printLog("device")
-	boardMessage := deviceMessageMakeSync(deviceID, board)
-	err := c.sendOutgoingEventMessage(DeviceMsg, boardMessage, toAll)
+	var boardMessage any
+	var sendMsg string
+	if board.isMSDevice() {
+		boardMessage = msDeviceMessageMakeSync(deviceID, board)
+		sendMsg = MSDeviceMsg
+	} else {
+		boardMessage = deviceMessageMakeSync(deviceID, board)
+		sendMsg = DeviceMsg
+	}
+	err := c.sendOutgoingEventMessage(sendMsg, boardMessage, toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
 	}
@@ -653,11 +668,18 @@ func deviceMessageMakeSync(deviceID string, board *BoardFlashAndSerial) *DeviceM
 		Controller: board.Type.Controller,
 		Programmer: board.Type.Programmer,
 		SerialID:   board.SerialID,
+		PortName:   board.getPort(),
 	}
-	if board.portsNum() > 1 {
-		devMes.PortNames = board.getPorts()
-	} else {
-		devMes.PortName = board.getPort()
+	return &devMes
+}
+
+func msDeviceMessageMakeSync(deviceID string, board *BoardFlashAndSerial) *MSDeviceMessage {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	devMes := MSDeviceMessage{
+		ID:        deviceID,
+		Name:      board.Type.Name,
+		PortNames: board.getPorts(),
 	}
 	return &devMes
 }
