@@ -263,3 +263,13 @@ func (d *Detector) initDeviceListErrorHandle(pathToList string) {
 		}
 	}
 }
+
+func (d *Detector) boardExists(deviceID string) bool {
+	_, exists := d.boards[deviceID]
+	return exists
+}
+func (d *Detector) boardExistsSync(deviceID string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.boardExists(deviceID)
+}

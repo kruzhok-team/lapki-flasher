@@ -280,16 +280,6 @@ func (board *BoardFlashAndSerial) getSerialMonitorSync() *serial.Port {
 	return board.getSerialMonitor()
 }
 
-func (d *Detector) boardExists(deviceID string) bool {
-	_, exists := d.boards[deviceID]
-	return exists
-}
-func (d *Detector) boardExistsSync(deviceID string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.boardExists(deviceID)
-}
-
 // получить клиента, который занял монитор порта
 func (board *BoardFlashAndSerial) getSerialMonitorClient() *WebSocketConnection {
 	return board.serialMonitorClient
