@@ -5,6 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"os"
 	"sync"
 )
 
@@ -24,15 +27,12 @@ type Detector struct {
 	boardActions *list.List
 }
 
-//go:embed device_list.JSON
-var boardTemplatesRaw []byte
-
 func NewDetector() *Detector {
 	var d Detector
 	d.boards = make(map[string]*BoardFlashAndSerial)
 	// добавление фальшивых плат
 	d.generateFakeBoards()
-	json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+	d.initDeviceListErrorHandle(deviceListPath)
 	d.dontAddTypes = make(map[int]void)
 	d.boardActions = list.New()
 	return &d
@@ -209,4 +209,57 @@ func (d *Detector) isFake(ID string) bool {
 		}
 	}
 	return false
+}
+
+//go:embed device_list.JSON
+var boardTemplatesRaw []byte
+
+/*
+Добавление списка устройств в детектор.
+
+pathToList - путь к json-файлу со списком устройств.
+Если pathToList - пуст, то используется стандартный список (boardTemplatesRaw)
+*/
+func (d *Detector) initDeviceList(pathToList string) error {
+	if pathToList == "" {
+		err := json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
+		return err
+	} else {
+		jsonFile, err := os.Open(pathToList)
+		if err != nil {
+			//log.Println("Can't open json file with custom device list. Standard device list will be used instead.", err.Error())
+			return err
+		}
+		defer jsonFile.Close()
+		byteValue, err := io.ReadAll(jsonFile)
+		if err != nil {
+			//log.Println("Can't read json file with custom device list. Standard device list will be used instead.", err.Error())
+			return err
+		}
+		err = json.Unmarshal(byteValue, &d.boardTemplates)
+		if err != nil {
+			//log.Println("Can't unmarshal json file with custom device list. Standard device list will be used instead.", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+/*
+Обработка ошибок, связанных с добавлением списка устройств в детектор.
+
+pathToList - путь к json-файлу со списком устройств.
+Если pathToList - пуст, то используется стандартный список (boardTemplatesRaw)
+*/
+func (d *Detector) initDeviceListErrorHandle(pathToList string) {
+	err := d.initDeviceList(pathToList)
+	if err != nil {
+		if pathToList == "" {
+			log.Fatal("Can't run lapki-flasher because failed to use standart device list. Device detector won't be able to work!", err.Error())
+		} else {
+			log.Println("Can't use json file with custom device list because of error. Standard device list will be used instead.", err.Error())
+			d.initDeviceListErrorHandle("")
+			return
+		}
+	}
 }

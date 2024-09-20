@@ -44,11 +44,15 @@ var avrdudePath string
 // путь к файлу конфигурации (если пустой, то он не будет передаваться через аргументы в avrdude)
 var configPath string
 
+// путь к файлу со списком устройств (будет использован вместо стандартного списка)
+var deviceListPath string
+
 // чтение флагов и происвоение им стандартных значений
 func setArgs() {
 	flag.StringVar(&webAddress, "address", "localhost:8080", "адресс для подключения")
 	flag.StringVar(&avrdudePath, "avrdudePath", "avrdude", "путь к avrdude, используется системный путь по-умолчанию")
 	flag.StringVar(&configPath, "configPath", "", "путь к файлу конфигурации avrdude")
+	flag.StringVar(&deviceListPath, "deviceListPath", "", "путь к JSON-файлу со списком устройств. Если прописан, то заменяет стандартный список устройств, при условии, что не возникнет ошибок, связанных с чтением и открытием JSON-файла, иначе используется стандартный список устройств (по-умолчанию пустая строка, означающая, что будет используется, встроенный в загрузчик список)")
 	flag.IntVar(&maxMsgSize, "msgSize", 1024, "максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)")
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
 	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
@@ -79,9 +83,10 @@ func printArgsDesc() {
 	verboseStr := fmt.Sprintf("вывод подробной информации в консоль: %v", verbose)
 	alwaysUpdateStr := fmt.Sprintf("постоянное обновление списка устройств: %v", alwaysUpdate)
 	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
-	avrdudePathStr := fmt.Sprintf("путь к avrdude (напишите avrdude, если нужно, чтобы использовался системный путь): %s", avrdudePath)
+	avrdudePathStr := fmt.Sprintf("путь к avrdude (если написано avrdude, то используется системный путь): %s", avrdudePath)
 	configPathStr := fmt.Sprintf("путь к файлу конфигурации avrdude: %s", configPath)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
+	deviceListPathStr := fmt.Sprintf("путь к файлу со списком устройств (если пусто, то используется встроенный список): %s", deviceListPath)
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
 		webAddressStr,
 		maxFileSizeStr,
 		maxMsgSizeStr,
@@ -92,5 +97,6 @@ func printArgsDesc() {
 		alwaysUpdateStr,
 		fakeBoardsNumStr,
 		avrdudePathStr,
-		configPathStr)
+		configPathStr,
+		deviceListPathStr)
 }
