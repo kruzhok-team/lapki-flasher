@@ -56,7 +56,6 @@ type Device struct {
 	Name          string
 	ProductID     string
 	VendorID      string
-	SerialID      string
 	Mu            sync.Mutex
 	Flashing      bool
 	Board         Board

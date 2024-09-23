@@ -19,7 +19,6 @@ type ArduinoOS struct {
 	deviceID  string
 	productID string
 	vendorID  string
-	isSerial  bool
 }
 
 type MS1OS struct {

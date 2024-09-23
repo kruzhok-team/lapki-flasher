@@ -9,6 +9,7 @@ import (
 type Arduino struct {
 	controller   string
 	programmer   string
+	serialID     string
 	portName     string
 	bootloaderID int
 	ardOS        ArduinoOS
@@ -77,4 +78,8 @@ func (board *Arduino) Flash(filePath string) (string, error) {
 	stdout, err := cmd.CombinedOutput()
 	avrdudeMessage := handleFlashResult(string(stdout), err)
 	return avrdudeMessage, err
+}
+
+func (board *Arduino) hasSerial() bool {
+	return board.serialID != NOT_FOUND
 }
