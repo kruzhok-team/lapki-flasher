@@ -80,7 +80,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 							var id string
 							// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
 							if serialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
-								id = detectedBoard.SerialID
+								id = serialID
 								detectedBoard.SerialID = serialID
 							} else {
 								id = properties[0]
@@ -177,10 +177,6 @@ func findPortName(desc *gousb.DeviceDesc) []string {
 			fileSystem := os.DirFS(root)
 			var devicePath string
 			fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					log.Fatal(err)
-				}
-				fmt.Println("WALK_DIR", path, d.Name())
 				if d.Name() == tty {
 					// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
 					dirs, err := os.ReadDir(root + "/" + path)
@@ -195,7 +191,9 @@ func findPortName(desc *gousb.DeviceDesc) []string {
 				}
 				return nil
 			})
-			portNames = append(portNames, devicePath)
+			if devicePath != NOT_FOUND {
+				portNames = append(portNames, devicePath)
+			}
 		}
 	}
 	return portNames
