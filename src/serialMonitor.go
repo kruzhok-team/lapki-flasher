@@ -7,6 +7,44 @@ import (
 	"github.com/albenik/go-serial/v2"
 )
 
+type SerialMonitor struct {
+	// порт на котром открыт монитор порта, nil значит, что монитор порта закрыт
+	Port *serial.Port
+	// канал для оповещения о том, что следует сменить бод
+	ChangeBaud chan int
+	// текущее значение бод
+	Baud int
+	// клиент, который открыл монитор порта этого устройства
+	Client *WebSocketConnection
+	// открыт ли монитор порта
+	Open bool
+	// канал для передачи на устройство
+	Write chan string
+}
+
+func (serialMonitor *SerialMonitor) set(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {
+	serialMonitor.Port = serialPort
+	serialMonitor.Client = serialClient
+	serialMonitor.ChangeBaud = make(chan int)
+	serialMonitor.Baud = baud
+	serialMonitor.Open = true
+	serialMonitor.Write = make(chan string)
+}
+
+func (serialMonitor *SerialMonitor) isOpen() bool {
+	return serialMonitor.Port != nil && serialMonitor.Open
+}
+
+func (serialMonitor *SerialMonitor) close() {
+	if serialMonitor.Port == nil {
+		return
+	}
+	if err := serialMonitor.Port.Close(); err != nil {
+		printLog(err.Error())
+	}
+	serialMonitor.Open = false
+}
+
 // Открываем порт заново, если он был закрыт
 func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 	// TODO: вынести настройку ReadTimeout/WriteTimeout во флаги
@@ -22,7 +60,6 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 		// Ошибка: не удалось открыть последовательный порт. Проверьте настройки и переподключитесь к порту.
 		return nil, err
 	}
-	//broadcast <- fmt.Sprintf("Подключение к последовательному порту %s со скоростью %d успешно!", currentSettings.Port, currentSettings.BaudRate)
 	return serialPort, nil
 }
 
