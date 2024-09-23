@@ -45,6 +45,24 @@ func (board BoardType) hasBootloader() bool {
 	return board.isArduino() && board.BootloaderTypeID > -1
 }
 
+type Board interface {
+	IsConnected() bool
+	GetSerialPort() string
+	Flash(filePath string) (string, error)
+	Update() bool
+}
+
+type Device struct {
+	Name          string
+	ProductID     string
+	VendorID      string
+	SerialID      string
+	Mu            sync.Mutex
+	Flashing      bool
+	Board         Board
+	SerialMonitor SerialMonitor
+}
+
 type BoardFlashAndSerial struct {
 	Type BoardType
 	// список портов, для arduino-подобных устройств он состоит из одного элемента, для МС-ТЮК может состоять из нескольких
