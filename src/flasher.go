@@ -95,7 +95,7 @@ func flashMS(board *BoardFlashAndSerial, filePath string) (flashMessage string, 
 			return "Не удалось использовать адрес устройства. " + err.Error(), err
 		}
 	}
-	packs, err := device.WriteFirmware(filePath, true)
+	packs, err := device.WriteFirmware(filePath, false)
 	if err != nil {
 		return err.Error(), err
 	}
