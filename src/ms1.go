@@ -10,6 +10,7 @@ type MS1 struct {
 	portNames []string
 	address   string
 	verify    bool // если true, то будет проверка после прошивки
+	ms1OS     MS1OS
 }
 
 func (board *MS1) GetSerialPort() string {

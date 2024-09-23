@@ -11,6 +11,7 @@ type Arduino struct {
 	programmer   string
 	portName     string
 	bootloaderID int
+	ardOS        ArduinoOS
 }
 
 // подключено ли устройство

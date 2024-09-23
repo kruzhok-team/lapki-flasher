@@ -14,6 +14,14 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+type ArduinoOS struct {
+	pathToDevice string
+}
+
+type MS1OS struct {
+	pathesToDevices []string
+}
+
 // настройка ОС (для Windows она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
 func setupOS() {
 

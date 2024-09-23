@@ -15,6 +15,19 @@ import (
 	"github.com/google/gousb"
 )
 
+type ArduinoOS struct {
+	deviceID  string
+	productID string
+	vendorID  string
+	isSerial  bool
+}
+
+type MS1OS struct {
+	deviceID  string
+	productID string
+	vendorID  string
+}
+
 const DEV = "/dev"
 const ID_SERIAL = "ID_SERIAL_SHORT"
 const USEC_INITIALIZED = "USEC_INITIALIZED"

@@ -9,6 +9,12 @@ import (
 	"howett.net/plist"
 )
 
+type ArduinoOS struct {
+}
+
+type MS1OS struct {
+}
+
 type IOREG struct {
 	VendorID  int64 `plist:"idVendor"`
 	ProductID int64 `plist:"idProduct"`
