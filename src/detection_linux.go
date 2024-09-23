@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	stdlog "log"
 	"os"
 	"os/exec"
@@ -149,25 +150,29 @@ func findPortName(desc *gousb.DeviceDesc) string {
 	tty := "tty"
 	for _, conf := range desc.Configs {
 		for _, inter := range conf.Interfaces {
-			dir := fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, tty)
-			printLog("DIR", dir)
-			existance, _ := exists(dir)
-			if existance {
-				// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
-				dirs, _ := os.ReadDir(dir)
-				return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
-				//return fmt.Sprintf("%s/%s", dir, dirs[0].Name())
-			} else {
-				// TODO: избавиться от костыля
-				dir = fmt.Sprintf("%s/%d-%s:%d.%d/%s", dir_prefix, desc.Bus, ports, conf.Number, inter.Number, "ttyUSB0")
-				printLog("DIR", dir)
-				existance, _ = exists(dir)
-				if existance {
-					dirs, _ := os.ReadDir(dir)
-					return fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
+			root := fmt.Sprintf("%s/%d-%s:%d.%d", dir_prefix, desc.Bus, ports, conf.Number, inter.Number)
+			fileSystem := os.DirFS(root)
+			var devicePath string
+			fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					log.Fatal(err)
 				}
-			}
-			printLog(dir, "doesn't exists")
+				fmt.Println("WALK_DIR", path, d.Name())
+				if d.Name() == tty {
+					// использование Readdirnames вместо ReadDir может ускорить работу в 20 раз
+					dirs, err := os.ReadDir(root + "/" + path)
+					if err != nil {
+						return err
+					}
+					if len(dirs) < 1 {
+						return nil
+					}
+					devicePath = fmt.Sprintf("%s/%s", DEV, dirs[0].Name())
+					return fs.SkipAll
+				}
+				return nil
+			})
+			return devicePath
 		}
 
 	}
