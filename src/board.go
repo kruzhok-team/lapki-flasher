@@ -31,8 +31,18 @@ type BoardTemplate struct {
 	IsMSDevice   bool     `json:"isMSDevice"`
 }
 
+// является ли устройство МС-ТЮК
+func (board BoardType) isMS() bool {
+	return board.IsMSDevice
+}
+
+// является ли устройство Ардуино
+func (board BoardType) isArduino() bool {
+	return !board.IsMSDevice
+}
+
 func (board BoardType) hasBootloader() bool {
-	return board.BootloaderTypeID > -1
+	return board.isArduino() && board.BootloaderTypeID > -1
 }
 
 type BoardFlashAndSerial struct {
