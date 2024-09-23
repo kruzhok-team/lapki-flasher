@@ -44,9 +44,6 @@
     "name": "МС-ТЮК",
     "productIDs": ["55D5"],
     "vendorIDs": ["1A86"],
-    "controller": "",
-    "programmer": "",
-    "bootloaderID": -1,
     "isMSDevice": true
   }
 ]
