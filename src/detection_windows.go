@@ -347,3 +347,11 @@ func composeMS(boards map[string]*BoardFlashAndSerial) {
 		value.Board.PortNames = orderedPortNames
 	}
 }
+
+func (board *Arduino) Update() bool {
+	return false
+}
+
+func (board *MS1) Update() bool {
+	return false
+}

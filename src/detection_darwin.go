@@ -199,3 +199,11 @@ func collectBoardInfo(reg IOREG, board *BoardFlashAndSerial) (sessionID int64) {
 	}
 	return sessionID
 }
+
+func (board *Arduino) Update() bool {
+	return false
+}
+
+func (board *MS1) Update() bool {
+	return false
+}

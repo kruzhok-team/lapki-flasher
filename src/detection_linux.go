@@ -244,3 +244,11 @@ func rebootPort(portName string) (err error) {
 	}
 	return err
 }
+
+func (board *Arduino) Update() bool {
+	return false
+}
+
+func (board *MS1) Update() bool {
+	return false
+}
