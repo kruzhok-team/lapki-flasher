@@ -7,10 +7,10 @@ import (
 )
 
 type MS1 struct {
-	portNames []string
+	portNames [4]string // должно быть ровно 4 порта
 	address   string
-	verify    bool // если true, то будет проверка после прошивки
-	ms1OS     MS1OS
+	verify    bool  // если true, то будет проверка после прошивки
+	ms1OS     MS1OS // структура с данными для поиска устройства на определённой ОС
 }
 
 func (board *MS1) GetSerialPort() string {
