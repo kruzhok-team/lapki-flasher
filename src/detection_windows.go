@@ -42,19 +42,6 @@ func getAllRegistryValues(path string) ([]string, error) {
 		return nil, err
 	}
 	return registryValues, nil
-	// var result = make([]string, len(registryValues))
-	// for i, valueName := range registryValues {
-	// 	value, _, err := key.GetStringValue(valueName)
-	// 	if err != nil {
-	// 		if err == registry.ErrUnexpectedType {
-	// 			continue
-	// 		}
-	// 		printLog("Error on getting registry values:", err.Error())
-	// 		continue
-	// 	}
-	// 	result[i] = value
-	// }
-	// return result, err
 }
 func handleCloseRegistryKey(key registry.Key, path string) {
 	if err := key.Close(); err != nil {
