@@ -207,7 +207,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 
 	if !sendToAll {
 		for deviceID, device := range devicesInList {
-			Device(deviceID, device, false, c)
+			SendDevice(deviceID, device, false, c)
 		}
 	}
 	/*
@@ -237,7 +237,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 				case PORT_UPDATE:
 					DeviceUpdatePort(boardWithAction.boardID, boardWithAction.board, c)
 				case ADD:
-					Device(boardWithAction.boardID, boardWithAction.board, true, c)
+					SendDevice(boardWithAction.boardID, boardWithAction.board, true, c)
 				case DELETE:
 					DeviceUpdateDelete(boardWithAction.boardID, c)
 				default:

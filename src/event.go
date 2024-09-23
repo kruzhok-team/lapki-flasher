@@ -166,7 +166,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func Device(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
+func SendDevice(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
 	//printLog("device")
 	var boardMessage any
 	var sendMsg string
