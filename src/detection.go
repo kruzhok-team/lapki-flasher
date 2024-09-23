@@ -38,11 +38,17 @@ func NewDetector() *Detector {
 	return &d
 }
 
-// Обновление текущего списка устройств.
-// Вовращает:
-// detectedBoards - все платы, которые удалось обнаружить;
-// notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes;
-// devicesInList - текущий список плат, без учёта notAddedDevices
+/*
+Обновление текущего списка устройств.
+
+Вовращает:
+
+detectedBoards - все платы, которые удалось обнаружить;
+
+notAddedDevices - список новых устройств, которые были обнаружены, но не были добавлены, так как их типы были добавлены в исключения dontAddTypes;
+
+devicesInList - текущий список плат, без учёта notAddedDevices
+*/
 func (d *Detector) Update() (
 	detectedBoards map[string]*BoardFlashAndSerial,
 	notAddedDevices map[string]*BoardFlashAndSerial,
