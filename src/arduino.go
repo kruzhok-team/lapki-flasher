@@ -12,7 +12,7 @@ type Arduino struct {
 	serialID     string
 	portName     string
 	bootloaderID int
-	ardOS        ArduinoOS
+	ardOS        ArduinoOS // структура с данными для поиска устройства на определённой ОС
 }
 
 // подключено ли устройство
