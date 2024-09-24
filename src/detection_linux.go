@@ -137,9 +137,9 @@ func hasFound(ID string, isSerial bool, portName string) bool {
 	var properties []string
 	var err error
 	if isSerial {
-		properties, err = findProperty(portName, USEC_INITIALIZED)
-	} else {
 		properties, err = findProperty(portName, ID_SERIAL)
+	} else {
+		properties, err = findProperty(portName, USEC_INITIALIZED)
 	}
 	if err == nil && properties[0] == ID {
 		return true
@@ -272,5 +272,9 @@ func (board *Arduino) Update() bool {
 }
 
 func (board *MS1) Update() bool {
-	return !hasFound(board.ms1OS.deviceID, false, board.portNames[0])
+	if !hasFound(board.ms1OS.deviceID, false, board.portNames[0]) {
+		board.portNames[0] = NOT_FOUND
+		return true
+	}
+	return false
 }
