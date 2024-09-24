@@ -121,3 +121,9 @@ func (dev *Device) SetLockSync(lock bool) {
 	defer dev.Mu.Unlock()
 	dev.SetLock(lock)
 }
+
+func (dev *Device) isSerialMonitorOpenSync() bool {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	return dev.SerialMonitor.isOpen()
+}

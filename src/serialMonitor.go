@@ -72,11 +72,9 @@ func handleSerial(board *Device, deviceID string) {
 		board.Mu.Unlock()
 	}()
 	for {
-		board.Mu.Lock()
-		if board.SerialMonitor.Client.isClosedChan() || !board.SerialMonitor.isOpen() {
+		if board.SerialMonitor.Client.isClosedChan() || !board.isSerialMonitorOpenSync() {
 			return
 		}
-		board.Mu.Unlock()
 		if !detector.boardExistsSync(deviceID) {
 			DeviceUpdateDelete(deviceID, board.SerialMonitor.Client)
 			SerialConnectionStatus(DeviceCommentCodeMessage{
@@ -139,11 +137,9 @@ func handleSerial(board *Device, deviceID string) {
 			if err != nil {
 				// если ошибка произошла из-за того, монитор порта закрылся, то
 				// игнорируем ошибку
-				board.Mu.Lock()
-				if !board.SerialMonitor.isOpen() {
+				if !board.isSerialMonitorOpenSync() {
 					return
 				}
-				board.Mu.Unlock()
 				// Ошибка при чтении из последовательного порта
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
