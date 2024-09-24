@@ -217,7 +217,9 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
 			dev := boardWithAction.board
-			dev.Mu.Lock()
+			if dev != nil {
+				dev.Mu.Lock()
+			}
 			//TODO: в обоих случаях происходит тоже самое, просто используется разный синтаксис, следует придумать как это объединить
 			if sendToAll {
 				switch boardWithAction.action {
@@ -242,7 +244,9 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 					printLog("Warning! Unknown action with board!", boardWithAction.action)
 				}
 			}
-			dev.Mu.Unlock()
+			if dev != nil {
+				dev.Mu.Unlock()
+			}
 		} else {
 			break
 		}
