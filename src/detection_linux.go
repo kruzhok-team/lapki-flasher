@@ -55,11 +55,11 @@ func (LogrusWriter) Write(data []byte) (int, error) {
 }
 
 // находит все подключённые платы
-func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	ctx := gousb.NewContext()
 	defer ctx.Close()
 
-	boards := make(map[string]*BoardFlashAndSerial)
+	devs := make(map[string]*Device)
 
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
@@ -68,22 +68,13 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) {
 					for _, pid := range boardTemplate.ProductIDs {
 						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
-							boardType := BoardType{
-								boardTemplate.ID,
-								pid,
-								vid,
-								boardTemplate.Name,
-								boardTemplate.Controller,
-								boardTemplate.Programmer,
-								boardTemplate.BootloaderID,
-								boardTemplate.IsMSDevice,
-							}
-							detectedBoard := NewBoardToFlashPorts(boardType, findPortName(desc))
-							if detectedBoard.getPort() == NOT_FOUND {
-								printLog("can't find port")
+							ports := findPortName(desc)
+							portsNum := len(ports)
+							if portsNum < 1 || ports[0] == NOT_FOUND {
+								printLog("can't find port", ports)
 								continue
 							}
-							properties, err := findProperty(detectedBoard.getPort(), USEC_INITIALIZED, ID_SERIAL)
+							properties, err := findProperty(ports[0], USEC_INITIALIZED, ID_SERIAL)
 							if err != nil {
 								printLog("can't find ID", err.Error())
 								continue
@@ -91,13 +82,43 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 							serialID := properties[1]
 							var id string
 							// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
-							if serialID != NOT_FOUND && !detectedBoard.Type.IsMSDevice {
+							if serialID != NOT_FOUND && !boardTemplate.IsMSDevice {
 								id = serialID
-								detectedBoard.SerialID = serialID
 							} else {
 								id = properties[0]
 							}
-							boards[id] = detectedBoard
+							var board Board
+							if boardTemplate.IsMSDevice {
+								if portsNum != 4 {
+									printLog("Number of ports for ms1 should be equal to 4. Number of ports for this device:", portsNum)
+									continue
+								}
+								board = NewMS1(
+									[4]string{
+										ports[0],
+										ports[1],
+										ports[2],
+										ports[3],
+									},
+									MS1OS{
+										deviceID:  id,
+										productID: pid,
+										vendorID:  vid,
+									},
+								)
+							} else {
+								board = NewArduinoFromTemp(
+									boardTemplate,
+									ports[0],
+									ArduinoOS{
+										deviceID:  id,
+										productID: pid,
+										vendorID:  vid,
+									},
+									serialID,
+								)
+							}
+							devs[id] = newDevice(boardTemplate.Name, boardTemplate.ID, board)
 						}
 					}
 				}
@@ -109,59 +130,20 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 		log.Printf("OpenDevices(): %v\n", err)
 		return nil
 	}
-	return boards
+	return devs
 }
 
-/*
-true - если порт изменился или не найден, иначе false
-
-назначает порту значение NOT_FOUND, если не удалось найти порт
-
-TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
-*/
-func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
-	// TODO: сделать проверку для МС-ТЮК
-	if board.isMSDevice() {
-		return false
-	}
+func hasFound(ID string, isSerial bool, portName string) bool {
 	var properties []string
 	var err error
-	if board.SerialID == NOT_FOUND {
-		properties, err = findProperty(board.getPortSync(), USEC_INITIALIZED)
+	if isSerial {
+		properties, err = findProperty(portName, USEC_INITIALIZED)
 	} else {
-		properties, err = findProperty(board.getPortSync(), ID_SERIAL)
-	}
-	if err != nil {
-		board.setPort(NOT_FOUND)
-		return true
+		properties, err = findProperty(portName, ID_SERIAL)
 	}
 	if err == nil && properties[0] == ID {
 		return false
 	}
-	if board.SerialID == NOT_FOUND {
-		return true
-	}
-	ctx := gousb.NewContext()
-	defer ctx.Close()
-	var portNames []string
-	ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
-		if desc.Product.String() == board.Type.ProductID && desc.Vendor.String() == board.Type.VendorID {
-			portNames = findPortName(desc)
-			foundSerialID := false
-			for _, portName := range portNames {
-				properties, _ = findProperty(portName, ID_SERIAL)
-				printLog("prop", properties)
-				if properties[0] == board.SerialID {
-					foundSerialID = true
-				}
-			}
-			if foundSerialID {
-				return false
-			}
-		}
-		return false
-	})
-	board.setPortsSync(portNames)
 	return true
 }
 
@@ -258,9 +240,37 @@ func rebootPort(portName string) (err error) {
 }
 
 func (board *Arduino) Update() bool {
-	return false
+	if hasFound(board.ardOS.deviceID, board.hasSerial(), board.portName) {
+		return false
+	}
+	board.portName = NOT_FOUND
+	if !board.hasSerial() {
+		return true
+	}
+	ctx := gousb.NewContext()
+	defer ctx.Close()
+	var portName string
+	ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
+		if desc.Product.String() == board.ardOS.productID && desc.Vendor.String() == board.ardOS.vendorID {
+			portNames := findPortName(desc)
+			portsNum := len(portNames)
+			if portsNum == 0 || portsNum > 1 {
+				printLog("number of ports is not equal to 1", portsNum)
+			} else {
+				properties, _ := findProperty(portNames[0], ID_SERIAL)
+				printLog("prop", properties)
+				if properties[0] == board.serialID {
+					portName = portNames[0]
+					return false
+				}
+			}
+		}
+		return false
+	})
+	board.portName = portName
+	return true
 }
 
 func (board *MS1) Update() bool {
-	return false
+	return hasFound(board.ms1OS.deviceID, false, board.portNames[0])
 }
