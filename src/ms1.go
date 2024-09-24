@@ -13,6 +13,16 @@ type MS1 struct {
 	ms1OS     MS1OS // структура с данными для поиска устройства на определённой ОС
 }
 
+func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
+	ms1 := MS1{
+		portNames: portNames,
+		address:   "",
+		verify:    false,
+		ms1OS:     ms1OS,
+	}
+	return &ms1
+}
+
 func (board *MS1) GetSerialPort() string {
 	return board.portNames[3]
 }
