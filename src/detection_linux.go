@@ -23,9 +23,7 @@ type ArduinoOS struct {
 }
 
 type MS1OS struct {
-	deviceID  string
-	productID string
-	vendorID  string
+	deviceID string
 }
 
 const DEV = "/dev"
@@ -101,9 +99,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 										ports[3],
 									},
 									MS1OS{
-										deviceID:  id,
-										productID: pid,
-										vendorID:  vid,
+										deviceID: id,
 									},
 								)
 							} else {
