@@ -15,6 +15,18 @@ type Arduino struct {
 	ardOS        ArduinoOS // структура с данными для поиска устройства на определённой ОС
 }
 
+func NewArduinoFromTemp(temp BoardTemplate, portName string, ardOS ArduinoOS, serialID string) *Arduino {
+	arduino := Arduino{
+		controller:   temp.Controller,
+		programmer:   temp.Programmer,
+		bootloaderID: temp.BootloaderID,
+		serialID:     serialID,
+		portName:     portName,
+		ardOS:        ardOS,
+	}
+	return &arduino
+}
+
 // подключено ли устройство
 func (board *Arduino) IsConnected() bool {
 	return board.portName != NOT_FOUND
