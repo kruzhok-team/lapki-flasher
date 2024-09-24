@@ -50,7 +50,7 @@ func (board *Arduino) flashBootloader(filePath string) (string, error) {
 	detector.DontAddThisType(bootloaderType)
 	defer detector.AddThisType(bootloaderType)
 	defer time.Sleep(500 * time.Millisecond)
-	var notAddedDevices map[string]*BoardFlashAndSerial
+	var notAddedDevices map[string]*Device
 	found := false
 	for i := 0; i < 25; i++ {
 		// TODO: возможно стоит добавить количество необходимого времени в параметры сервера
@@ -60,8 +60,8 @@ func (board *Arduino) flashBootloader(filePath string) (string, error) {
 		sameTypeCnt := 0
 		var bootloaderDevice *Device
 		for _, dev := range notAddedDevices {
-			if dev.Type.typeID == bootloaderType {
-				//bootloaderDevice = dev
+			if dev.typeID == bootloaderType {
+				bootloaderDevice = dev
 				sameTypeCnt++
 				if sameTypeCnt > 1 {
 					return "Не удалось опознать Bootloader. Ошибка могла быть вызвана перезагрузкой одного из устройств, либо из-за подключения нового.", errors.New("bootloader: too many")
@@ -94,4 +94,19 @@ func (board *Arduino) Flash(filePath string) (string, error) {
 
 func (board *Arduino) hasSerial() bool {
 	return board.serialID != NOT_FOUND
+}
+
+func (board *Arduino) GetWebMessageType() string {
+	return DeviceMsg
+}
+
+func (board *Arduino) GetWebMessage(name string, deviceID string) any {
+	return DeviceMessage{
+		ID:         deviceID,
+		Name:       name,
+		Controller: board.controller,
+		Programmer: board.programmer,
+		SerialID:   board.serialID,
+		PortName:   board.portName,
+	}
 }

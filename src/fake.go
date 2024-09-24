@@ -32,3 +32,18 @@ func (board *FakeBoard) Flash(filePath string) (string, error) {
 func (board *FakeBoard) Update() bool {
 	return false
 }
+
+func (board *FakeBoard) GetWebMessageType() string {
+	return DeviceMsg
+}
+
+func (board *FakeBoard) GetWebMessage(name string, deviceID string) any {
+	return DeviceMessage{
+		ID:         deviceID,
+		Name:       name,
+		Controller: board.controller,
+		Programmer: board.programmer,
+		SerialID:   board.serialID,
+		PortName:   board.portName,
+	}
+}

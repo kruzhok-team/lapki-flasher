@@ -56,3 +56,15 @@ func (board *MS1) Flash(filePath string) (string, error) {
 func (board *MS1) getFlashPort() string {
 	return board.portNames[0]
 }
+
+func (board *MS1) GetWebMessageType() string {
+	return MSDeviceMsg
+}
+
+func (board *MS1) GetWebMessage(name string, deviceID string) any {
+	return MSDeviceMessage{
+		ID:        deviceID,
+		Name:      name,
+		PortNames: board.portNames,
+	}
+}

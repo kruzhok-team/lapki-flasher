@@ -31,9 +31,9 @@ type DeviceMessage struct {
 }
 
 type MSDeviceMessage struct {
-	ID        string   `json:"deviceID"`
-	Name      string   `json:"name,omitempty"`
-	PortNames []string `json:"portNames,omitempty"`
+	ID        string    `json:"deviceID"`
+	Name      string    `json:"name,omitempty"`
+	PortNames [4]string `json:"portNames,omitempty"`
 }
 
 // тип данных для flash-start и ms-bin-start
@@ -166,18 +166,8 @@ func GetList(event Event, c *WebSocketConnection) error {
 
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
-func SendDevice(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebSocketConnection) error {
-	//printLog("device")
-	var boardMessage any
-	var sendMsg string
-	if board.isMSDevice() {
-		boardMessage = msDeviceMessageMakeSync(deviceID, board)
-		sendMsg = MSDeviceMsg
-	} else {
-		boardMessage = deviceMessageMakeSync(deviceID, board)
-		sendMsg = DeviceMsg
-	}
-	err := c.sendOutgoingEventMessage(sendMsg, boardMessage, toAll)
+func SendDevice(deviceID string, board *Device, toAll bool, c *WebSocketConnection) error {
+	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.Name, deviceID), toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
 	}
@@ -185,7 +175,7 @@ func SendDevice(deviceID string, board *BoardFlashAndSerial, toAll bool, c *WebS
 }
 
 // сообщение о том, что порт обновлён
-func DeviceUpdatePort(deviceID string, board *BoardFlashAndSerial, c *WebSocketConnection) {
+func DeviceUpdatePort(deviceID string, board *Device, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(board, deviceID), true)
 }
 
@@ -211,62 +201,59 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if msg.FileSize > maxFileSize {
 		return ErrFlashLargeFile
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		return ErrFlashWrongID
 	}
-	if !detector.isFake(msg.ID) {
-		updated := board.updatePortName(msg.ID)
-		if updated {
-			if board.IsConnectedSync() {
-				DeviceUpdatePort(msg.ID, board, c)
-			} else {
-				detector.DeleteBoard(msg.ID)
-				DeviceUpdateDelete(msg.ID, c)
-				return ErrFlashDisconnected
-			}
-		}
-	}
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	if board.IsFlashBlocked() {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			return ErrFlashDisconnected
+		}
+	}
+	if dev.IsFlashBlocked() {
 		return ErrFlashBlocked
 	}
-	if board.isSerialMonitorOpen() {
-		return ErrFlashOpenSerialMonitor
-	}
-	boardToFlashName := strings.ToLower(board.Type.Name)
+	boardToFlashName := strings.ToLower(dev.Name)
 	for _, boardName := range notSupportedBoards {
 		if boardToFlashName == strings.ToLower(boardName) {
 			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
 			return nil
 		}
 	}
-	if board.isMSDevice() && event.Type != MSBinStartMsg {
-		// TODO
-	}
-	if !board.isMSDevice() && event.Type != FlashStartMsg {
-		// TODO
+	// расширение для файла прошивки
+	var ext string
+	switch dev.Board.(type) {
+	case *Arduino:
+		if dev.SerialMonitor.isOpen() {
+			return ErrFlashOpenSerialMonitor
+		}
+		if event.Type == FlashStartMsg {
+			ext = "hex"
+		} else {
+			// TODO
+		}
+	case *MS1:
+		if event.Type == MSBinStartMsg {
+			ext = "bin"
+			if msg.Address != "" {
+				dev.Board.(*MS1).address = msg.Address
+			}
+		} else {
+			// TODO
+		}
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-	c.FlashingBoard = board
+	c.FlashingBoard = dev
 	c.FlashingBoard.SetLock(true)
-	if board.refToBoot != nil {
-		board.refToBoot.SetLock(true)
-	}
-	var ext string
-	if event.Type == FlashStartMsg {
-		ext = "hex"
-	} else {
-		if msg.Address != "" {
-			board.setAddressMS(msg.Address)
-		} else {
-			// TODO: сообщить о том, что МС-ТЮК должен знать адрес для прошивки
-		}
-		ext = "bin"
-	}
 	c.FileWriter.Start(msg.FileSize, ext)
 
 	FlashNextBlock(c)
@@ -284,15 +271,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		// сообщение от программы avrdude
-		var avrMsg string
-		// сообщение об ошибке (если есть)
-		var err error
-		if detector.isFake(c.FlashingBoard.SerialID) {
-			avrMsg, err = fakeFlash(c.FlashingBoard, c.FileWriter.GetFilePath())
-		} else {
-			avrMsg, err = autoFlash(c.FlashingBoard, c.FileWriter.GetFilePath())
-		}
+		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath())
 		c.avrMsg = avrMsg
 		if err != nil {
 			c.StopFlashing()
@@ -317,10 +296,10 @@ func FlashNextBlock(c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(FlashNextBlockMsg, nil, false)
 }
 
-func newDeviceUpdatePortMessage(board *BoardFlashAndSerial, deviceID string) *DeviceUpdatePortMessage {
+func newDeviceUpdatePortMessage(dev *Device, deviceID string) *DeviceUpdatePortMessage {
 	boardMessage := DeviceUpdatePortMessage{
 		deviceID,
-		board.getPort(),
+		dev.Board.(*Arduino).portName,
 	}
 	return &boardMessage
 }
@@ -347,7 +326,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return err
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		SerialConnectionStatus(DeviceCommentCodeMessage{
@@ -356,17 +335,21 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	if detector.isFake(msg.ID) {
+	if _, isFake := dev.Board.(*FakeBoard); isFake {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 3,
 		}, c)
 		return nil
 	}
-	updated := board.updatePortName(msg.ID)
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
 	if updated {
-		if board.IsConnectedSync() {
-			DeviceUpdatePort(msg.ID, board, c)
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -377,25 +360,21 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	// плата блокируется!!!
-	// не нужно использовать sync функции внутри блока
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	if board.IsFlashBlocked() {
+	if _, isArduino := dev.Board.(*Arduino); isArduino && dev.IsFlashBlocked() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 5,
 		}, c)
 		return nil
 	}
-	if board.isSerialMonitorOpen() {
+	if dev.SerialMonitor.isOpen() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 6,
 		}, c)
 		return nil
 	}
-	serialPort, err := openSerialPort(board.getSerialPortName(), msg.Baud)
+	serialPort, err := openSerialPort(dev.Board.GetSerialPort(), msg.Baud)
 	if err != nil {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:      msg.ID,
@@ -408,8 +387,8 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		ID:   msg.ID,
 		Code: 0,
 	}, c)
-	board.setSerialPortMonitor(serialPort, c, msg.Baud)
-	go handleSerial(board, msg.ID, c)
+	dev.SerialMonitor.set(serialPort, c, msg.Baud)
+	go handleSerial(dev, msg.ID)
 	return nil
 }
 
@@ -426,17 +405,17 @@ func SerialDisconnect(event Event, c *WebSocketConnection) error {
 	board, exists := detector.GetBoardSync(msg.ID)
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
-	board.mu.Lock()
-	defer board.mu.Unlock()
+	board.Mu.Lock()
+	defer board.Mu.Unlock()
 	if exists {
-		if board.getSerialMonitorClient() != c {
+		if board.SerialMonitor.Client != c {
 			SerialConnectionStatus(DeviceCommentCodeMessage{
 				ID:   msg.ID,
 				Code: 14,
 			}, c)
 			return nil
 		}
-		board.closeSerialMonitor()
+		board.SerialMonitor.close()
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 8,
@@ -462,7 +441,7 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 		}, c)
 		return err
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		SerialSentStatus(DeviceCommentCodeMessage{
@@ -475,17 +454,19 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	if !board.isSerialMonitorOpenSync() {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	if !dev.SerialMonitor.isOpen() {
 		SerialSentStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 3,
 		}, c)
 		return nil
 	}
-	updated := board.updatePortName(msg.ID)
+	updated := dev.Board.Update()
 	if updated {
-		if board.IsConnectedSync() {
-			DeviceUpdatePort(msg.ID, board, c)
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -496,14 +477,14 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	if board.getSerialMonitorClientSync() != c {
+	if dev.SerialMonitor.Client != c {
 		SerialSentStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 5,
 		}, c)
 	}
 	// см. handleSerial в serialMonitor.go
-	board.serialMonitorWrite <- msg.Msg
+	dev.SerialMonitor.Write <- msg.Msg
 	return nil
 }
 
@@ -522,7 +503,7 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		}, c)
 		return err
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		SerialConnectionStatus(DeviceCommentCodeMessage{
@@ -531,21 +512,23 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	if !board.isSerialMonitorOpenSync() {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	if !dev.SerialMonitor.isOpen() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 12,
 		}, c)
 		return nil
 	}
-	if board.getSerialMonitorClientSync() != c {
+	if dev.SerialMonitor.Client != c {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 13,
 		}, c)
 		return nil
 	}
-	if msg.Baud == board.getBaudSync() {
+	if msg.Baud == dev.SerialMonitor.Baud {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 15,
@@ -553,7 +536,7 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		return nil
 	}
 	// см. handleSerial в serialMonitor.go
-	board.serialMonitorChangeBaud <- msg.Baud
+	dev.SerialMonitor.ChangeBaud <- msg.Baud
 	return nil
 }
 
@@ -563,16 +546,23 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	if err != nil {
 		return err
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		MSPingResult(msg.ID, 1, c)
 		return nil
 	}
-	updated := board.updatePortName(msg.ID)
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		// TODO
+		return nil
+	}
+	updated := board.Update()
 	if updated {
-		if board.IsConnectedSync() {
-			DeviceUpdatePort(msg.ID, board, c)
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -580,9 +570,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	portMS, err := ms1.MkSerial(board.getPort())
+	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		MSPingResult(msg.ID, 2, c)
 		return err
@@ -604,16 +592,23 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	if err != nil {
 		return err
 	}
-	board, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		MSAddress(msg.ID, 1, "", c)
 		return nil
 	}
-	updated := board.updatePortName(msg.ID)
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		// TODO
+		return nil
+	}
+	updated := board.Update()
 	if updated {
-		if board.IsConnectedSync() {
-			DeviceUpdatePort(msg.ID, board, c)
+		if board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -621,9 +616,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	portMS, err := ms1.MkSerial(board.getPort())
+	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		MSAddress(msg.ID, 2, err.Error(), c)
 		return err
@@ -635,7 +628,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 		MSAddress(msg.ID, 2, "Не удалось получить ID устройства. "+err.Error(), c)
 		return err
 	}
-	board.setAddressMS(deviceMS.GetAddress())
+	board.address = deviceMS.GetAddress()
 	MSAddress(msg.ID, 0, deviceMS.GetAddress(), c)
 	return nil
 }
@@ -657,29 +650,4 @@ func DeviceCommentCode(messageType string, deviceID string, code int, comment st
 
 func MSAddress(deviceID string, code int, comment string, c *WebSocketConnection) {
 	DeviceCommentCode(MSAddressMsg, deviceID, code, comment, c)
-}
-
-func deviceMessageMakeSync(deviceID string, board *BoardFlashAndSerial) *DeviceMessage {
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	devMes := DeviceMessage{
-		ID:         deviceID,
-		Name:       board.Type.Name,
-		Controller: board.Type.Controller,
-		Programmer: board.Type.Programmer,
-		SerialID:   board.SerialID,
-		PortName:   board.getPort(),
-	}
-	return &devMes
-}
-
-func msDeviceMessageMakeSync(deviceID string, board *BoardFlashAndSerial) *MSDeviceMessage {
-	board.mu.Lock()
-	defer board.mu.Unlock()
-	devMes := MSDeviceMessage{
-		ID:        deviceID,
-		Name:      board.Type.Name,
-		PortNames: board.getPorts(),
-	}
-	return &devMes
 }

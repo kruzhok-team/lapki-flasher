@@ -64,90 +64,98 @@ func openSerialPort(port string, baudRate int) (*serial.Port, error) {
 }
 
 // Чтение, отправка сообщений и изменение скорости передачи последовательного порта
-func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocketConnection) {
+func handleSerial(board *Device, deviceID string) {
 	defer func() {
 		printLog("Serial monitor is closed")
-		board.closeSerialMonitorSync()
+		board.Mu.Lock()
+		board.SerialMonitor.close()
+		board.Mu.Unlock()
 	}()
 	for {
-		if client.isClosedChan() || !board.isSerialMonitorOpenSync() {
+		board.Mu.Lock()
+		if board.SerialMonitor.Client.isClosedChan() || !board.SerialMonitor.isOpen() {
 			return
 		}
+		board.Mu.Unlock()
 		if !detector.boardExistsSync(deviceID) {
-			DeviceUpdateDelete(deviceID, client)
+			DeviceUpdateDelete(deviceID, board.SerialMonitor.Client)
 			SerialConnectionStatus(DeviceCommentCodeMessage{
 				ID:   deviceID,
 				Code: 2,
-			}, client)
+			}, board.SerialMonitor.Client)
 			return
 		}
 		select {
-		case baud := <-board.serialMonitorChangeBaud:
+		case baud := <-board.SerialMonitor.ChangeBaud:
 			// TODO: можно заменить на configure, но нужно дополнительно протестить, так как при использовании configure в прошлый раз возникла проблема с тем, что не получалось осуществить повторное подключение
-			err := board.serialPortMonitor.Close()
+			err := board.SerialMonitor.Port.Close()
 			if err != nil {
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    9,
 					Comment: err.Error(),
-				}, client)
+				}, board.SerialMonitor.Client)
 				return
 			}
 			//time.Sleep(time.Second)
-			newSerialPort, err := openSerialPort(board.getSerialPortName(), baud)
+			newSerialPort, err := openSerialPort(board.Board.GetSerialPort(), baud)
 			if err != nil {
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    9,
 					Comment: err.Error(),
-				}, client)
+				}, board.SerialMonitor.Client)
 				return
 			}
-			board.setSerialPortMonitorSync(newSerialPort, client, baud)
+			board.Mu.Lock()
+			board.SerialMonitor.set(newSerialPort, board.SerialMonitor.Client, baud)
+			board.Mu.Unlock()
 			SerialConnectionStatus(DeviceCommentCodeMessage{
 				ID:      deviceID,
 				Code:    10,
 				Comment: strconv.Itoa(baud),
-			}, client)
-		case writeMsg := <-board.serialMonitorWrite:
-			_, err := board.serialPortMonitor.Write([]byte(writeMsg))
+			}, board.SerialMonitor.Client)
+		case writeMsg := <-board.SerialMonitor.Write:
+			_, err := board.SerialMonitor.Port.Write([]byte(writeMsg))
 			if err != nil {
 				SerialSentStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    1,
 					Comment: err.Error(),
-				}, client)
+				}, board.SerialMonitor.Client)
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:   deviceID,
 					Code: 1,
-				}, client)
+				}, board.SerialMonitor.Client)
 				return
 			}
 			SerialSentStatus(DeviceCommentCodeMessage{
 				ID:   deviceID,
 				Code: 0,
-			}, client)
+			}, board.SerialMonitor.Client)
 		default:
 			buf := make([]byte, 128)
-			bytes, err := board.serialPortMonitor.Read(buf)
+			bytes, err := board.SerialMonitor.Port.Read(buf)
 			if err != nil {
 				// если ошибка произошла из-за того, монитор порта закрылся, то
 				// игнорируем ошибку
-				if !board.isSerialMonitorOpenSync() {
+				board.Mu.Lock()
+				if !board.SerialMonitor.isOpen() {
 					return
 				}
+				board.Mu.Unlock()
 				// Ошибка при чтении из последовательного порта
 				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    7,
 					Comment: err.Error(),
-				}, client)
+				}, board.SerialMonitor.Client)
 				return
 			}
 			if bytes == 0 {
 				continue
 			}
-			err = client.sendOutgoingEventMessage(
+			err = board.SerialMonitor.Client.sendOutgoingEventMessage(
 				SerialDeviceReadMsg,
 				SerialMessage{
 					ID:  deviceID,

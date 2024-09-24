@@ -216,17 +216,15 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	*/
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
+			dev := boardWithAction.board
+			dev.Mu.Lock()
 			//TODO: в обоих случаях происходит тоже самое, просто используется разный синтаксис, следует придумать как это объединить
 			if sendToAll {
 				switch boardWithAction.action {
 				case PORT_UPDATE:
 					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
 				case ADD:
-					if boardWithAction.board.isMSDevice() {
-						m.sendMessageToAll(MSDeviceMsg, msDeviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
-					} else {
-						m.sendMessageToAll(DeviceMsg, deviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
-					}
+					m.sendMessageToAll(dev.Board.GetWebMessageType(), dev.Board.GetWebMessage(dev.Name, boardWithAction.boardID))
 				case DELETE:
 					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
 				default:
@@ -244,6 +242,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 					printLog("Warning! Unknown action with board!", boardWithAction.action)
 				}
 			}
+			dev.Mu.Unlock()
 		} else {
 			break
 		}
