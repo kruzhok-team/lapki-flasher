@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// фальшивая плата, используется для тестирования, отправляется на клиент через тип сообщения "Device"
 type FakeBoard struct {
 	controller string
 	programmer string
