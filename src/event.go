@@ -454,18 +454,16 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	dev.Mu.Lock()
-	defer dev.Mu.Unlock()
-	if !dev.SerialMonitor.isOpen() {
+	if !dev.isSerialMonitorOpenSync() {
 		SerialSentStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 3,
 		}, c)
 		return nil
 	}
-	updated := dev.Board.Update()
+	updated := dev.updateSync()
 	if updated {
-		if dev.Board.IsConnected() {
+		if dev.isConnectedSync() {
 			DeviceUpdatePort(msg.ID, dev, c)
 		} else {
 			detector.DeleteBoard(msg.ID)
@@ -512,23 +510,21 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	dev.Mu.Lock()
-	defer dev.Mu.Unlock()
-	if !dev.SerialMonitor.isOpen() {
+	if !dev.isConnectedSync() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 12,
 		}, c)
 		return nil
 	}
-	if dev.SerialMonitor.Client != c {
+	if dev.getSerialMonitorClientSync() != c {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 13,
 		}, c)
 		return nil
 	}
-	if msg.Baud == dev.SerialMonitor.Baud {
+	if msg.Baud == dev.getSerialMonitorBaudSync() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 15,

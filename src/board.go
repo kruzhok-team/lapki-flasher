@@ -127,3 +127,27 @@ func (dev *Device) isSerialMonitorOpenSync() bool {
 	defer dev.Mu.Unlock()
 	return dev.SerialMonitor.isOpen()
 }
+
+func (dev *Device) updateSync() bool {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	return dev.Board.Update()
+}
+
+func (dev *Device) isConnectedSync() bool {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	return dev.Board.IsConnected()
+}
+
+func (dev *Device) getSerialMonitorClientSync() *WebSocketConnection {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	return dev.SerialMonitor.Client
+}
+
+func (dev *Device) getSerialMonitorBaudSync() int {
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	return dev.SerialMonitor.Baud
+}
