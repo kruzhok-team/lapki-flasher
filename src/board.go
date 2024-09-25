@@ -151,3 +151,14 @@ func (dev *Device) getSerialMonitorBaudSync() int {
 	defer dev.Mu.Unlock()
 	return dev.SerialMonitor.Baud
 }
+
+func (dev *Device) isFake() bool {
+	switch dev.Board.(type) {
+	case *FakeBoard:
+		return true
+	case *FakeMS:
+		return true
+	default:
+		return false
+	}
+}

@@ -60,7 +60,7 @@ func (d *Detector) Update() (
 	detectedBoards = detectBoards(d.boardTemplates)
 
 	// добавление фальшивых плат к действительно обнаруженным
-	if fakeBoardsNum > 0 {
+	if fakeBoardsNum > 0 || fakeMSNum > 0 {
 		if detectedBoards == nil {
 			detectedBoards = make(map[string]*Device)
 		}
@@ -188,6 +188,7 @@ func (d *Detector) generateFakeBoards() {
 	controller := "Fake Controller"
 	programmer := "Fake Programmer"
 
+	// генерация фальшивых ардуино-подобных устройств
 	for i := 0; i < fakeBoardsNum; i++ {
 		fakeID := fmt.Sprintf("fakeid-%d", i)
 		fakePort := fmt.Sprintf("fakecom-%d", i)
@@ -200,6 +201,32 @@ func (d *Detector) generateFakeBoards() {
 		d.fakeBoards[fakeID] = newFakeBoard
 	}
 
+	nameMS := "Fake ms1"
+	idMS := -2
+	// генерация фальшивых МС-ТЮК
+	for i := 0; i < fakeMSNum; i++ {
+		fakeID := fmt.Sprintf("fakeidms-%d", i)
+		var fakePorts [4]string
+		for j := 0; j < 4; j++ {
+			fakePorts[j] = fmt.Sprintf("fms-%d", i+j)
+		}
+		var fakeAddress string
+		// тут может быть проблема, если количество фальшивых МС-ТЮК огромнно
+		for j := 0; j < 16-len(fakeID); j++ {
+			fakeAddress += "0"
+		}
+		fakeAddress += fakeID
+		newFakeBoard := newDevice(
+			nameMS,
+			idMS,
+			&FakeMS{
+				portNames:     fakePorts,
+				fakeAddress:   fakeAddress,
+				clientAddress: "",
+			},
+		)
+		d.fakeBoards[fakeID] = newFakeBoard
+	}
 	for ID, board := range d.fakeBoards {
 		d.boards[ID] = board
 	}

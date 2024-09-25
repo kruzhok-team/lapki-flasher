@@ -335,7 +335,7 @@ func SerialConnect(event Event, c *WebSocketConnection) error {
 		}, c)
 		return nil
 	}
-	if _, isFake := dev.Board.(*FakeBoard); isFake {
+	if dev.isFake() {
 		SerialConnectionStatus(DeviceCommentCodeMessage{
 			ID:   msg.ID,
 			Code: 3,
