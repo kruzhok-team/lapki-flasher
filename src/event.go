@@ -683,6 +683,7 @@ func MSReset(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
+	board.address = msg.Address
 	err = board.reset()
 	if err != nil {
 		DeviceCommentCode(MSResetResultMsg, msg.ID, 2, err.Error(), c)
