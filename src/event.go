@@ -83,7 +83,7 @@ type SerialMessage struct {
 	Msg string `json:"msg"`
 }
 
-type MSPingMessage struct {
+type MSAddressMessage struct {
 	ID      string `json:"deviceID"`
 	Address string `json:"address"`
 }
@@ -149,6 +149,8 @@ const (
 	MSGetAddressMsg = "ms-get-address"
 	// передача адреса из МС-ТЮК клиенту
 	MSAddressMsg = "ms-address"
+	// сброс МС-ТЮК
+	MSResetMsg = "ms-reset"
 )
 
 // отправить клиенту список всех устройств
@@ -537,7 +539,7 @@ func SerialChangeBaud(event Event, c *WebSocketConnection) error {
 }
 
 func MSPing(event Event, c *WebSocketConnection) error {
-	var msg MSPingMessage
+	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
 		return err
