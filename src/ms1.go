@@ -83,3 +83,18 @@ func (board *MS1) reset() error {
 	deviceMS.Reset(true)
 	return nil
 }
+
+func (board *MS1) ping() error {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	err = deviceMS.SetAddress(board.address)
+	_, err = deviceMS.Ping()
+	if err != nil {
+		return err
+	}
+	return nil
+}

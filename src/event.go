@@ -562,7 +562,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	updated := board.Update()
 	if updated {
 		if dev.Board.IsConnected() {
-			DeviceUpdatePort(msg.ID, dev, c)
+			// TODO
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -570,14 +570,8 @@ func MSPing(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	portMS, err := ms1.MkSerial(board.getFlashPort())
-	if err != nil {
-		MSPingResult(msg.ID, 2, c)
-		return err
-	}
-	defer portMS.Close()
-	deviceMS := ms1.NewDevice(portMS)
-	_, err = deviceMS.Ping()
+	board.address = msg.Address
+	err = board.ping()
 	if err != nil {
 		MSPingResult(msg.ID, 2, c)
 		return err
