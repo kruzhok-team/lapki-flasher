@@ -57,6 +57,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[SerialChangeBaudMsg] = SerialChangeBaud
 	m.handlers[MSGetAddressMsg] = MSGetAddress
 	m.handlers[MSPingMsg] = MSPing
+	m.handlers[MSResetMsg] = MSReset
 }
 
 // обработка нового соединения
