@@ -151,6 +151,8 @@ const (
 	MSAddressMsg = "ms-address"
 	// сброс МС-ТЮК
 	MSResetMsg = "ms-reset"
+	// результат выполнения сброса МС-ТЮК
+	MSResetResultMsg = "ms-reset-result"
 )
 
 // отправить клиенту список всех устройств
@@ -606,7 +608,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	updated := board.Update()
 	if updated {
 		if board.IsConnected() {
-			DeviceUpdatePort(msg.ID, dev, c)
+			// TODO
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
@@ -648,4 +650,44 @@ func DeviceCommentCode(messageType string, deviceID string, code int, comment st
 
 func MSAddress(deviceID string, code int, comment string, c *WebSocketConnection) {
 	DeviceCommentCode(MSAddressMsg, deviceID, code, comment, c)
+}
+
+func MSReset(event Event, c *WebSocketConnection) error {
+	var msg MSAddressMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		DeviceCommentCode(MSResetResultMsg, msg.ID, 4, err.Error(), c)
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		DeviceCommentCode(MSResetResultMsg, msg.ID, 1, "", c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		DeviceCommentCode(MSResetResultMsg, msg.ID, 3, "", c)
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			DeviceCommentCode(MSResetResultMsg, msg.ID, 1, "", c)
+			return nil
+		}
+	}
+	err = board.reset()
+	if err != nil {
+		DeviceCommentCode(MSResetResultMsg, msg.ID, 2, err.Error(), c)
+		return err
+	}
+	DeviceCommentCode(MSResetResultMsg, msg.ID, 0, "", c)
+	return nil
 }

@@ -68,3 +68,18 @@ func (board *MS1) GetWebMessage(name string, deviceID string) any {
 		PortNames: board.portNames,
 	}
 }
+
+func (board *MS1) reset() error {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	err = deviceMS.SetAddress(board.address)
+	if err != nil {
+		return err
+	}
+	deviceMS.Reset(true)
+	return nil
+}
