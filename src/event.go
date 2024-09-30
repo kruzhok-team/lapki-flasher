@@ -617,7 +617,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	defer dev.Mu.Unlock()
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
-		// TODO
+		MSAddressSend(msg.ID, 3, "", c)
 		return nil
 	}
 	updated := board.Update()
