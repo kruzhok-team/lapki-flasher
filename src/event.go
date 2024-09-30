@@ -563,6 +563,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
+		MSPingResult(msg.ID, 4, err.Error(), c)
 		return err
 	}
 	dev, exists := detector.GetBoardSync(msg.ID)
@@ -603,6 +604,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	var msg MSGetAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
+		MSAddressSend(msg.ID, 4, err.Error(), c)
 		return err
 	}
 	dev, exists := detector.GetBoardSync(msg.ID)
