@@ -27,6 +27,17 @@ func NewArduinoFromTemp(temp BoardTemplate, portName string, ardOS ArduinoOS, se
 	return &arduino
 }
 
+func CopyArduino(board *Arduino) *Arduino {
+	return &Arduino{
+		controller:   board.controller,
+		programmer:   board.programmer,
+		bootloaderID: board.bootloaderID,
+		serialID:     board.serialID,
+		portName:     board.portName,
+		ardOS:        board.ardOS,
+	}
+}
+
 // подключено ли устройство
 func (board *Arduino) IsConnected() bool {
 	return board.portName != NOT_FOUND

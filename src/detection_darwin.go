@@ -10,6 +10,7 @@ import (
 )
 
 type ArduinoOS struct {
+	ID string
 }
 
 type MS1OS struct {
@@ -31,8 +32,8 @@ func setupOS() {}
 
 // находит все подключённые платы
 // TODO: добавить поиск сериного номера
-func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
-	boards := make(map[string]*BoardFlashAndSerial)
+func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
+	devices := make(map[string]*Device)
 	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
 	plistData, err := cmd.CombinedOutput()
 	if err != nil {
@@ -47,63 +48,22 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 		//printLog(string(plistData))
 		return nil
 	}
-	IOREGscan(plistArr, boardTemplates, boards)
-	return boards
+	IOREGscan(plistArr, boardTemplates, devices)
+	return devices
 }
 
-/*
-true - если порт изменился или не найден, иначе false
-
-назначает порту значение NOT_FOUND, если не удалось найти порт
-
-TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
-
-TODO: обновление нескольких портов
-*/
-func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
-	// TODO: сделать проверку для МС-ТЮК
-	if board.isMSDevice() {
-		return false
-	}
-	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
-	plistData, err := cmd.CombinedOutput()
-	if err != nil {
-		printLog("plist error", string(plistData), err.Error())
-		board.setPortSync(NOT_FOUND)
-		return true
-	}
-	plistArr := []IOREG{}
-	format, err := plist.Unmarshal(plistData, &plistArr)
-	if err != nil {
-		printLog("unmarshal error:", err.Error(), cmd.String())
-		printLog("plint format:", format)
-		//printLog(string(plistData))
-		board.setPortSync(NOT_FOUND)
-		return true
-	}
-	portName, _ := IOREGport(plistArr, ID, board)
-	if portName == NOT_FOUND {
-		board.setPortSync(NOT_FOUND)
-		return true
-	}
-	if portName != board.getPortSync() {
-		board.setPortSync(portName)
-		return true
-	}
-	return false
-}
-
-func IOREGport(plistArr []IOREG, ID string, board *BoardFlashAndSerial) (portName string, foundID bool) {
+func IOREGport(plistArr []IOREG, ID string, board *Arduino) (portName string, foundID bool) {
 	for _, entry := range plistArr {
 		if (entry.SerialNumber == "" && strconv.FormatInt(entry.SessionID, 10) == ID) || entry.SerialNumber == ID {
-			detectedBoard := NewBoardToFlash(board.Type, NOT_FOUND)
-			collectBoardInfo(entry, detectedBoard)
-			if detectedBoard.getPort() == "" || detectedBoard.getPort() == NOT_FOUND {
+			detectedBoard := CopyArduino(board)
+			detectedBoard.portName = NOT_FOUND
+			collectArduinoBoardInfo(entry, detectedBoard)
+			if detectedBoard.portName == NOT_FOUND {
 				printLog("can't find port name!")
-				detectedBoard.setPortSync(NOT_FOUND)
+				detectedBoard.portName = NOT_FOUND
 				return NOT_FOUND, true
 			}
-			return detectedBoard.getPort(), true
+			return detectedBoard.portName, true
 		}
 	}
 	for _, entry := range plistArr {
@@ -127,7 +87,7 @@ func rebootPort(portName string) (err error) {
 	return err
 }
 
-func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[string]*BoardFlashAndSerial) {
+func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[string]*Device) {
 	for _, entry := range plistArr {
 		isFound := false
 		for _, boardTemplate := range boardTemplates {
@@ -144,32 +104,38 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 						continue
 					}
 					if entry.ProductID == PID && entry.VendorID == VID {
-						boardType := BoardType{
-							typeID:           boardTemplate.ID,
-							ProductID:        productID,
-							VendorID:         vendorID,
-							Name:             boardTemplate.Name,
-							Controller:       boardTemplate.Controller,
-							Programmer:       boardTemplate.Programmer,
-							BootloaderTypeID: boardTemplate.BootloaderID,
-						}
-						detectedBoard := NewBoardToFlash(boardType, NOT_FOUND)
-						ID := strconv.FormatInt(collectBoardInfo(entry, detectedBoard), 10)
-						if detectedBoard.SerialID != "" {
-							ID = detectedBoard.SerialID
-						}
-						if ID == "" || ID == "0" {
-							printLog("can't find ID!")
+						if boardTemplate.IsMSDevice {
+							// TODO
+						} else {
+							arduino := NewArduinoFromTemp(
+								boardTemplate,
+								NOT_FOUND,
+								ArduinoOS{},
+								NOT_FOUND,
+							)
+							ID := strconv.FormatInt(collectArduinoBoardInfo(entry, arduino), 10)
+							if arduino.serialID != "" {
+								ID = arduino.serialID
+							}
+							if ID == "" || ID == "0" {
+								printLog("can't find ID!")
+								goto SKIP
+							}
+							if arduino.portName == NOT_FOUND {
+								printLog("can't find port name!")
+								goto SKIP
+							}
+							arduino.ardOS.ID = ID
+							detectedDevice := newDevice(
+								boardTemplate.Name,
+								boardTemplate.ID,
+								arduino,
+							)
+							boards[ID] = detectedDevice
+							printLog("Found device", ID, detectedDevice)
+							isFound = true
 							goto SKIP
 						}
-						if detectedBoard.getPort() == "" || detectedBoard.getPort() == NOT_FOUND {
-							printLog("can't find port name!")
-							goto SKIP
-						}
-						boards[ID] = detectedBoard
-						printLog("Found device", ID, detectedBoard)
-						isFound = true
-						goto SKIP
 					}
 				}
 			}
@@ -181,18 +147,18 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 	}
 }
 
-func collectBoardInfo(reg IOREG, board *BoardFlashAndSerial) (sessionID int64) {
+func collectArduinoBoardInfo(reg IOREG, board *Arduino) (sessionID int64) {
 	if reg.SerialNumber != "" {
-		board.SerialID = reg.SerialNumber
+		board.serialID = reg.SerialNumber
 	}
 	if reg.Port != "" {
-		board.setPortSync(reg.Port)
+		board.portName = reg.Port
 	}
 	if reg.SessionID != 0 {
 		sessionID = reg.SessionID
 	}
 	for _, child := range reg.Children {
-		res := collectBoardInfo(child, board)
+		res := collectArduinoBoardInfo(child, board)
 		if res != 0 {
 			sessionID = res
 		}
@@ -201,6 +167,31 @@ func collectBoardInfo(reg IOREG, board *BoardFlashAndSerial) (sessionID int64) {
 }
 
 func (board *Arduino) Update() bool {
+	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
+	plistData, err := cmd.CombinedOutput()
+	if err != nil {
+		printLog("plist error", string(plistData), err.Error())
+		board.portName = NOT_FOUND
+		return true
+	}
+	plistArr := []IOREG{}
+	format, err := plist.Unmarshal(plistData, &plistArr)
+	if err != nil {
+		printLog("unmarshal error:", err.Error(), cmd.String())
+		printLog("plint format:", format)
+		//printLog(string(plistData))
+		board.portName = NOT_FOUND
+		return true
+	}
+	portName, _ := IOREGport(plistArr, board.ardOS.ID, board)
+	if portName == NOT_FOUND {
+		board.portName = NOT_FOUND
+		return true
+	}
+	if portName != board.portName {
+		board.portName = portName
+		return true
+	}
 	return false
 }
 
