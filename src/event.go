@@ -666,20 +666,20 @@ func MSReset(event Event, c *WebSocketConnection) error {
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
-		DeviceCommentCode(MSResetResultMsg, msg.ID, 4, err.Error(), c)
+		MSResetSend(msg.ID, 4, err.Error(), c)
 		return err
 	}
 	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		DeviceCommentCode(MSResetResultMsg, msg.ID, 1, "", c)
+		MSResetSend(msg.ID, 1, "", c)
 		return nil
 	}
 	dev.Mu.Lock()
 	defer dev.Mu.Unlock()
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
-		DeviceCommentCode(MSResetResultMsg, msg.ID, 3, "", c)
+		MSResetSend(msg.ID, 3, "", c)
 		return nil
 	}
 	updated := board.Update()
@@ -689,16 +689,20 @@ func MSReset(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			DeviceCommentCode(MSResetResultMsg, msg.ID, 1, "", c)
+			MSResetSend(msg.ID, 1, "", c)
 			return nil
 		}
 	}
 	board.address = msg.Address
 	err = board.reset()
 	if err != nil {
-		DeviceCommentCode(MSResetResultMsg, msg.ID, 2, err.Error(), c)
+		MSResetSend(msg.ID, 2, err.Error(), c)
 		return err
 	}
-	DeviceCommentCode(MSResetResultMsg, msg.ID, 0, "", c)
+	MSResetSend(msg.ID, 0, "", c)
 	return nil
+}
+
+func MSResetSend(deviceID string, code int, comment string, client *WebSocketConnection) {
+	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
 }
