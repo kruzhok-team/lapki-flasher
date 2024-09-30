@@ -93,11 +93,6 @@ type MSAddressMessage struct {
 	Address string `json:"address"`
 }
 
-type MSPingResultMessage struct {
-	ID   string `json:"deviceID"`
-	Code int    `json:"code"`
-}
-
 type MSGetAddressMessage struct {
 	ID string `json:"deviceID"`
 }
@@ -573,14 +568,14 @@ func MSPing(event Event, c *WebSocketConnection) error {
 	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		MSPingResult(msg.ID, 1, c)
+		MSPingResult(msg.ID, 1, "", c)
 		return nil
 	}
 	dev.Mu.Lock()
 	defer dev.Mu.Unlock()
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
-		// TODO
+		MSPingResult(msg.ID, 3, "", c)
 		return nil
 	}
 	updated := board.Update()
@@ -590,17 +585,17 @@ func MSPing(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			MSPingResult(msg.ID, 1, c)
+			MSPingResult(msg.ID, 1, "", c)
 			return nil
 		}
 	}
 	board.address = msg.Address
 	err = board.ping()
 	if err != nil {
-		MSPingResult(msg.ID, 2, c)
+		MSPingResult(msg.ID, 2, err.Error(), c)
 		return err
 	}
-	MSPingResult(msg.ID, 0, c)
+	MSPingResult(msg.ID, 0, "", c)
 	return nil
 }
 
@@ -643,11 +638,8 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	return nil
 }
 
-func MSPingResult(deviceID string, code int, c *WebSocketConnection) {
-	c.sendOutgoingEventMessage(MSPingResultMsg, MSPingResultMessage{
-		ID:   deviceID,
-		Code: code,
-	}, false)
+func MSPingResult(deviceID string, code int, comment string, c *WebSocketConnection) {
+	DeviceCommentCode(MSPingResultMsg, deviceID, code, comment, c)
 }
 
 func DeviceCommentCode(messageType string, deviceID string, code int, comment string, c *WebSocketConnection) {
