@@ -70,8 +70,8 @@ func (d *Detector) Update() (
 	for deviceID, newBoard := range detectedBoards {
 		oldBoard, exists := d.boards[deviceID]
 		if exists {
-			if oldBoard.getPortSync() != newBoard.PortName {
-				oldBoard.setPortSync(newBoard.PortName)
+			if oldBoard.getPortSync() != newBoard.getPort() {
+				oldBoard.setPortSync(newBoard.getPort())
 				d.boardActions.PushBack(ActionWithBoard{board: oldBoard, boardID: deviceID, action: PORT_UPDATE})
 			}
 		} else {
@@ -262,4 +262,14 @@ func (d *Detector) initDeviceListErrorHandle(pathToList string) {
 			return
 		}
 	}
+}
+
+func (d *Detector) boardExists(deviceID string) bool {
+	_, exists := d.boards[deviceID]
+	return exists
+}
+func (d *Detector) boardExistsSync(deviceID string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.boardExists(deviceID)
 }

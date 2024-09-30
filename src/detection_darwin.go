@@ -45,10 +45,20 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 	return boards
 }
 
-// true - если порт изменился или не найден, иначе false
-// назначает порту значение NOT_FOUND, если не удалось найти порт
-// TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
+/*
+true - если порт изменился или не найден, иначе false
+
+назначает порту значение NOT_FOUND, если не удалось найти порт
+
+TODO: переделать интерфейс функции для всех платформ, сделать, чтобы функция возвращала error
+
+TODO: обновление нескольких портов
+*/
 func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
+	// TODO: сделать проверку для МС-ТЮК
+	if board.isMSDevice() {
+		return false
+	}
 	cmd := exec.Command("ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-a")
 	plistData, err := cmd.CombinedOutput()
 	if err != nil {
@@ -82,12 +92,12 @@ func IOREGport(plistArr []IOREG, ID string, board *BoardFlashAndSerial) (portNam
 		if (entry.SerialNumber == "" && strconv.FormatInt(entry.SessionID, 10) == ID) || entry.SerialNumber == ID {
 			detectedBoard := NewBoardToFlash(board.Type, NOT_FOUND)
 			collectBoardInfo(entry, detectedBoard)
-			if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
+			if detectedBoard.getPort() == "" || detectedBoard.getPort() == NOT_FOUND {
 				printLog("can't find port name!")
 				detectedBoard.setPortSync(NOT_FOUND)
 				return NOT_FOUND, true
 			}
-			return detectedBoard.PortName, true
+			return detectedBoard.getPort(), true
 		}
 	}
 	for _, entry := range plistArr {
@@ -146,7 +156,7 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 							printLog("can't find ID!")
 							goto SKIP
 						}
-						if detectedBoard.PortName == "" || detectedBoard.PortName == NOT_FOUND {
+						if detectedBoard.getPort() == "" || detectedBoard.getPort() == NOT_FOUND {
 							printLog("can't find port name!")
 							goto SKIP
 						}

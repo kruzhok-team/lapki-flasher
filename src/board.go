@@ -17,6 +17,7 @@ type BoardType struct {
 	Controller       string
 	Programmer       string
 	BootloaderTypeID int
+	IsMSDevice       bool
 }
 
 type BoardTemplate struct {
@@ -27,6 +28,7 @@ type BoardTemplate struct {
 	Controller   string   `json:"controller"`
 	Programmer   string   `json:"programmer"`
 	BootloaderID int      `json:"bootloaderID"`
+	IsMSDevice   bool     `json:"isMSDevice"`
 }
 
 func (board BoardType) hasBootloader() bool {
@@ -34,10 +36,11 @@ func (board BoardType) hasBootloader() bool {
 }
 
 type BoardFlashAndSerial struct {
-	Type     BoardType
-	PortName string
-	SerialID string
-	mu       sync.Mutex
+	Type BoardType
+	// список портов, для arduino-подобных устройств он состоит из одного элемента, для МС-ТЮК может состоять из нескольких
+	PortNames []string
+	SerialID  string
+	mu        sync.Mutex
 	// устройство прошивается
 	flashing bool
 	// bootloader, связанный с платой, nil - если не найден, или отсутствует вообще
@@ -51,12 +54,13 @@ type BoardFlashAndSerial struct {
 	serialMonitorBaud   int
 	serialMonitorOpen   bool
 	serialMonitorWrite  chan string
+	// адрес устройства (для МС-ТЮК), он может не совпадать с реальным адресом МС-ТЮК, используется для запоминания и использования где-то ещё
+	msAddress string
 }
 
-func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
+func newBoard(Type BoardType) *BoardFlashAndSerial {
 	var board BoardFlashAndSerial
 	board.Type = Type
-	board.PortName = PortName
 	board.flashing = false
 
 	if board.Type.hasBootloader() {
@@ -76,6 +80,18 @@ func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
 		}
 	}
 	return &board
+}
+
+func NewBoardToFlash(Type BoardType, PortName string) *BoardFlashAndSerial {
+	board := newBoard(Type)
+	board.setPort(PortName)
+	return board
+}
+
+func NewBoardToFlashPorts(Type BoardType, PortNames []string) *BoardFlashAndSerial {
+	board := newBoard(Type)
+	board.setPorts(PortNames)
+	return board
 }
 
 // находит шаблон платы по его id
@@ -104,7 +120,7 @@ func findTemplateByID(boardID int) *BoardTemplate {
 
 // подключено ли устройство
 func (board *BoardFlashAndSerial) IsConnected() bool {
-	return board.PortName != NOT_FOUND
+	return board.getPort() != NOT_FOUND
 }
 
 // подключено ли устройство
@@ -150,22 +166,71 @@ func (board *BoardFlashAndSerial) SetLockSync(lock bool) {
 	board.SetLock(lock)
 }
 
+// получить первый в списке порт, возвращает константу NOT_FOUND, если массив пустой
 func (board *BoardFlashAndSerial) getPort() string {
-	return board.PortName
+	if board.PortNames == nil {
+		return NOT_FOUND
+	}
+	return board.PortNames[0]
 }
+
+// получить первый в списке порт, возвращает константу NOT_FOUND, если массив пустой
 func (board *BoardFlashAndSerial) getPortSync() string {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.getPort()
 }
 
+// поменять первый в списке порт, если массив пустой, то создаёт новый массив, где единственным элементом является переданная строка
 func (board *BoardFlashAndSerial) setPort(newPortName string) {
-	board.PortName = newPortName
+	if board.PortNames == nil {
+		board.PortNames = make([]string, 1)
+	}
+	board.PortNames[0] = newPortName
 }
+
+// поменять первый в списке порт, если массив пустой, то создаёт новый массив, где единственным элементом является переданная строка
 func (board *BoardFlashAndSerial) setPortSync(newPortName string) {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	board.setPort(newPortName)
+}
+
+// получить список портов
+func (board *BoardFlashAndSerial) getPorts() []string {
+	return board.PortNames
+}
+
+// получить список портов
+func (board *BoardFlashAndSerial) getPortsSync() []string {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.getPorts()
+}
+
+// поменять список портов, копирует ссылку на переданный массив!
+func (board *BoardFlashAndSerial) setPorts(newPortNames []string) {
+	board.PortNames = newPortNames
+}
+
+// поменять список портов, копирует ссылку на переданный массив!
+func (board *BoardFlashAndSerial) setPortsSync(newPortNames []string) {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	board.setPorts(newPortNames)
+}
+
+// добавить порт в список
+func (board *BoardFlashAndSerial) addPort(newPortName string) {
+	board.PortNames = append(board.PortNames, newPortName)
+}
+
+// количество портов
+func (board *BoardFlashAndSerial) portsNum() int {
+	if board.PortNames == nil {
+		return 0
+	}
+	return len(board.PortNames)
 }
 
 func (board *BoardFlashAndSerial) setSerialPortMonitor(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {
@@ -215,16 +280,6 @@ func (board *BoardFlashAndSerial) getSerialMonitorSync() *serial.Port {
 	return board.getSerialMonitor()
 }
 
-func (d *Detector) boardExists(deviceID string) bool {
-	_, exists := d.boards[deviceID]
-	return exists
-}
-func (d *Detector) boardExistsSync(deviceID string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.boardExists(deviceID)
-}
-
 // получить клиента, который занял монитор порта
 func (board *BoardFlashAndSerial) getSerialMonitorClient() *WebSocketConnection {
 	return board.serialMonitorClient
@@ -244,4 +299,31 @@ func (board *BoardFlashAndSerial) getBaudSync() int {
 	board.mu.Lock()
 	defer board.mu.Unlock()
 	return board.getBaud()
+}
+
+func (board *BoardFlashAndSerial) isMSDevice() bool {
+	return board.Type.IsMSDevice
+}
+func (board *BoardFlashAndSerial) isMSDeviceSync() bool {
+	board.mu.Lock()
+	defer board.mu.Unlock()
+	return board.isMSDevice()
+}
+
+func (board *BoardFlashAndSerial) getSerialPortName() string {
+	if board.isMSDevice() {
+		return board.PortNames[3]
+	} else {
+		return board.getPort()
+	}
+}
+
+// запомнить адрес устройства МС-ТЮК
+func (board *BoardFlashAndSerial) setAddressMS(address string) {
+	board.msAddress = address
+}
+
+// получить последнее записанное значение адреса МС-ТЮК
+func (board *BoardFlashAndSerial) getAddressMS() string {
+	return board.msAddress
 }

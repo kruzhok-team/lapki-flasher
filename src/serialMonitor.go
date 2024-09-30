@@ -38,7 +38,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		}
 		if !detector.boardExistsSync(deviceID) {
 			DeviceUpdateDelete(deviceID, client)
-			SerialConnectionStatus(SerialStatusMessage{
+			SerialConnectionStatus(DeviceCommentCodeMessage{
 				ID:   deviceID,
 				Code: 2,
 			}, client)
@@ -49,7 +49,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 			// TODO: можно заменить на configure, но нужно дополнительно протестить, так как при использовании configure в прошлый раз возникла проблема с тем, что не получалось осуществить повторное подключение
 			err := board.serialPortMonitor.Close()
 			if err != nil {
-				SerialConnectionStatus(SerialStatusMessage{
+				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    9,
 					Comment: err.Error(),
@@ -57,9 +57,9 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 				return
 			}
 			//time.Sleep(time.Second)
-			newSerialPort, err := openSerialPort(board.PortName, baud)
+			newSerialPort, err := openSerialPort(board.getSerialPortName(), baud)
 			if err != nil {
-				SerialConnectionStatus(SerialStatusMessage{
+				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    9,
 					Comment: err.Error(),
@@ -67,7 +67,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 				return
 			}
 			board.setSerialPortMonitorSync(newSerialPort, client, baud)
-			SerialConnectionStatus(SerialStatusMessage{
+			SerialConnectionStatus(DeviceCommentCodeMessage{
 				ID:      deviceID,
 				Code:    10,
 				Comment: strconv.Itoa(baud),
@@ -75,18 +75,18 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 		case writeMsg := <-board.serialMonitorWrite:
 			_, err := board.serialPortMonitor.Write([]byte(writeMsg))
 			if err != nil {
-				SerialSentStatus(SerialStatusMessage{
+				SerialSentStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    1,
 					Comment: err.Error(),
 				}, client)
-				SerialConnectionStatus(SerialStatusMessage{
+				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:   deviceID,
 					Code: 1,
 				}, client)
 				return
 			}
-			SerialSentStatus(SerialStatusMessage{
+			SerialSentStatus(DeviceCommentCodeMessage{
 				ID:   deviceID,
 				Code: 0,
 			}, client)
@@ -100,7 +100,7 @@ func handleSerial(board *BoardFlashAndSerial, deviceID string, client *WebSocket
 					return
 				}
 				// Ошибка при чтении из последовательного порта
-				SerialConnectionStatus(SerialStatusMessage{
+				SerialConnectionStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
 					Code:    7,
 					Comment: err.Error(),

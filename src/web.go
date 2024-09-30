@@ -48,12 +48,15 @@ func (m *WebSocketManager) hasMultipleConnections() bool {
 func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[GetListMsg] = GetList
 	m.handlers[FlashStartMsg] = FlashStart
+	m.handlers[MSBinStartMsg] = FlashStart
 	m.handlers[FlashBinaryBlockMsg] = FlashBinaryBlock
 	m.handlers[GetMaxFileSizeMsg] = GetMaxFileSize
 	m.handlers[SerialConnectMsg] = SerialConnect
 	m.handlers[SerialDisconnectMsg] = SerialDisconnect
 	m.handlers[SerialSendMsg] = SerialSend
 	m.handlers[SerialChangeBaudMsg] = SerialChangeBaud
+	m.handlers[MSGetAddressMsg] = MSGetAddress
+	m.handlers[MSPingMsg] = MSPing
 }
 
 // обработка нового соединения
@@ -219,7 +222,11 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 				case PORT_UPDATE:
 					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
 				case ADD:
-					m.sendMessageToAll(DeviceMsg, newDeviceMessage(boardWithAction.board, boardWithAction.boardID))
+					if boardWithAction.board.isMSDevice() {
+						m.sendMessageToAll(MSDeviceMsg, msDeviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
+					} else {
+						m.sendMessageToAll(DeviceMsg, deviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
+					}
 				case DELETE:
 					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
 				default:
