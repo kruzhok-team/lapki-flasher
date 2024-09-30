@@ -613,7 +613,7 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		MSAddress(msg.ID, 1, "", c)
+		MSAddressSend(msg.ID, 1, "", c)
 		return nil
 	}
 	dev.Mu.Lock()
@@ -630,16 +630,16 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			MSAddress(msg.ID, 1, "", c)
+			MSAddressSend(msg.ID, 1, "", c)
 			return nil
 		}
 	}
 	address, err := board.getAddress()
 	if err != nil {
-		MSAddress(msg.ID, 2, err.Error(), c)
+		MSAddressSend(msg.ID, 2, err.Error(), c)
 		return err
 	}
-	MSAddress(msg.ID, 0, address, c)
+	MSAddressSend(msg.ID, 0, address, c)
 	return nil
 }
 
@@ -658,7 +658,7 @@ func DeviceCommentCode(messageType string, deviceID string, code int, comment st
 	}, false)
 }
 
-func MSAddress(deviceID string, code int, comment string, c *WebSocketConnection) {
+func MSAddressSend(deviceID string, code int, comment string, c *WebSocketConnection) {
 	DeviceCommentCode(MSAddressMsg, deviceID, code, comment, c)
 }
 
