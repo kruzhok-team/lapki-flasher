@@ -36,11 +36,18 @@ type MSDeviceMessage struct {
 	PortNames [4]string `json:"portNames,omitempty"`
 }
 
-// тип данных для flash-start и ms-bin-start
+// тип данных для flash-start (для arduino-подобных устройств)
 type FlashStartMessage struct {
 	ID       string `json:"deviceID"`
-	FileSize int    `json:"fileSize"`
-	Address  string `json:"address"`
+	FileSize int    `json:"fileSize"` // размер прошивки
+}
+
+// тип данных для ms-bin-start (для МС-ТЮК)
+type MSBinStartMessage struct {
+	ID           string `json:"deviceID"`
+	FileSize     int    `json:"fileSize"`     // размер прошивки
+	Address      string `json:"address"`      // киберген
+	Verification bool   `json:"verification"` // если true, то загрузчик потратит дополнительное время на проверку прошивки
 }
 
 type FlashBlockMessage struct {
@@ -194,18 +201,36 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if c.IsFlashing() {
 		return ErrFlashNotFinished
 	}
-	var msg FlashStartMessage
-	err := json.Unmarshal(event.Payload, &msg)
-	if err != nil {
-		return err
+	var deviceID string
+	var fileSize int
+	var address string    // адрес, только для МС-ТЮК
+	var verification bool // верификация, только для МС-ТЮК
+	if event.Type == FlashStartMsg {
+		var msg FlashStartMessage
+		err := json.Unmarshal(event.Payload, &msg)
+		if err != nil {
+			return err
+		}
+		deviceID = msg.ID
+		fileSize = msg.FileSize
+	} else {
+		var msg MSBinStartMessage
+		err := json.Unmarshal(event.Payload, &msg)
+		if err != nil {
+			return err
+		}
+		deviceID = msg.ID
+		fileSize = msg.FileSize
+		address = msg.Address
+		verification = msg.Verification
 	}
-	if msg.FileSize < 1 {
+	if fileSize < 1 {
 		return nil
 	}
-	if msg.FileSize > maxFileSize {
+	if fileSize > maxFileSize {
 		return ErrFlashLargeFile
 	}
-	dev, exists := detector.GetBoardSync(msg.ID)
+	dev, exists := detector.GetBoardSync(deviceID)
 	if !exists {
 		return ErrFlashWrongID
 	}
@@ -216,10 +241,10 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	updated := dev.Board.Update()
 	if updated {
 		if dev.Board.IsConnected() {
-			DeviceUpdatePort(msg.ID, dev, c)
+			DeviceUpdatePort(deviceID, dev, c)
 		} else {
-			detector.DeleteBoard(msg.ID)
-			DeviceUpdateDelete(msg.ID, c)
+			detector.DeleteBoard(deviceID)
+			DeviceUpdateDelete(deviceID, c)
 			return ErrFlashDisconnected
 		}
 	}
@@ -248,9 +273,10 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	case *MS1:
 		if event.Type == MSBinStartMsg {
 			ext = "bin"
-			if msg.Address != "" {
-				dev.Board.(*MS1).address = msg.Address
+			if address != "" {
+				dev.Board.(*MS1).address = address
 			}
+			dev.Board.(*MS1).verify = verification
 		} else {
 			// TODO
 		}
@@ -258,7 +284,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = dev
 	c.FlashingBoard.SetLock(true)
-	c.FileWriter.Start(msg.FileSize, ext)
+	c.FileWriter.Start(fileSize, ext)
 
 	FlashNextBlock(c)
 	return nil
