@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/polyus-nt/ms1-go/pkg/ms1"
@@ -97,4 +98,22 @@ func (board *MS1) ping() error {
 		return err
 	}
 	return nil
+}
+
+// получить адрес для МС-ТЮК
+func (board *MS1) getAddress() (string, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return "", err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	_, err, updated := deviceMS.GetId(true, true)
+	if err != nil {
+		return "", err
+	}
+	if !updated {
+		return "", errors.New("Не удалось обновить устройство.")
+	}
+	return deviceMS.GetAddress(), nil
 }

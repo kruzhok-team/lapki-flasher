@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
-
-	"github.com/polyus-nt/ms1-go/pkg/ms1"
 )
 
 // обработчик события
@@ -636,20 +634,12 @@ func MSGetAddress(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	portMS, err := ms1.MkSerial(board.getFlashPort())
+	address, err := board.getAddress()
 	if err != nil {
 		MSAddress(msg.ID, 2, err.Error(), c)
 		return err
 	}
-	defer portMS.Close()
-	deviceMS := ms1.NewDevice(portMS)
-	_, err, b := deviceMS.GetId(true, true)
-	if err != nil || b == false {
-		MSAddress(msg.ID, 2, "Не удалось получить ID устройства. "+err.Error(), c)
-		return err
-	}
-	board.address = deviceMS.GetAddress()
-	MSAddress(msg.ID, 0, deviceMS.GetAddress(), c)
+	MSAddress(msg.ID, 0, address, c)
 	return nil
 }
 
