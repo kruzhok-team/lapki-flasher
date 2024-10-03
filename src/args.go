@@ -38,6 +38,9 @@ var alwaysUpdate bool
 // количество ненастоящих, симулируемых устройств, которые будут восприниматься как настоящие, применяется для тестирования
 var fakeBoardsNum int
 
+// количество ненастоящих МС-ТЮК, которые симулируют работу, применяется для тестироваения
+var fakeMSNum int
+
 // путь к avrdude
 var avrdudePath string
 
@@ -57,6 +60,7 @@ func setArgs() {
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
 	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
 	flag.IntVar(&fakeBoardsNum, "stub", 0, "количество ненастоящих, симулируемых устройств, которые будут восприниматься как настоящие, применяется для тестирования, при значении 0 или меньше фальшивые устройства не добавляются")
+	flag.IntVar(&fakeMSNum, "stubms", 0, "количество ненастоящих, симулируемых устройств типа МС-ТЮК, которые будут восприниматься как настоящие, применяется для тестирования, при значении 0 или меньше фальшивые устройства не добавляются")
 	flag.BoolVar(&verbose, "verbose", false, "выводить в консоль подробную информацию")
 	flag.BoolVar(&alwaysUpdate, "alwaysUpdate", false, "всегда искать устройства и обновлять их список, даже когда ни один клиент не подключён (используется для тестирования)")
 	getListCooldownSeconds := flag.Int("listCooldown", 2, "минимальное время (в секундах), через которое клиент может снова запросить список устройств, игнорируется, если количество клиентов меньше чем 2")
@@ -64,6 +68,9 @@ func setArgs() {
 	flag.Parse()
 	if fakeBoardsNum < 0 {
 		fakeBoardsNum = 0
+	}
+	if fakeMSNum < 0 {
+		fakeMSNum = 0
 	}
 	if *updateListTimeSeconds < 1 {
 		*updateListTimeSeconds = 1
@@ -83,10 +90,11 @@ func printArgsDesc() {
 	verboseStr := fmt.Sprintf("вывод подробной информации в консоль: %v", verbose)
 	alwaysUpdateStr := fmt.Sprintf("постоянное обновление списка устройств: %v", alwaysUpdate)
 	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
+	fakeMSNumStr := fmt.Sprintf("количество фальшивых МС-ТЮК: %d", fakeMSNum)
 	avrdudePathStr := fmt.Sprintf("путь к avrdude (если написано avrdude, то используется системный путь): %s", avrdudePath)
 	configPathStr := fmt.Sprintf("путь к файлу конфигурации avrdude: %s", configPath)
 	deviceListPathStr := fmt.Sprintf("путь к файлу со списком устройств (если пусто, то используется встроенный список): %s", deviceListPath)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
 		webAddressStr,
 		maxFileSizeStr,
 		maxMsgSizeStr,
@@ -96,7 +104,9 @@ func printArgsDesc() {
 		verboseStr,
 		alwaysUpdateStr,
 		fakeBoardsNumStr,
+		fakeMSNumStr,
 		avrdudePathStr,
 		configPathStr,
-		deviceListPathStr)
+		deviceListPathStr,
+	)
 }
