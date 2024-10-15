@@ -12,7 +12,7 @@ require (
 require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tjgq/ticker v0.0.0-20140913211110-8b4870134629
-	golang.org/x/sys v0.25.0
+	golang.org/x/sys v0.26.0
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/polyus-nt/ms1-go v0.0.0-20240930080946-df96dd7c326d
+	github.com/polyus-nt/ms1-go v0.0.0-20241015094409-718270c7e700
 	howett.net/plist v1.0.1
 )
 
