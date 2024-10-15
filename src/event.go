@@ -153,6 +153,10 @@ const (
 	MSResetMsg = "ms-reset"
 	// результат выполнения сброса МС-ТЮК
 	MSResetResultMsg = "ms-reset-result"
+	// запрос на получение метаданных МС-ТЮК
+	MSGetMetaDataMsg = "ms-get-meta-data"
+	// сообщение с метаданными, предназначенными для пользователя
+	MSMetaDataMsg = "ms-meta-data"
 )
 
 // отправить клиенту список всех устройств
@@ -699,4 +703,45 @@ func MSReset(event Event, c *WebSocketConnection) error {
 
 func MSResetSend(deviceID string, code int, comment string, client *WebSocketConnection) {
 	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
+}
+
+func MSGetMetaData(event Event, c *WebSocketConnection) error {
+	var msg MSAddressMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		// TODO
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		// TODO
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		// TODO
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			// TODO
+			return nil
+		}
+	}
+	board.address = msg.Address
+	_, err = board.getMetaData()
+	if err != nil {
+		// TODO
+		return err
+	}
+	// TODO
+	return nil
 }
