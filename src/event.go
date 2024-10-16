@@ -101,6 +101,19 @@ type DeviceIdMessage struct {
 	ID string `json:"deviceID"`
 }
 
+type MSMetaDataMessage struct {
+	ID            string `json:"deviceID"`
+	RefBlHw       string `json:"RefBlHw"`       // Описывает физическое окружение контроллера (плату)
+	RefBlFw       string `json:"RefBlFw"`       // Указывает на версию прошивки загрузчика
+	RefBlUserCode string `json:"RefBlUserCode"` //
+	RefBlChip     string `json:"RefBlChip"`     // Указывает на контроллер, здесь то, что нужно для компиляции прошивки
+	RefBlProtocol string `json:"RefBlProtocol"` // Описывает возможности протокола загрузчика
+	RefCgHw       string `json:"RefCgHw"`       // Указывает на аппаратное исполнение
+	RefCgFw       string `json:"RefCgFw"`       // Указывает на версию прошивки кибергена
+	RefCgProtocol string `json:"RefCgProtocol"` // Указывает на возможности протокола кибергена
+	MSType        string `json:"type"`          // тип устройства (определяется по RefBlHw)
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -155,8 +168,10 @@ const (
 	MSResetResultMsg = "ms-reset-result"
 	// запрос на получение метаданных МС-ТЮК
 	MSGetMetaDataMsg = "ms-get-meta-data"
-	// сообщение с метаданными, предназначенными для пользователя
+	// сообщение с метаданными, предназначенными для клиента
 	MSMetaDataMsg = "ms-meta-data"
+	// сообщение в случае, если не удалось извлечь метаданные по запросу клиента
+	MSMetaDataErrorMsg = "ms-meta-data-error"
 )
 
 // отправить клиенту список всех устройств
@@ -705,24 +720,35 @@ func MSResetSend(deviceID string, code int, comment string, client *WebSocketCon
 	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
 }
 
+const (
+	META_ERROR        = 1
+	META_NO_DEVICE    = 2
+	META_WRONG_DEVICE = 3
+	META_JSON_ERROR   = 4
+)
+
+func MSMetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
+	DeviceCommentCode(MSMetaDataMsg, deviceID, code, comment, client)
+}
+
 func MSGetMetaData(event Event, c *WebSocketConnection) error {
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
-		// TODO
+		MSMetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
 		return err
 	}
 	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		// TODO
+		MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
 		return nil
 	}
 	dev.Mu.Lock()
 	defer dev.Mu.Unlock()
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
-		// TODO
+		MSMetaDataError(msg.ID, META_WRONG_DEVICE, "", c)
 		return nil
 	}
 	updated := board.Update()
@@ -732,16 +758,27 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			// TODO
+			MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
 			return nil
 		}
 	}
 	board.address = msg.Address
-	_, err = board.getMetaData()
+	meta, err := board.getMetaData()
 	if err != nil {
-		// TODO
+		MSMetaDataError(msg.ID, META_NO_DEVICE, err.Error(), c)
 		return err
 	}
-	// TODO
+	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
+		ID:            msg.ID,
+		RefBlHw:       meta.RefBlHw,
+		RefBlFw:       meta.RefBlFw,
+		RefBlUserCode: meta.RefBlUserCode,
+		RefBlChip:     meta.RefBlChip,
+		RefBlProtocol: meta.RefBlProtocol,
+		RefCgHw:       meta.RefCgHw,
+		RefCgFw:       meta.RefCgFw,
+		RefCgProtocol: meta.RefCgProtocol,
+		MSType:        getMSType(meta.RefBlHw),
+	}, false)
 	return nil
 }
