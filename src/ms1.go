@@ -141,21 +141,21 @@ func (board *MS1) getMetaData() (ms1.Meta, error) {
 */
 func getMSType(RefBlHw string) string {
 	switch RefBlHw {
-	case "0x1e3204c1e573a118":
+	case "1e3204c1e573a118":
 		return "tjc-ms1-main-a3"
-	case "0x028e53ca92358dd9":
+	case "028e53ca92358dd9":
 		return "tjc-ms1-main-a4"
-	case "0x7669fba1c9175843":
+	case "7669fba1c9175843":
 		return "tjc-ms1-mtrx-a2"
-	case "0x47af73c71f3930ce":
+	case "47af73c71f3930ce":
 		return "tjc-ms1-mtrx-a3"
-	case "0xda047a039c8acff1":
+	case "da047a039c8acff1":
 		return "tjc-ms1-btn-a2"
-	case "0x58e2581437a30762":
+	case "58e2581437a30762":
 		return "tjc-ms1-btn-a3"
-	case "0xc4ef6036603a600f":
+	case "c4ef6036603a600f":
 		return "tjc-ms1-lmp-a2"
-	case "0x274b36772c9ea32a":
+	case "274b36772c9ea32a":
 		return "tjc-ms1-lmp-a4"
 	}
 	return ""
