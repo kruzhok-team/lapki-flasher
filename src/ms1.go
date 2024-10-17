@@ -128,10 +128,11 @@ func (board *MS1) getMetaData() (ms1.Meta, error) {
 	deviceMS.SetAddress(board.address)
 	meta, err := deviceMS.GetMeta()
 	if err != nil {
+		printLog("meta data:", meta, " error:", err.Error())
 		return meta, err
 	}
-	printLog(meta)
-	return meta, err
+	printLog("meta data:", meta)
+	return meta, nil
 }
 
 /*
