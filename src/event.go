@@ -765,7 +765,7 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 	board.address = msg.Address
 	meta, err := board.getMetaData()
 	if err != nil {
-		MSMetaDataError(msg.ID, META_NO_DEVICE, err.Error(), c)
+		MSMetaDataError(msg.ID, META_ERROR, err.Error(), c)
 		return err
 	}
 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
