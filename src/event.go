@@ -728,7 +728,7 @@ const (
 )
 
 func MSMetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
-	DeviceCommentCode(MSMetaDataMsg, deviceID, code, comment, client)
+	DeviceCommentCode(MSMetaDataErrorMsg, deviceID, code, comment, client)
 }
 
 func MSGetMetaData(event Event, c *WebSocketConnection) error {
