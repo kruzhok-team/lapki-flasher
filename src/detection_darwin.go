@@ -3,7 +3,9 @@
 package main
 
 import (
+	"log"
 	"os/exec"
+	"sort"
 	"strconv"
 
 	"howett.net/plist"
@@ -27,7 +29,7 @@ type IOREG struct {
 	Children     []IOREG `plist:"IORegistryEntryChildren"`
 }
 
-// настройка ОС (для Darwin она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
+// настройка ОС (для Darwin она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые используют свои реализации этой функции)
 func setupOS() {}
 
 // находит все подключённые платы
@@ -104,8 +106,40 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 						continue
 					}
 					if entry.ProductID == PID && entry.VendorID == VID {
+						var board Board
+						var ID string
 						if boardTemplate.IsMSDevice {
 							// TODO
+							portsMap := make(map[string]struct{}, 4)
+							ID = strconv.FormatInt(collectMSBoardInfo(entry, portsMap), 10)
+							if ID == "" || ID == "0" {
+								printLog("can't find ID!")
+								goto SKIP
+							}
+							portsLen := len(portsMap)
+							if portsLen != 4 {
+								log.Println("Error: incorrect number of ports for ms1 device:", portsLen)
+								goto SKIP
+							}
+							ports := make([]string, portsLen)
+							i := 0
+							for port, _ := range portsMap {
+								ports[i] = port
+								i++
+							}
+							sort.Slice(ports, func(i, j int) bool {
+								len_1 := len(ports[i])
+								len_2 := len(ports[j])
+								if len_1 != len_2 {
+									return len_1 < len_2
+								} else {
+									return ports[i] < ports[j]
+								}
+							})
+							board = NewMS1(
+								[4]string{ports[0], ports[1], ports[2], ports[3]},
+								MS1OS{},
+							)
 						} else {
 							arduino := NewArduinoFromTemp(
 								boardTemplate,
@@ -113,7 +147,7 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 								ArduinoOS{},
 								NOT_FOUND,
 							)
-							ID := strconv.FormatInt(collectArduinoBoardInfo(entry, arduino), 10)
+							ID = strconv.FormatInt(collectArduinoBoardInfo(entry, arduino), 10)
 							if arduino.serialID != "" {
 								ID = arduino.serialID
 							}
@@ -126,16 +160,18 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 								goto SKIP
 							}
 							arduino.ardOS.ID = ID
-							detectedDevice := newDevice(
-								boardTemplate.Name,
-								boardTemplate.ID,
-								arduino,
-							)
-							boards[ID] = detectedDevice
-							printLog("Found device", ID, detectedDevice)
-							isFound = true
-							goto SKIP
+							board = arduino
 						}
+						detectedDevice := newDevice(
+							boardTemplate.Name,
+							boardTemplate.ID,
+							board,
+						)
+						boards[ID] = detectedDevice
+						printLog("Found device", ID, detectedDevice)
+						isFound = true
+						goto SKIP
+
 					}
 				}
 			}
@@ -159,6 +195,22 @@ func collectArduinoBoardInfo(reg IOREG, board *Arduino) (sessionID int64) {
 	}
 	for _, child := range reg.Children {
 		res := collectArduinoBoardInfo(child, board)
+		if res != 0 {
+			sessionID = res
+		}
+	}
+	return sessionID
+}
+
+func collectMSBoardInfo(reg IOREG, ports map[string]struct{}) (sessionID int64) {
+	if reg.Port != "" {
+		ports[reg.Port] = struct{}{}
+	}
+	if reg.SessionID != 0 {
+		sessionID = reg.SessionID
+	}
+	for _, child := range reg.Children {
+		res := collectMSBoardInfo(child, ports)
 		if res != 0 {
 			sessionID = res
 		}
