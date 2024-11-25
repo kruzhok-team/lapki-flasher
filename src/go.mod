@@ -12,7 +12,7 @@ require (
 require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tjgq/ticker v0.0.0-20140913211110-8b4870134629
-	golang.org/x/sys v0.26.0
+	golang.org/x/sys v0.27.0
 )
 
 require (
@@ -23,8 +23,11 @@ require (
 )
 
 require (
-	github.com/polyus-nt/ms1-go v0.0.0-20241015094409-718270c7e700
+	github.com/polyus-nt/ms1-go v0.0.0-20241122070838-c13aa2a01449
 	howett.net/plist v1.0.1
 )
 
-require go.bug.st/serial v1.6.2 // indirect
+require (
+	github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f // indirect
+	go.bug.st/serial v1.6.2 // indirect
+)
