@@ -14,6 +14,14 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+type ArduinoOS struct {
+	pathToDevice string
+}
+
+type MS1OS struct {
+	pathesToDevices [4]string
+}
+
 // настройка ОС (для Windows она не требуется, но она здесь присутствует, чтобы обеспечить совместимость с другими платформами, которые использует свои реализации этой функции)
 func setupOS() {
 
@@ -34,19 +42,6 @@ func getAllRegistryValues(path string) ([]string, error) {
 		return nil, err
 	}
 	return registryValues, nil
-	// var result = make([]string, len(registryValues))
-	// for i, valueName := range registryValues {
-	// 	value, _, err := key.GetStringValue(valueName)
-	// 	if err != nil {
-	// 		if err == registry.ErrUnexpectedType {
-	// 			continue
-	// 		}
-	// 		printLog("Error on getting registry values:", err.Error())
-	// 		continue
-	// 	}
-	// 	result[i] = value
-	// }
-	// return result, err
 }
 func handleCloseRegistryKey(key registry.Key, path string) {
 	if err := key.Close(); err != nil {
@@ -150,14 +145,25 @@ func getInstanceId(substring string) []string {
 }
 
 // находит все подключённые платы
-func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSerial {
+func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	//startTime := time.Now()
-	boards := make(map[string]*BoardFlashAndSerial)
+	devs := make(map[string]*Device)
 	presentUSBDevices := getInstanceId("")
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
 	}
+	// структура для хранения одной части МС-ТЮК, которую удалось найти
+	type ms1Part struct {
+		template     *BoardTemplate
+		portName     string
+		pathToDevice string
+		// части МС-ТЮК имеют имена, которые сожержат слова SerialA, SerialB, SerialC, SerialD,
+		// порядок портов в МС-ТЮК должен соответствовать алфавитному порядку этих слов
+		friendlyName string
+	}
+	// все части МС-ТЮК, которые удалось найти, используется для того, чтобы "собрать" из них полноценные МС-ТЮКи
+	var ms1parts []ms1Part
 	for _, line := range presentUSBDevices {
 		device := strings.TrimSpace(line)
 		deviceLen := len(device)
@@ -174,35 +180,80 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*BoardFlashAndSeria
 							printLog(device)
 							continue
 						}
-						boardType := BoardType{
-							typeID:           boardTemplate.ID,
-							ProductID:        productID,
-							VendorID:         vendorID,
-							Name:             boardTemplate.Name,
-							Controller:       boardTemplate.Controller,
-							Programmer:       boardTemplate.Programmer,
-							BootloaderTypeID: boardTemplate.BootloaderID,
-							IsMSDevice:       boardTemplate.IsMSDevice,
+						if boardTemplate.IsMSDevice {
+							// сбор МС-ТЮК "по-частям"
+
+							// поиск "FriendlyName"
+
+							keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s", device)
+							key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+							if err != nil {
+								printLog("can't open key for ms1-device.", err.Error())
+								continue
+							}
+							friendlyName, _, err := key.GetStringValue("FriendlyName")
+							if err != nil {
+								printLog("can't get FriendlyName property for ms1-device.", err.Error())
+								key.Close()
+								continue
+							}
+							key.Close()
+							ms1parts = append(ms1parts, ms1Part{
+								template:     &boardTemplate,
+								portName:     portName,
+								pathToDevice: device,
+								friendlyName: friendlyName,
+							})
+						} else {
+							// поиск серийного номера
+							serialIndex := strings.LastIndex(device, "\\")
+							possibleSerialID := device[serialIndex+1:]
+							if strings.Contains(possibleSerialID, "&") {
+								possibleSerialID = ""
+							}
+							detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
+							devs[device] = newDevice(boardTemplate.Name, boardTemplate.ID, detectedBoard)
+							printLog("Arduino device was found:", detectedBoard, device)
 						}
-						detectedBoard := NewBoardToFlash(boardType, portName)
-						serialIndex := strings.LastIndex(device, "\\")
-						possibleSerialID := device[serialIndex+1:]
-						if !strings.Contains(possibleSerialID, "&") {
-							detectedBoard.SerialID = device[serialIndex+1:]
-						}
-						boards[device] = detectedBoard
-						printLog("Device was found:", detectedBoard, device)
 					}
 				}
 			}
 		}
 	}
-	// windows распознает один МС-ТЮК как 4 разных устройства, поэтому их нужно отфильтровать
-	composeMS(boards)
+	// windows распознает один МС-ТЮК как 4 разных устройства, поэтому их нужно "объединить" в одно устройство для загрузчика
+	sort.Slice(ms1parts, func(i, j int) bool {
+		port1 := ms1parts[i].portName
+		port2 := ms1parts[j].portName
+		len1 := len(port1)
+		len2 := len(port2)
+		if len1 == len2 {
+			return port1 < port2
+		}
+		return len1 < len2
+	})
+	msPartsNum := len(ms1parts)
+	if msPartsNum%4 != 0 {
+		log.Println("Incorrect number of ms1 parts! Can't identify them")
+		return devs
+	}
+	for msPart := 0; msPart < msPartsNum; msPart += 4 {
+		pack := ms1parts[msPart : msPart+4]
+		sort.Slice(pack, func(i, j int) bool {
+			return pack[i].friendlyName < pack[j].friendlyName
+		})
+		var portNames [4]string
+		var pathesToDevices [4]string
+		for i := range 4 {
+			portNames[i] = pack[i].portName
+			pathesToDevices[i] = pack[i].pathToDevice
+		}
+		ms1 := NewMS1(portNames, MS1OS{pathesToDevices: pathesToDevices})
+		devs[pack[0].pathToDevice] = newDevice(pack[0].template.Name, pack[0].template.ID, ms1)
+	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))
-	printLog(boards)
-	return boards
+	printLog(devs)
+	return devs
 }
 
 /*
@@ -238,27 +289,17 @@ func findPortName(instanceId *string) string {
 
 // true - если порт изменился или не найден, иначе false
 // назначает порту значение NOT_FOUND, если не удалось найти порт
-func (board *BoardFlashAndSerial) updatePortName(ID string) bool {
-	// TODO: сделать проверку для МС-ТЮК
-	if board.isMSDevice() {
-		return false
-	}
-	instanceId := getInstanceId(ID)
+func updatePortName(pathToDevice string) string {
+	instanceId := getInstanceId(pathToDevice)
 	// такого устройства нет
 	if instanceId == nil {
-		board.setPort(NOT_FOUND)
-		return true
+		return NOT_FOUND
 	}
 	if len(instanceId) > 1 {
-		log.Printf("updatePortName: found more than one devices that are matched ID = %s\n", ID)
-		return false
+		log.Printf("updatePortName: found more than one devices that are matched ID = %s\n", pathToDevice)
+		return NOT_FOUND
 	}
-	portName := findPortName(&ID)
-	if board.getPortSync() != portName {
-		board.setPortSync(portName)
-		return true
-	}
-	return false
+	return findPortName(&pathToDevice)
 }
 
 // перезагрузка порта
@@ -271,71 +312,15 @@ func rebootPort(portName string) (err error) {
 	return err
 }
 
-// собрать части МС-ТЮК в одно устройство
-func composeMS(boards map[string]*BoardFlashAndSerial) {
-	type BoardID struct {
-		ID           string
-		friendlyName string
-		Board        *BoardFlashAndSerial
+func (board *Arduino) Update() bool {
+	newPortName := updatePortName(board.ardOS.pathToDevice)
+	if newPortName != board.portName {
+		board.portName = newPortName
+		return true
 	}
-	var MSdevices []BoardID
-	for boardID, board := range boards {
-		if board.isMSDevice() {
-			keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s", boardID)
-			key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-			if err != nil {
-				printLog("can't open key for ms1-device.", err.Error())
-				return
-			}
-			defer func() {
-				err := key.Close()
-				if err != nil {
-					printLog("windows: in function composeMS.", err.Error())
-				}
-			}()
-			friendlyName, _, err := key.GetStringValue("FriendlyName")
-			if err != nil {
-				printLog("can't get FriendlyName property for ms1-device.", err.Error())
-				return
-			}
-			MSdevices = append(MSdevices, BoardID{
-				ID:           boardID,
-				friendlyName: friendlyName,
-				Board:        board,
-			})
-		}
-	}
-	sort.Slice(MSdevices, func(i, j int) bool {
-		port1 := MSdevices[i].Board.getPort()
-		port2 := MSdevices[j].Board.getPort()
-		len1 := len(port1)
-		len2 := len(port2)
-		if len1 == len2 {
-			return port1 < port2
-		}
-		return len1 < len2
-	})
-	for i, v := range MSdevices {
-		if i%4 != 0 {
-			MSdevices[i-i%4].Board.addPort(v.Board.getPort())
-			delete(boards, v.ID)
-		}
-	}
-	for index, value := range MSdevices {
-		if index%4 != 0 {
-			continue
-		}
-		indexMap := make(map[string]int, 4)
-		var stringKeys []string
-		for i := range 4 {
-			indexMap[MSdevices[index+i].friendlyName] = index + i
-			stringKeys = append(stringKeys, MSdevices[index+i].friendlyName)
-		}
-		sort.Strings(stringKeys)
-		var orderedPortNames []string
-		for i := range value.Board.PortNames {
-			orderedPortNames = append(orderedPortNames, MSdevices[indexMap[stringKeys[i]]].Board.getPort())
-		}
-		value.Board.PortNames = orderedPortNames
-	}
+	return false
+}
+
+func (board *MS1) Update() bool {
+	return false
 }

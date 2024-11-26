@@ -57,6 +57,8 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[SerialChangeBaudMsg] = SerialChangeBaud
 	m.handlers[MSGetAddressMsg] = MSGetAddress
 	m.handlers[MSPingMsg] = MSPing
+	m.handlers[MSResetMsg] = MSReset
+	m.handlers[MSGetMetaDataMsg] = MSGetMetaData
 }
 
 // обработка нового соединения
@@ -207,7 +209,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 
 	if !sendToAll {
 		for deviceID, device := range devicesInList {
-			Device(deviceID, device, false, c)
+			SendDevice(deviceID, device, false, c)
 		}
 	}
 	/*
@@ -216,17 +218,17 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 	*/
 	for {
 		if boardWithAction, exists := detector.PopFrontActionSync(); exists {
+			dev := boardWithAction.board
+			if dev != nil {
+				dev.Mu.Lock()
+			}
 			//TODO: в обоих случаях происходит тоже самое, просто используется разный синтаксис, следует придумать как это объединить
 			if sendToAll {
 				switch boardWithAction.action {
 				case PORT_UPDATE:
 					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
 				case ADD:
-					if boardWithAction.board.isMSDevice() {
-						m.sendMessageToAll(MSDeviceMsg, msDeviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
-					} else {
-						m.sendMessageToAll(DeviceMsg, deviceMessageMakeSync(boardWithAction.boardID, boardWithAction.board))
-					}
+					m.sendMessageToAll(dev.Board.GetWebMessageType(), dev.Board.GetWebMessage(dev.Name, boardWithAction.boardID))
 				case DELETE:
 					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
 				default:
@@ -237,12 +239,15 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 				case PORT_UPDATE:
 					DeviceUpdatePort(boardWithAction.boardID, boardWithAction.board, c)
 				case ADD:
-					Device(boardWithAction.boardID, boardWithAction.board, true, c)
+					SendDevice(boardWithAction.boardID, boardWithAction.board, true, c)
 				case DELETE:
 					DeviceUpdateDelete(boardWithAction.boardID, c)
 				default:
 					printLog("Warning! Unknown action with board!", boardWithAction.action)
 				}
+			}
+			if dev != nil {
+				dev.Mu.Unlock()
 			}
 		} else {
 			break

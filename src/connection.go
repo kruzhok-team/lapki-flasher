@@ -21,7 +21,7 @@ type WebSocketConnection struct {
 	wsc        *websocket.Conn
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
-	FlashingBoard *BoardFlashAndSerial
+	FlashingBoard *Device
 	// сообщение от avrdude
 	avrMsg          string
 	outgoingMsg     chan OutgoingEventMessage
