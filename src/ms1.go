@@ -52,6 +52,7 @@ func (board *MS1) Flash(filePath string, logger chan int) (string, error) {
 			for log := range devLogger {
 				logger <- int(log)
 			}
+			close(logger)
 		}()
 	}
 	packs, err := device.WriteFirmware(filePath, board.verify)
