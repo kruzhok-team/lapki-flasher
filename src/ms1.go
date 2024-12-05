@@ -32,7 +32,7 @@ func (board *MS1) IsConnected() bool {
 	return board.portNames[0] != NOT_FOUND
 }
 
-func (board *MS1) Flash(filePath string) (string, error) {
+func (board *MS1) Flash(filePath string, logger chan int) (string, error) {
 	port, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return err.Error(), err
@@ -45,6 +45,14 @@ func (board *MS1) Flash(filePath string) (string, error) {
 		if err != nil {
 			return "Не удалось использовать адрес устройства. " + err.Error(), err
 		}
+	}
+	if logger != nil {
+		devLogger := device.ActivateLog()
+		go func() {
+			for log := range devLogger {
+				logger <- int(log)
+			}
+		}()
 	}
 	packs, err := device.WriteFirmware(filePath, board.verify)
 	if err != nil {

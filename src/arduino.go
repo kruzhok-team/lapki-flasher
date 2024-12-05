@@ -51,7 +51,7 @@ func (board *Arduino) hasBootloader() bool {
 	return board.bootloaderID != -1
 }
 
-func (board *Arduino) flashBootloader(filePath string) (string, error) {
+func (board *Arduino) flashBootloader(filePath string, logger chan int) (string, error) {
 	flasherSync.Lock()
 	defer flasherSync.Unlock()
 	if e := rebootPort(board.portName); e != nil {
@@ -81,15 +81,15 @@ func (board *Arduino) flashBootloader(filePath string) (string, error) {
 			}
 		}
 		if found {
-			return bootloaderDevice.Board.Flash(filePath)
+			return bootloaderDevice.Board.Flash(filePath, logger)
 		}
 	}
 	return "Не удалось найти Bootloader.", errors.New("bootloader: not found")
 }
 
-func (board *Arduino) Flash(filePath string) (string, error) {
+func (board *Arduino) Flash(filePath string, logger chan int) (string, error) {
 	if board.hasBootloader() {
-		return board.flashBootloader(filePath)
+		return board.flashBootloader(filePath, logger)
 	}
 	flashFile := "flash:w:" + getAbolutePath(filePath) + ":a"
 	// без опции "-D" не может прошить Arduino Mega

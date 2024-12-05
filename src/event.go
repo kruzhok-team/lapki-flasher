@@ -313,7 +313,13 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath())
+		logger := make(chan int)
+		go func() {
+			for log := range logger {
+				printLog("test log", log)
+			}
+		}()
+		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg
 		if err != nil {
 			c.StopFlashing()

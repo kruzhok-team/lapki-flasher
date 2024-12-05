@@ -19,7 +19,7 @@ func (board *FakeMS) IsConnected() bool {
 	return board.portNames[0] != NOT_FOUND
 }
 
-func (board *FakeMS) Flash(filePath string) (string, error) {
+func (board *FakeMS) Flash(filePath string, logger chan int) (string, error) {
 	if board.fakeAddress != board.clientAddress {
 		return "Address doesn't match", nil
 	}
