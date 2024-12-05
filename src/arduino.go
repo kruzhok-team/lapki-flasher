@@ -51,7 +51,7 @@ func (board *Arduino) hasBootloader() bool {
 	return board.bootloaderID != -1
 }
 
-func (board *Arduino) flashBootloader(filePath string, logger chan int) (string, error) {
+func (board *Arduino) flashBootloader(filePath string, logger chan string) (string, error) {
 	flasherSync.Lock()
 	defer flasherSync.Unlock()
 	if e := rebootPort(board.portName); e != nil {
@@ -87,7 +87,7 @@ func (board *Arduino) flashBootloader(filePath string, logger chan int) (string,
 	return "Не удалось найти Bootloader.", errors.New("bootloader: not found")
 }
 
-func (board *Arduino) Flash(filePath string, logger chan int) (string, error) {
+func (board *Arduino) Flash(filePath string, logger chan string) (string, error) {
 	if board.hasBootloader() {
 		return board.flashBootloader(filePath, logger)
 	}

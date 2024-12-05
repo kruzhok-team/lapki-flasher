@@ -136,7 +136,7 @@ const (
 	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
 	FlashBinaryBlockMsg = "flash-block"
 	// обратная связть от программы загрузки прошивки
-	FlashBackTrack = "flash-back-track"
+	FlashBackTrack = "flash-backtrack"
 	// устройство удалено из списка
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
@@ -320,7 +320,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		logger := make(chan int)
+		logger := make(chan string)
 		go func() {
 			for log := range logger {
 				c.sendOutgoingEventMessage(FlashBackTrack, log, false)

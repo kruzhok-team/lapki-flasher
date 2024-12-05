@@ -46,7 +46,7 @@ func (board BoardType) hasBootloader() bool {
 type Board interface {
 	IsConnected() bool
 	GetSerialPort() string
-	Flash(filePath string, logger chan int) (string, error)
+	Flash(filePath string, logger chan string) (string, error)
 	Update() bool
 	GetWebMessageType() string
 	GetWebMessage(name string, deviceID string) any

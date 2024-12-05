@@ -14,6 +14,17 @@ type MS1 struct {
 	ms1OS     MS1OS // структура с данными для поиска устройства на определённой ОС
 }
 
+var ms1backtrackStatus = map[ms1.UploadStage]string{
+	ms1.PING:                "PING",
+	ms1.PREPARE_FIRMWARE:    "PREPARE_FIRMWARE",
+	ms1.CHANGE_MODE_TO_PROG: "CHANGE_MODE_TO_PROG",
+	ms1.CHANGE_MODE_TO_RUN:  "CHANGE_MODE_TO_RUN",
+	ms1.ERASE_OLD_FIRMWARE:  "ERASE_OLD_FIRMWARE",
+	ms1.PUSH_FIRMWARE:       "PUSH_FIRMWARE",
+	ms1.PULL_FIRMWARE:       "PULL_FIRMWARE",
+	ms1.VERIFY_FIRMWARE:     "VERIFY_FIRMWARE",
+}
+
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
 	ms1 := MS1{
 		portNames: portNames,
@@ -32,7 +43,7 @@ func (board *MS1) IsConnected() bool {
 	return board.portNames[0] != NOT_FOUND
 }
 
-func (board *MS1) Flash(filePath string, logger chan int) (string, error) {
+func (board *MS1) Flash(filePath string, logger chan string) (string, error) {
 	port, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return err.Error(), err
@@ -50,7 +61,7 @@ func (board *MS1) Flash(filePath string, logger chan int) (string, error) {
 		devLogger := device.ActivateLog()
 		go func() {
 			for log := range devLogger {
-				logger <- int(log)
+				logger <- ms1backtrackStatus[log]
 			}
 			close(logger)
 		}()
