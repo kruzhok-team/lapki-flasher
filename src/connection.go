@@ -21,7 +21,8 @@ type WebSocketConnection struct {
 	wsc        *websocket.Conn
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
-	FlashingBoard *Device
+	FlashingBoard   *Device
+	FlashingBoardID string
 	// сообщение от avrdude
 	avrMsg          string
 	outgoingMsg     chan OutgoingEventMessage
@@ -119,6 +120,7 @@ func (c *WebSocketConnection) StopFlashing() {
 	if c.FlashingBoard != nil {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
+		c.FlashingBoardID = ""
 		c.FileWriter.Clear()
 	}
 }

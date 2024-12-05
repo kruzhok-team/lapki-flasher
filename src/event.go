@@ -82,6 +82,11 @@ type DeviceCommentCodeMessage struct {
 	Comment string `json:"comment"`
 }
 
+type DeviceCodeMessage struct {
+	ID   string `json:"deviceID"`
+	Code int    `json:"code"`
+}
+
 // тип данных для serial-device-read и serial-send
 type SerialMessage struct {
 	ID  string `json:"deviceID"`
@@ -130,6 +135,8 @@ const (
 	FlashNextBlockMsg = "flash-next-block"
 	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
 	FlashBinaryBlockMsg = "flash-block"
+	// обратная связть от программы загрузки прошивки
+	FlashBackTrack = "flash-back-track"
 	// устройство удалено из списка
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
@@ -295,6 +302,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = dev
+	c.FlashingBoardID = deviceID
 	c.FlashingBoard.SetLock(true)
 	c.FileWriter.Start(fileSize, ext)
 
@@ -316,8 +324,9 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		logger := make(chan int)
 		go func() {
 			for log := range logger {
-				printLog("test log", log)
+				c.sendOutgoingEventMessage(FlashBackTrack, DeviceCodeMessage{ID: c.FlashingBoardID, Code: log}, false)
 			}
+			printLog("firmware logging is over")
 		}()
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg
