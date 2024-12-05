@@ -302,7 +302,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = dev
-	c.FlashingBoardID = deviceID
 	c.FlashingBoard.SetLock(true)
 	c.FileWriter.Start(fileSize, ext)
 
@@ -324,7 +323,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		logger := make(chan int)
 		go func() {
 			for log := range logger {
-				c.sendOutgoingEventMessage(FlashBackTrack, DeviceCodeMessage{ID: c.FlashingBoardID, Code: log}, false)
+				c.sendOutgoingEventMessage(FlashBackTrack, log, false)
 			}
 			printLog("firmware logging is over")
 		}()
