@@ -22,7 +22,7 @@ func (board *FakeBoard) GetSerialPort() string {
 	return board.portName
 }
 
-func (board *FakeBoard) Flash(filePath string) (string, error) {
+func (board *FakeBoard) Flash(filePath string, logger chan string) (string, error) {
 	time.Sleep(3 * time.Second)
 	printLog(fmt.Sprintf("Fake uploading of file %s in board %v is completed", filePath, board))
 	fakeMessage := "Fake flashing is completed"
