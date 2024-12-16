@@ -36,6 +36,10 @@ github.com/polyus-nt/ms1-go v0.0.0-20241122070838-c13aa2a01449 h1:PGyLCvNrxjVFnU
 github.com/polyus-nt/ms1-go v0.0.0-20241122070838-c13aa2a01449/go.mod h1:i5iZF5nbIPqa0F3REMbOYfWeTM8nJupUtNBgWJzm6/I=
 github.com/polyus-nt/ms1-go v0.0.0-20241204061541-59a035ab2f43 h1:pw8xNiD4ZlImxFwD3ZCHRsY386f48Zw3dKtA3qRRScc=
 github.com/polyus-nt/ms1-go v0.0.0-20241204061541-59a035ab2f43/go.mod h1:i5iZF5nbIPqa0F3REMbOYfWeTM8nJupUtNBgWJzm6/I=
+github.com/polyus-nt/ms1-go v0.0.0-20241209100614-1f38bf5131da h1:vFVWjcfGpLgZASQD1yKryNmHh5/D9TVNuFgvUxLVzmo=
+github.com/polyus-nt/ms1-go v0.0.0-20241209100614-1f38bf5131da/go.mod h1:i5iZF5nbIPqa0F3REMbOYfWeTM8nJupUtNBgWJzm6/I=
+github.com/polyus-nt/ms1-go v0.0.0-20241210035514-09281b2d1dda h1:yTEPsUOzGHRgEkmFA+SBcuOLTH0sfBiv9sz8ap22W+U=
+github.com/polyus-nt/ms1-go v0.0.0-20241210035514-09281b2d1dda/go.mod h1:i5iZF5nbIPqa0F3REMbOYfWeTM8nJupUtNBgWJzm6/I=
 github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f h1:1R9KdKjCNSd7F8iGTxIpoID9prlYH8nuNYKt0XvweHA=
 github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f/go.mod h1:vQhwQ4meQEDfahT5kd61wLAF5AAeh5ZPLVI4JJ/tYo8=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
