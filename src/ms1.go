@@ -65,7 +65,7 @@ func (board *MS1) Flash(filePath string, logger chan any) (string, error) {
 					UploadStage: ms1backtrackStatus[log.UploadStage],
 					NoPacks:     log.NoPacks,
 					CurPack:     log.CurPack,
-					TotalPacks:  log.CurPack,
+					TotalPacks:  log.TotalPacks,
 				}
 			}
 			close(logger)
