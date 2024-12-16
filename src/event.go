@@ -320,7 +320,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		logger := make(chan string)
+		logger := make(chan any)
 		go func() {
 			for log := range logger {
 				c.sendOutgoingEventMessage(FlashBackTrack, log, false)
