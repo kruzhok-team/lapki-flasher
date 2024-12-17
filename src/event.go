@@ -318,6 +318,19 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	return nil
 }
 
+func LogSend(client *WebSocketConnection, logger chan any) {
+	if client.FlashingBoard == nil || logger == nil {
+		return
+	}
+	switch client.FlashingBoard.Board.(type) {
+	case *MS1:
+		for log := range logger {
+			client.sendOutgoingEventMessage(FlashBackTrackMs, log, false)
+		}
+		printLog("firmware logging is over")
+	}
+}
+
 // принятие блока с бинарными данными файла
 func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	if !c.IsFlashing() {
@@ -330,15 +343,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	}
 	if fileCreated {
 		logger := make(chan any)
-		go func() {
-			switch c.FlashingBoard.Board.(type) {
-			case *MS1:
-				for log := range logger {
-					c.sendOutgoingEventMessage(FlashBackTrackMs, log, false)
-				}
-				printLog("firmware logging is over")
-			}
-		}()
+		go LogSend(c, logger)
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg
 		if err != nil {
