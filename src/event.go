@@ -119,6 +119,15 @@ type MSMetaDataMessage struct {
 	MSType        string `json:"type"`          // тип устройства (определяется по RefBlHw)
 }
 
+type FlashBacktrackMsMessage struct {
+	UploadStage string `json:"UploadStage"`
+
+	NoPacks bool `json:"NoPacks"`
+
+	CurPack    uint16 `json:"CurPack"`
+	TotalPacks uint16 `json:"TotalPacks"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -135,8 +144,8 @@ const (
 	FlashNextBlockMsg = "flash-next-block"
 	// сообщение, для отметки бинарных данных загружаемого файла прошивки, прикрепляется сервером к сообщению после получения данных бинарного типа
 	FlashBinaryBlockMsg = "flash-block"
-	// обратная связть от программы загрузки прошивки
-	FlashBackTrack = "flash-backtrack"
+	// обратная связь от программы загрузки прошивки МС-ТЮК
+	FlashBackTrackMs = "flash-backtrack-ms"
 	// устройство удалено из списка
 	DeviceUpdateDeleteMsg = "device-update-delete"
 	// устройство поменяло порт
@@ -320,12 +329,15 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	if fileCreated {
-		logger := make(chan string)
+		logger := make(chan any)
 		go func() {
-			for log := range logger {
-				c.sendOutgoingEventMessage(FlashBackTrack, log, false)
+			switch c.FlashingBoard.Board.(type) {
+			case *MS1:
+				for log := range logger {
+					c.sendOutgoingEventMessage(FlashBackTrackMs, log, false)
+				}
+				printLog("firmware logging is over")
 			}
-			printLog("firmware logging is over")
 		}()
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg

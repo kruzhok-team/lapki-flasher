@@ -43,7 +43,7 @@ func (board *MS1) IsConnected() bool {
 	return board.portNames[0] != NOT_FOUND
 }
 
-func (board *MS1) Flash(filePath string, logger chan string) (string, error) {
+func (board *MS1) Flash(filePath string, logger chan any) (string, error) {
 	port, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return err.Error(), err
@@ -61,7 +61,12 @@ func (board *MS1) Flash(filePath string, logger chan string) (string, error) {
 		devLogger := device.ActivateLog()
 		go func() {
 			for log := range devLogger {
-				logger <- ms1backtrackStatus[log]
+				logger <- FlashBacktrackMsMessage{
+					UploadStage: ms1backtrackStatus[log.UploadStage],
+					NoPacks:     log.NoPacks,
+					CurPack:     log.CurPack,
+					TotalPacks:  log.TotalPacks,
+				}
 			}
 			close(logger)
 		}()
