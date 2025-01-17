@@ -19,7 +19,7 @@ type SerialMonitor struct {
 	// открыт ли монитор порта
 	Open bool
 	// канал для передачи на устройство
-	Write chan string
+	Write chan []byte
 }
 
 func (serialMonitor *SerialMonitor) set(serialPort *serial.Port, serialClient *WebSocketConnection, baud int) {
@@ -28,7 +28,7 @@ func (serialMonitor *SerialMonitor) set(serialPort *serial.Port, serialClient *W
 	serialMonitor.ChangeBaud = make(chan int)
 	serialMonitor.Baud = baud
 	serialMonitor.Open = true
-	serialMonitor.Write = make(chan string)
+	serialMonitor.Write = make(chan []byte)
 }
 
 func (serialMonitor *SerialMonitor) isOpen() bool {
@@ -114,7 +114,7 @@ func handleSerial(board *Device, deviceID string) {
 				Comment: strconv.Itoa(baud),
 			}, board.SerialMonitor.Client)
 		case writeMsg := <-board.SerialMonitor.Write:
-			_, err := board.SerialMonitor.Port.Write([]byte(writeMsg))
+			_, err := board.SerialMonitor.Port.Write(writeMsg)
 			if err != nil {
 				SerialSentStatus(DeviceCommentCodeMessage{
 					ID:      deviceID,
@@ -155,7 +155,7 @@ func handleSerial(board *Device, deviceID string) {
 				SerialDeviceReadMsg,
 				SerialMessage{
 					ID:  deviceID,
-					Msg: string(buf[:bytes]),
+					Msg: buf[:bytes],
 				},
 				false,
 			)

@@ -90,7 +90,7 @@ type DeviceCodeMessage struct {
 // тип данных для serial-device-read и serial-send
 type SerialMessage struct {
 	ID  string `json:"deviceID"`
-	Msg string `json:"msg"`
+	Msg []byte `json:"msg"`
 }
 
 type MSAddressMessage struct {
