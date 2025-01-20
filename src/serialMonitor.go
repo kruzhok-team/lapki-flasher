@@ -1,6 +1,7 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"strconv"
 	"time"
 
@@ -155,7 +156,7 @@ func handleSerial(board *Device, deviceID string) {
 				SerialDeviceReadMsg,
 				SerialMessage{
 					ID:  deviceID,
-					Msg: buf[:bytes],
+					Msg: b64.StdEncoding.EncodeToString(buf[:bytes]),
 				},
 				false,
 			)

@@ -2,6 +2,7 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"log"
 	"strings"
@@ -90,7 +91,7 @@ type DeviceCodeMessage struct {
 // тип данных для serial-device-read и serial-send
 type SerialMessage struct {
 	ID  string `json:"deviceID"`
-	Msg []byte `json:"msg"`
+	Msg string `json:"msg"`
 }
 
 type MSAddressMessage struct {
@@ -554,8 +555,17 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			Code: 5,
 		}, c)
 	}
+	decoded, err := b64.RawStdEncoding.DecodeString(msg.Msg)
+	if err != nil {
+		SerialSentStatus(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    1,
+			Comment: err.Error(),
+		}, c)
+		return nil
+	}
 	// см. handleSerial в serialMonitor.go
-	dev.SerialMonitor.Write <- msg.Msg
+	dev.SerialMonitor.Write <- decoded
 	return nil
 }
 
