@@ -555,7 +555,7 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			Code: 5,
 		}, c)
 	}
-	decoded, err := b64.RawStdEncoding.DecodeString(msg.Msg)
+	decoded, err := b64.StdEncoding.DecodeString(msg.Msg)
 	if err != nil {
 		SerialSentStatus(DeviceCommentCodeMessage{
 			ID:      msg.ID,
