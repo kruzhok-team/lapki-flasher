@@ -118,6 +118,9 @@ func (board *MS1) ping() error {
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	err = deviceMS.SetAddress(board.address)
+	if err != nil {
+		return err
+	}
 	_, err = deviceMS.Ping()
 	if err != nil {
 		return err
