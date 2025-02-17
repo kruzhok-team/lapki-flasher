@@ -141,7 +141,7 @@ func (board *MS1) getAddress() (string, error) {
 		return "", err
 	}
 	if !updated {
-		return "", errors.New("Не удалось обновить устройство.")
+		return "", errors.New("не удалось обновить устройство")
 	}
 	return deviceMS.GetAddress(), nil
 }
