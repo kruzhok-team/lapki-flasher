@@ -106,6 +106,17 @@ type DeviceIdMessage struct {
 	ID string `json:"deviceID"`
 }
 
+type MetaSubMessage struct {
+	RefBlHw       string `json:"RefBlHw"`       // Описывает физическое окружение контроллера (плату)
+	RefBlFw       string `json:"RefBlFw"`       // Указывает на версию прошивки загрузчика
+	RefBlUserCode string `json:"RefBlUserCode"` //
+	RefBlChip     string `json:"RefBlChip"`     // Указывает на контроллер, здесь то, что нужно для компиляции прошивки
+	RefBlProtocol string `json:"RefBlProtocol"` // Описывает возможности протокола загрузчика
+	RefCgHw       string `json:"RefCgHw"`       // Указывает на аппаратное исполнение
+	RefCgFw       string `json:"RefCgFw"`       // Указывает на версию прошивки кибергена
+	RefCgProtocol string `json:"RefCgProtocol"` // Указывает на возможности протокола кибергена
+}
+
 type MSMetaDataMessage struct {
 	ID            string `json:"deviceID"`
 	RefBlHw       string `json:"RefBlHw"`       // Описывает физическое окружение контроллера (плату)
@@ -126,6 +137,15 @@ type FlashBacktrackMsMessage struct {
 
 	CurPack    uint16 `json:"CurPack"`
 	TotalPacks uint16 `json:"TotalPacks"`
+}
+
+type MSAddressAndMetaMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	MSType    string         `json:"type"` // тип устройства (определяется по RefBlHw)
+	ErrorMsg  string         `json:"errorMsg"`
+	ErrorCode int            `json:"errorCode"`
+	Meta      MetaSubMessage `json:"Meta"`
 }
 
 // типы сообщений (событий)
@@ -188,6 +208,10 @@ const (
 	MSMetaDataMsg = "ms-meta-data"
 	// сообщение в случае, если не удалось извлечь метаданные по запросу клиента
 	MSMetaDataErrorMsg = "ms-meta-data-error"
+	// Получение адреса и метаданных платы
+	MSGetAddressAndMetaMsg = "ms-get-address-and-meta"
+	// Результат выполнения команды ms-get-address-and-meta
+	MSAddressAndMetaMsg = "ms-address-and-meta"
 )
 
 // отправить клиенту список всех устройств
@@ -813,3 +837,55 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 	}, false)
 	return nil
 }
+
+// func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
+// 	var msg MSGetAddressMessage
+// 	err := json.Unmarshal(event.Payload, &msg)
+// 	if err != nil {
+// 		MSMetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
+// 		return err
+// 	}
+// 	dev, exists := detector.GetBoardSync(msg.ID)
+// 	if !exists {
+// 		DeviceUpdateDelete(msg.ID, c)
+// 		MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
+// 		return nil
+// 	}
+// 	dev.Mu.Lock()
+// 	defer dev.Mu.Unlock()
+// 	board, isMS1 := dev.Board.(*MS1)
+// 	if !isMS1 {
+// 		MSMetaDataError(msg.ID, META_WRONG_DEVICE, "", c)
+// 		return nil
+// 	}
+// 	updated := board.Update()
+// 	if updated {
+// 		if board.IsConnected() {
+// 			// TODO
+// 		} else {
+// 			detector.DeleteBoard(msg.ID)
+// 			DeviceUpdateDelete(msg.ID, c)
+// 			MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
+// 			return nil
+// 		}
+// 	}
+// 	board.address = msg.Address
+// 	meta, err := board.getMetaData()
+// 	if err != nil {
+// 		MSMetaDataError(msg.ID, META_ERROR, err.Error(), c)
+// 		return err
+// 	}
+// 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
+// 		ID:            msg.ID,
+// 		RefBlHw:       meta.RefBlHw,
+// 		RefBlFw:       meta.RefBlFw,
+// 		RefBlUserCode: meta.RefBlUserCode,
+// 		RefBlChip:     meta.RefBlChip,
+// 		RefBlProtocol: meta.RefBlProtocol,
+// 		RefCgHw:       meta.RefCgHw,
+// 		RefCgFw:       meta.RefCgFw,
+// 		RefCgProtocol: meta.RefCgProtocol,
+// 		MSType:        getMSType(meta.RefBlHw),
+// 	}, false)
+// 	return nil
+// }
