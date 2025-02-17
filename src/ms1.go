@@ -178,7 +178,7 @@ func getMSType(RefBlHw string) string {
 	case "da047a039c8acff1":
 		return "tjc-ms1-btn-a2"
 	case "58e2581437a30762":
-		return "tjc-ms1-btn-a3"
+		return "tjc-ms1-btn-a2"
 	case "c4ef6036603a600f":
 		return "tjc-ms1-lmp-a2"
 	case "274b36772c9ea32a":
