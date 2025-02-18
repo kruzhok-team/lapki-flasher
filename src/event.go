@@ -145,7 +145,7 @@ type MSAddressAndMetaMessage struct {
 	MSType    string         `json:"type"` // тип устройства (определяется по RefBlHw)
 	ErrorMsg  string         `json:"errorMsg"`
 	ErrorCode int            `json:"errorCode"`
-	Meta      MetaSubMessage `json:"Meta"`
+	Meta      MetaSubMessage `json:"meta"`
 }
 
 // типы сообщений (событий)
