@@ -775,18 +775,17 @@ func MSResetSend(deviceID string, code int, comment string, client *WebSocketCon
 	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
 }
 
-const (
-	META_ERROR        = 1
-	META_NO_DEVICE    = 2
-	META_WRONG_DEVICE = 3
-	META_JSON_ERROR   = 4
-)
-
 func MSMetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
 	DeviceCommentCode(MSMetaDataErrorMsg, deviceID, code, comment, client)
 }
 
 func MSGetMetaData(event Event, c *WebSocketConnection) error {
+	const (
+		META_ERROR        = 1
+		META_NO_DEVICE    = 2
+		META_WRONG_DEVICE = 3
+		META_JSON_ERROR   = 4
+	)
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
@@ -838,54 +837,103 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 	return nil
 }
 
-// func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
-// 	var msg MSGetAddressMessage
-// 	err := json.Unmarshal(event.Payload, &msg)
-// 	if err != nil {
-// 		MSMetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
-// 		return err
-// 	}
-// 	dev, exists := detector.GetBoardSync(msg.ID)
-// 	if !exists {
-// 		DeviceUpdateDelete(msg.ID, c)
-// 		MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
-// 		return nil
-// 	}
-// 	dev.Mu.Lock()
-// 	defer dev.Mu.Unlock()
-// 	board, isMS1 := dev.Board.(*MS1)
-// 	if !isMS1 {
-// 		MSMetaDataError(msg.ID, META_WRONG_DEVICE, "", c)
-// 		return nil
-// 	}
-// 	updated := board.Update()
-// 	if updated {
-// 		if board.IsConnected() {
-// 			// TODO
-// 		} else {
-// 			detector.DeleteBoard(msg.ID)
-// 			DeviceUpdateDelete(msg.ID, c)
-// 			MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
-// 			return nil
-// 		}
-// 	}
-// 	board.address = msg.Address
-// 	meta, err := board.getMetaData()
-// 	if err != nil {
-// 		MSMetaDataError(msg.ID, META_ERROR, err.Error(), c)
-// 		return err
-// 	}
-// 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
-// 		ID:            msg.ID,
-// 		RefBlHw:       meta.RefBlHw,
-// 		RefBlFw:       meta.RefBlFw,
-// 		RefBlUserCode: meta.RefBlUserCode,
-// 		RefBlChip:     meta.RefBlChip,
-// 		RefBlProtocol: meta.RefBlProtocol,
-// 		RefCgHw:       meta.RefCgHw,
-// 		RefCgFw:       meta.RefCgFw,
-// 		RefCgProtocol: meta.RefCgProtocol,
-// 		MSType:        getMSType(meta.RefBlHw),
-// 	}, false)
-// 	return nil
-// }
+func MSAddressAndMeta(msg MSAddressAndMetaMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(MSAddressAndMetaMsg, msg, false)
+}
+
+func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
+	const (
+		NO_ERROR  = 0
+		NO_ADDR   = 1
+		NO_META   = 2
+		NO_DEV    = 3
+		WRONG_DEV = 4
+	)
+	var msg MSGetAddressMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  err.Error(),
+			ErrorCode: NO_ADDR,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  "",
+			ErrorCode: NO_DEV,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  "",
+			ErrorCode: WRONG_DEV,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if !board.IsConnected() {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  "",
+				ErrorCode: NO_DEV,
+				MSType:    "",
+				Address:   "",
+				Meta:      MetaSubMessage{},
+			}, c)
+		}
+	}
+	addr, meta, err := board.getAddressAndMeta()
+	if err != nil {
+		if addr == "" {
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  err.Error(),
+				ErrorCode: NO_ADDR,
+				MSType:    "",
+				Address:   "",
+				Meta:      MetaSubMessage{},
+			}, c)
+		} else {
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  err.Error(),
+				ErrorCode: NO_META,
+				MSType:    "",
+				Address:   addr,
+				Meta:      MetaSubMessage{},
+			}, c)
+		}
+		return err
+	}
+	MSAddressAndMeta(MSAddressAndMetaMessage{
+		ID:        msg.ID,
+		ErrorMsg:  "",
+		ErrorCode: NO_ERROR,
+		MSType:    getMSType(meta.RefBlHw),
+		Address:   addr,
+		Meta:      metaToJSON(meta),
+	}, c)
+	return nil
+}

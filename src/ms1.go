@@ -189,3 +189,45 @@ func getMSType(RefBlHw string) string {
 	}
 	return ""
 }
+
+func metaToJSON(meta *ms1.Meta) MetaSubMessage {
+	return MetaSubMessage{
+		RefBlHw:       meta.RefBlHw,
+		RefBlFw:       meta.RefBlFw,
+		RefBlUserCode: meta.RefBlUserCode,
+		RefBlChip:     meta.RefBlChip,
+		RefBlProtocol: meta.RefBlProtocol,
+		RefCgHw:       meta.RefCgHw,
+		RefCgFw:       meta.RefCgFw,
+		RefCgProtocol: meta.RefCgProtocol,
+	}
+}
+
+/*
+Получение адреса и затем метаданных.
+Если адрес не удалось получить, то вернётся пустая строка,  nil и ошибкой.
+Если метаданные не удалось получить то вернётся адрес, nil и ошибка.
+*/
+func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return "", nil, err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	// получение адреса
+	_, err, updated := deviceMS.GetId(true, true)
+	if err != nil {
+		return "", nil, err
+	}
+	if !updated {
+		return "", nil, errors.New("не удалось обновить устройство")
+	}
+	// получение метаданных
+	meta, err := deviceMS.GetMeta()
+	if err != nil {
+		return deviceMS.GetAddress(), &meta, err
+	}
+	deviceMS.GetAddress()
+	return deviceMS.GetAddress(), &meta, nil
+}
