@@ -146,10 +146,10 @@ func (board *MS1) getAddress() (string, error) {
 	return deviceMS.GetAddress(), nil
 }
 
-func (board *MS1) getMetaData() (ms1.Meta, error) {
+func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
-		return ms1.Meta{}, err
+		return nil, err
 	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
@@ -157,10 +157,10 @@ func (board *MS1) getMetaData() (ms1.Meta, error) {
 	meta, err := deviceMS.GetMeta()
 	if err != nil {
 		printLog("meta data:", meta, " error:", err.Error())
-		return meta, err
+		return &meta, err
 	}
 	printLog("meta data:", meta)
-	return meta, nil
+	return &meta, nil
 }
 
 /*

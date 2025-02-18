@@ -118,16 +118,9 @@ type MetaSubMessage struct {
 }
 
 type MSMetaDataMessage struct {
-	ID            string `json:"deviceID"`
-	RefBlHw       string `json:"RefBlHw"`       // Описывает физическое окружение контроллера (плату)
-	RefBlFw       string `json:"RefBlFw"`       // Указывает на версию прошивки загрузчика
-	RefBlUserCode string `json:"RefBlUserCode"` //
-	RefBlChip     string `json:"RefBlChip"`     // Указывает на контроллер, здесь то, что нужно для компиляции прошивки
-	RefBlProtocol string `json:"RefBlProtocol"` // Описывает возможности протокола загрузчика
-	RefCgHw       string `json:"RefCgHw"`       // Указывает на аппаратное исполнение
-	RefCgFw       string `json:"RefCgFw"`       // Указывает на версию прошивки кибергена
-	RefCgProtocol string `json:"RefCgProtocol"` // Указывает на возможности протокола кибергена
-	MSType        string `json:"type"`          // тип устройства (определяется по RefBlHw)
+	ID     string         `json:"deviceID"`
+	Meta   MetaSubMessage `json:"meta"`
+	MSType string         `json:"type"` // тип устройства (определяется по RefBlHw)
 }
 
 type FlashBacktrackMsMessage struct {
@@ -823,16 +816,9 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
-		ID:            msg.ID,
-		RefBlHw:       meta.RefBlHw,
-		RefBlFw:       meta.RefBlFw,
-		RefBlUserCode: meta.RefBlUserCode,
-		RefBlChip:     meta.RefBlChip,
-		RefBlProtocol: meta.RefBlProtocol,
-		RefCgHw:       meta.RefCgHw,
-		RefCgFw:       meta.RefCgFw,
-		RefCgProtocol: meta.RefCgProtocol,
-		MSType:        getMSType(meta.RefBlHw),
+		ID:     msg.ID,
+		Meta:   metaToJSON(meta),
+		MSType: getMSType(meta.RefBlHw),
 	}, false)
 	return nil
 }
