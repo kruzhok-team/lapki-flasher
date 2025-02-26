@@ -118,6 +118,9 @@ func (board *MS1) ping() error {
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	err = deviceMS.SetAddress(board.address)
+	if err != nil {
+		return err
+	}
 	_, err = deviceMS.Ping()
 	if err != nil {
 		return err
@@ -138,15 +141,15 @@ func (board *MS1) getAddress() (string, error) {
 		return "", err
 	}
 	if !updated {
-		return "", errors.New("Не удалось обновить устройство.")
+		return "", errors.New("не удалось обновить устройство")
 	}
 	return deviceMS.GetAddress(), nil
 }
 
-func (board *MS1) getMetaData() (ms1.Meta, error) {
+func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
-		return ms1.Meta{}, err
+		return nil, err
 	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
@@ -154,10 +157,10 @@ func (board *MS1) getMetaData() (ms1.Meta, error) {
 	meta, err := deviceMS.GetMeta()
 	if err != nil {
 		printLog("meta data:", meta, " error:", err.Error())
-		return meta, err
+		return &meta, err
 	}
 	printLog("meta data:", meta)
-	return meta, nil
+	return &meta, nil
 }
 
 /*
@@ -178,11 +181,49 @@ func getMSType(RefBlHw string) string {
 	case "da047a039c8acff1":
 		return "tjc-ms1-btn-a2"
 	case "58e2581437a30762":
-		return "tjc-ms1-btn-a3"
+		return "tjc-ms1-btn-a2"
 	case "c4ef6036603a600f":
 		return "tjc-ms1-lmp-a2"
 	case "274b36772c9ea32a":
 		return "tjc-ms1-lmp-a4"
 	}
 	return ""
+}
+
+func metaToJSON(meta *ms1.Meta) MetaSubMessage {
+	return MetaSubMessage{
+		RefBlHw:       meta.RefBlHw,
+		RefBlFw:       meta.RefBlFw,
+		RefBlUserCode: meta.RefBlUserCode,
+		RefBlChip:     meta.RefBlChip,
+		RefBlProtocol: meta.RefBlProtocol,
+		RefCgHw:       meta.RefCgHw,
+		RefCgFw:       meta.RefCgFw,
+		RefCgProtocol: meta.RefCgProtocol,
+	}
+}
+
+/*
+Получение адреса и затем метаданных.
+Если адрес не удалось получить, то вернётся пустая строка,  nil и ошибкой.
+Если метаданные не удалось получить то вернётся адрес, nil и ошибка.
+*/
+func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return "", nil, err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	// получение адреса
+	_, err, updated := deviceMS.GetId(true, true)
+	if err != nil {
+		return "", nil, err
+	}
+	if !updated {
+		return "", nil, errors.New("не удалось обновить устройство")
+	}
+	// получение метаданных
+	meta, err := deviceMS.GetMeta()
+	return deviceMS.GetAddress(), &meta, err
 }
