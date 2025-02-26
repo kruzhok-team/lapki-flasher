@@ -34,3 +34,10 @@ jobs:
         name: linux-build
         path: |
           src/lapki-flasher
+
+    - name: Save windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: |
+          src/lapki-flasher.exe
