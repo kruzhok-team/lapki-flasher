@@ -25,7 +25,7 @@ jobs:
       run: sudo apt-get install libusb-1.0-0-dev
 
     - name: Build
-      run: go build -C src
+      run: go build -C src && GOOS=windows GOARCH=arm go build -C src
 
     
     - name: Save linux artifact
