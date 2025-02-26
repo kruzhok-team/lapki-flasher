@@ -225,9 +225,5 @@ func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
 	}
 	// получение метаданных
 	meta, err := deviceMS.GetMeta()
-	if err != nil {
-		return deviceMS.GetAddress(), &meta, err
-	}
-	deviceMS.GetAddress()
-	return deviceMS.GetAddress(), &meta, nil
+	return deviceMS.GetAddress(), &meta, err
 }
