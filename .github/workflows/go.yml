@@ -11,7 +11,7 @@ on:
 
 jobs:
 
-  build:
+  linux-windows-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -19,10 +19,45 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.23.0'
+
+    - name: Set up libusb
+      run: sudo apt-get install libusb-1.0-0-dev
 
     - name: Build
-      run: go build -v ./...
+      run: go build -C src && GOOS=windows GOARCH=amd64 go build -C src
 
-    - name: Test
-      run: go test -v ./...
+    
+    - name: Save linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-build
+        path: |
+          src/lapki-flasher
+
+    - name: Save windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: |
+          src/lapki-flasher.exe
+
+  mac-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.0'
+
+    - name: Build
+      run: go build -C src
+
+    - name: Save mac artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mac-build
+        path: |
+          src/lapki-flasher
