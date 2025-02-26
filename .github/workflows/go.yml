@@ -28,17 +28,9 @@ jobs:
       run: go build -C src
 
     
-    - name: Save deb artifact
+    - name: Save linux artifact
       uses: actions/upload-artifact@v4
       with:
-        name: deb-build
+        name: linux-build
         path: |
-          src/*.deb
-  
-
-    - name: Save snap artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: snap-build
-        path: |
-          src/*.snap
+          src/lapki-flasher
