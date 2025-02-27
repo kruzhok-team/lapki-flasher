@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -58,18 +59,7 @@ func (board *MS1) Flash(filePath string, logger chan any) (string, error) {
 		}
 	}
 	if logger != nil {
-		devLogger := device.ActivateLog()
-		go func() {
-			for log := range devLogger {
-				logger <- FlashBacktrackMsMessage{
-					UploadStage: ms1backtrackStatus[log.UploadStage],
-					NoPacks:     log.NoPacks,
-					CurPack:     log.CurPack,
-					TotalPacks:  log.TotalPacks,
-				}
-			}
-			close(logger)
-		}()
+		collectLogs(device, logger)
 	}
 	packs, err := device.WriteFirmware(filePath, board.verify)
 	if err != nil {
@@ -153,7 +143,10 @@ func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
-	deviceMS.SetAddress(board.address)
+	err = deviceMS.SetAddress(board.address)
+	if (err != nil) {
+		return nil, err
+	}
 	meta, err := deviceMS.GetMeta()
 	if err != nil {
 		printLog("meta data:", meta, " error:", err.Error())
@@ -226,4 +219,38 @@ func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
 	// получение метаданных
 	meta, err := deviceMS.GetMeta()
 	return deviceMS.GetAddress(), &meta, err
+}
+
+func (board *MS1) getFirmware(logger chan any) ([]byte, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return nil, err
+	}	
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	err = deviceMS.SetAddress(board.address)
+	if err != nil {
+		return nil, err
+	}
+	if logger != nil {
+		collectLogs(deviceMS, logger)
+	}
+	var b bytes.Buffer
+	err = deviceMS.GetFirmware(&b, 180)
+	return b.Bytes(), err
+}
+
+func collectLogs(deviceMS *ms1.Device, logger chan any){
+	devLogger := deviceMS.ActivateLog()
+	go func() {
+		for log := range devLogger {
+			logger <- FlashBacktrackMsMessage{
+				UploadStage: ms1backtrackStatus[log.UploadStage],
+				NoPacks:     log.NoPacks,
+				CurPack:     log.CurPack,
+				TotalPacks:  log.TotalPacks,
+			}
+		}
+		close(logger)
+	}()
 }
