@@ -157,11 +157,21 @@ func (m *WebSocketManager) writerHandler(c *WebSocketConnection) {
 			})
 		}
 		// отправить одному клиенту
-		err := c.wsc.WriteJSON(outgoing.event)
-		printLog("writer", outgoing.event.Type)
-		if err != nil {
-			log.Println("Writing JSON error:", err.Error())
-			return
+		if outgoing.event.Type == "" {
+			// отправка бинарных сообщений
+			err := c.wsc.WriteMessage(websocket.BinaryMessage, outgoing.event.Payload)
+			if err != nil {
+				log.Println("Writing binary error:", err.Error())
+				return
+			}
+		} else {
+			// отправка JSON сообщений
+			err := c.wsc.WriteJSON(outgoing.event)
+			printLog("writer", outgoing.event.Type)
+			if err != nil {
+				log.Println("Writing JSON error:", err.Error())
+				return
+			}
 		}
 	}
 }

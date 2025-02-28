@@ -148,6 +148,13 @@ type MSOperationReportMessage struct {
 	Code 	  int            `json:"code"`
 }
 
+type MSGetFirmwareMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	BlockSize int 			 `json:"blockSize"`
+}
+
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -940,13 +947,14 @@ func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
 }
 
 const (
-	GET_FIRMWARE_OK  = 0
+	GET_FIRMWARE_DONE  = 0
 	GET_FIRMWARE_NO_DEV   = 1
 	GET_FIRMWARE_WRONG_DEV = 2
 	GET_FIRMWARE_ERROR = 3
 	GET_FIRMWARE_CLIENT_BUSY = 4
 	GET_FIRMWARE_DEVICE_BUSY = 5
-	GET_FIRMWARE_TIMEOUT = 6
+	GET_FIRMWARE_INCORRECT_BLOCK_SIZE = 6
+	GET_FIRMWARE_TIMEOUT = 7
 )
 
 func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
@@ -955,7 +963,7 @@ func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
 
 // обработка запроса на выгрузку прошивки из устройства
 func GetFirmwareStart(event Event, c *WebSocketConnection) error {
-	var msg MSAddressMessage
+	var msg MSGetFirmwareMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
 		MSGetFirmwareFinish(
@@ -971,6 +979,15 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 				ID: msg.ID,
 				Address: msg.Address,
 				Code: GET_FIRMWARE_CLIENT_BUSY,
+			}, c)
+		return nil
+	}
+	if (msg.BlockSize < 1) {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
 			}, c)
 		return nil
 	}
@@ -1014,7 +1031,47 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	}
 	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
 	c.FlashingBoard = dev
+	c.FlashingDevId = msg.ID
+	c.FlashingAddress = msg.Address
 	c.FlashingBoard.SetLock(true)
+
+	board := dev.Board.(*MS1)
+	logger := make(chan any)
+	go LogSend(c, logger)
+	bytes, err := board.getFirmware(logger)
+	if err != nil {
+		close(logger)
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: msg.ID,
+			Address: msg.Address,
+			Comment: err.Error(),
+			Code: GET_FIRMWARE_ERROR,
+		}, c)
+		return err
+	}
+	c.Transmission.set(bytes, msg.BlockSize)
 	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
+	return nil
+}
+
+func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
+	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
+	if err != nil {
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: c.FlashingDevId,
+			Address: c.FlashingAddress,
+			Comment: err.Error(),
+			Code: GET_FIRMWARE_ERROR,
+		}, c)
+		return err
+	}
+	if (c.Transmission.isFinish()) {
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: c.FlashingDevId,
+			Address: c.FlashingAddress,
+			Code: GET_FIRMWARE_DONE,
+		}, c)
+		c.StopFlashing()
+	}
 	return nil
 }
