@@ -158,7 +158,7 @@ func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload a
 
 func (c *WebSocketConnection) sendBinaryMessage(bytes []byte, toAll bool) (err error) {
 	if c.isClosedChan() {
-		return errors.New("can't send message because the client is closed.")
+		return errors.New("can't send message because the client is closed")
 	}
 	outgoingMsg := OutgoingEventMessage{
 		event: &Event{
