@@ -1055,6 +1055,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 }
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
+	if c.Transmission.isFinish() {
+		return nil;
+	}
 	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
 	if err != nil {
 		MSGetFirmwareFinish(MSOperationReportMessage{
