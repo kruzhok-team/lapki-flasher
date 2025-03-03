@@ -1047,6 +1047,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			Comment: err.Error(),
 			Code: GET_FIRMWARE_ERROR,
 		}, c)
+		c.StopFlashing()
 		return err
 	}
 	c.Transmission.set(bytes, msg.BlockSize)
