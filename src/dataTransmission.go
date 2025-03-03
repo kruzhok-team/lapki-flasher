@@ -17,7 +17,8 @@ func newDataTransmission() *DataTransmission {
 func(transmission *DataTransmission) clear() {
 	transmission.blockSize = 0
 	transmission.bytes = []byte{}
-	transmission.blockSize = 0
+	transmission.curByte = 0
+	transmission.arraySize = 0
 }
 
 func (trasmission *DataTransmission) set(bytes []byte, blockSize int) {
@@ -29,7 +30,7 @@ func (trasmission *DataTransmission) set(bytes []byte, blockSize int) {
 
 func (transmission *DataTransmission) popBlock() []byte{
 	startIndex := transmission.curByte
-	endIndex := max(startIndex + transmission.blockSize, transmission.arraySize)
+	endIndex := min(startIndex + transmission.blockSize, transmission.arraySize)
 	transmission.curByte = endIndex
 	return transmission.bytes[startIndex:endIndex]
 }
