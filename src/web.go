@@ -61,6 +61,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSGetMetaDataMsg] = MSGetMetaData
 	m.handlers[MSGetAddressAndMetaMsg] = MSGetAddressAndMeta
 	m.handlers[MSGetFirmwareMsg] = GetFirmwareStart
+	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
 }
 
 // обработка нового соединения
