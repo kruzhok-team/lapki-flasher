@@ -47,9 +47,9 @@ func errorHandler(err error, c *WebSocketConnection) {
 	var payload any
 	switch err {
 	case ErrFlashWrongID, ErrFlashDisconnected, ErrFlashBlocked, ErrFlashLargeFile, ErrFlashLargeBlock, ErrFlashOpenSerialMonitor:
-		c.StopFlashing()
+		c.StopFlashingSync()
 	case ErrAvrdude:
-		c.StopFlashing()
+		c.StopFlashingSync()
 		payload = c.avrMsg
 		defer func() {
 			c.avrMsg = ""
