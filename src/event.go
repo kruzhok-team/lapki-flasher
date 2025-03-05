@@ -156,6 +156,21 @@ type MSGetFirmwareMessage struct {
 }
 
 
+type MSOperationReportMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	Comment   string         `json:"comment"`
+	Code 	  int            `json:"code"`
+}
+
+type MSGetFirmwareMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	BlockSize int 			 `json:"blockSize"`
+	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
+}
+
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -220,6 +235,14 @@ const (
 	MSGetAddressAndMetaMsg = "ms-get-address-and-meta"
 	// Результат выполнения команды ms-get-address-and-meta
 	MSAddressAndMetaMsg = "ms-address-and-meta"
+	// Запрос от клиента на выгрузку прошивки из платы МС-ТЮК
+	MSGetFirmwareMsg = "ms-get-firmware"
+	// Одобрение на запрос выгрузки прошивки
+	MSGetFirmwareApproveMsg = "ms-get-firmware-approve"
+	// Запрос от клиента на получение блока с бинарными данными
+	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block"
+	// Отчёт о завершении процесса выгрузки прошивки
+	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
 	// Запрос от клиента на выгрузку прошивки из платы МС-ТЮК
 	MSGetFirmwareMsg = "ms-get-firmware"
 	// Одобрение на запрос выгрузки прошивки

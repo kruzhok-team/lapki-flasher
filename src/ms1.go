@@ -25,6 +25,7 @@ var ms1backtrackStatus = map[ms1.UploadStage]string{
 	ms1.PULL_FIRMWARE:       "PULL_FIRMWARE",
 	ms1.VERIFY_FIRMWARE:     "VERIFY_FIRMWARE",
 	ms1.GET_FIRMWARE: 		 "GET_FIRMWARE",
+	ms1.GET_FIRMWARE: 		 "GET_FIRMWARE",
 }
 
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
@@ -60,6 +61,7 @@ func (board *MS1) Flash(filePath string, logger chan any) (string, error) {
 		}
 	}
 	if logger != nil {
+		collectLogs(device, logger)
 		collectLogs(device, logger)
 	}
 	packs, err := device.WriteFirmware(filePath, board.verify)
@@ -144,6 +146,10 @@ func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
+	err = deviceMS.SetAddress(board.address)
+	if (err != nil) {
+		return nil, err
+	}
 	err = deviceMS.SetAddress(board.address)
 	if (err != nil) {
 		return nil, err
