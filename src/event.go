@@ -2,6 +2,7 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"log"
 	"strings"
@@ -594,8 +595,17 @@ func SerialSend(event Event, c *WebSocketConnection) error {
 			Code: 5,
 		}, c)
 	}
+	decoded, err := b64.StdEncoding.DecodeString(msg.Msg)
+	if err != nil {
+		SerialSentStatus(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    1,
+			Comment: err.Error(),
+		}, c)
+		return nil
+	}
 	// см. handleSerial в serialMonitor.go
-	dev.SerialMonitor.Write <- msg.Msg
+	dev.SerialMonitor.Write <- decoded
 	return nil
 }
 
