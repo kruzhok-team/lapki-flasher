@@ -238,6 +238,7 @@ func (board *MS1) getFirmware(logger chan any, RefBlChip string) ([]byte, error)
 	}
 	frames := 0
 	if RefBlChip == "" {
+		// Присылать ли клиенту метаданные?
 		meta, err := deviceMS.GetMeta()
 		if err != nil {
 			printLog("getFirmware: no meta:", err.Error())
