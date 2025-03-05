@@ -1005,7 +1005,6 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
 	dev.Mu.Lock()
-	defer dev.Mu.Unlock()
 	updated := dev.Board.Update()
 	if updated {
 		if dev.Board.IsConnected() {
@@ -1040,6 +1039,8 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	logger := make(chan any)
 	go LogSend(c, logger)
 	bytes, err := board.getFirmware(logger, msg.RefBlChip)
+	// разблокировка платы!
+	dev.Mu.Unlock()
 	if err != nil {
 		close(logger)
 		MSGetFirmwareFinish(MSOperationReportMessage{
