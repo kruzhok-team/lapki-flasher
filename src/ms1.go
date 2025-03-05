@@ -222,7 +222,7 @@ func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
 	return deviceMS.GetAddress(), &meta, err
 }
 
-func (board *MS1) getFirmware(logger chan any) ([]byte, error) {
+func (board *MS1) getFirmware(logger chan any, RefBlChip string) ([]byte, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return nil, err
@@ -236,8 +236,23 @@ func (board *MS1) getFirmware(logger chan any) ([]byte, error) {
 	if logger != nil {
 		collectLogs(deviceMS, logger)
 	}
+	frames := 0
+	if RefBlChip == "" {
+		meta, err := deviceMS.GetMeta()
+		if err != nil {
+			printLog("getFirmware: no meta:", err.Error())
+		} else {
+			RefBlChip = meta.RefBlChip
+		}
+	}
+	frames = getFirmwareFrames(RefBlChip)
+	if frames == 0 {
+		printLog("getFirmware: no meta: can't identify RefBlChip, setting frames value as 400")
+		frames = 400
+	}
+	
 	var b bytes.Buffer
-	err = deviceMS.GetFirmware(&b, 180)
+	err = deviceMS.GetFirmware(&b, frames)
 	return b.Bytes(), err
 }
 
@@ -254,4 +269,32 @@ func collectLogs(deviceMS *ms1.Device, logger chan any){
 		}
 		close(logger)
 	}()
+}
+
+/*
+Функция возвращет максимальное количество фреймов, содержащих прошивку по параметру метаданных RefBlChip.
+Если не удаётся найти подходящее значение по RefBlChip, то возвращется 0.
+*/
+func getFirmwareFrames(RefBlChip string) int {
+	/*
+	# bootloader REF_CHIP
+
+	Указывает на контроллер, здесь то, что нужно для компиляции прошивки (вид контроллера, память, число страниц, первая страница).
+
+	- 0xb2cc4e728f9bf8f6: STM32G030F6, 8KB RAM, 0x7-я первая страница, всего 16 страниц, страницы по 2КБ.
+	- 0xb4272ba421624bbe: STM32G030K8/STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, но доступны только 17 (до 16U включительно), страницы по 2КБ.
+	- 0x387857a4b687c7f3: STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, страницы по 2КБ.
+	*/
+
+	// В одной странице 16 фреймов.
+	framesPerPage := 16
+	switch(RefBlChip) {
+	case "387857a4b687c7f3":
+		return (32-7)*framesPerPage
+	case "b4272ba421624bbe":
+		return (17-7)*framesPerPage
+	case "b2cc4e728f9bf8f6":
+		return (16-7)*framesPerPage
+	}
+	return 0
 }

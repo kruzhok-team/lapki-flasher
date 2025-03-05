@@ -152,6 +152,7 @@ type MSGetFirmwareMessage struct {
 	ID        string         `json:"deviceID"`
 	Address   string         `json:"address"`
 	BlockSize int 			 `json:"blockSize"`
+	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
 }
 
 
@@ -1038,7 +1039,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
-	bytes, err := board.getFirmware(logger)
+	bytes, err := board.getFirmware(logger, msg.RefBlChip)
 	if err != nil {
 		close(logger)
 		MSGetFirmwareFinish(MSOperationReportMessage{
