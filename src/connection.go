@@ -22,6 +22,9 @@ type WebSocketConnection struct {
 	FileWriter *FlashFileWriter
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *Device
+	FlashingDevId string
+	// Адрес МС-ТЮК, в который загружается/выгружается прошивка 
+	FlashingAddress string
 	// сообщение от avrdude
 	avrMsg          string
 	outgoingMsg     chan OutgoingEventMessage
@@ -34,18 +37,22 @@ type WebSocketConnection struct {
 	maxQueries int
 	// количество запросов, которые обрабатываются в данный момент
 	numQueries int
+	Transmission *DataTransmission
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
+	c.FlashingDevId = ""
+	c.FlashingAddress = ""
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.getListCooldown = getListCoolDown
 	c.maxQueries = maxQueries
 	c.numQueries = 0
+	c.Transmission = newDataTransmission()
 	return &c
 }
 
@@ -119,7 +126,10 @@ func (c *WebSocketConnection) StopFlashing() {
 	if c.FlashingBoard != nil {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
+		c.FlashingDevId = ""
+		c.FlashingAddress = ""
 		c.FileWriter.Clear()
+		c.Transmission.clear()
 	}
 }
 
@@ -142,6 +152,21 @@ func (c *WebSocketConnection) sendOutgoingEventMessage(msgType string, payload a
 	var outgoingMsg OutgoingEventMessage
 	outgoingMsg.event = &event
 	outgoingMsg.toAll = toAll
+	c.outgoingMsg <- outgoingMsg
+	return
+}
+
+func (c *WebSocketConnection) sendBinaryMessage(bytes []byte, toAll bool) (err error) {
+	if c.isClosedChan() {
+		return errors.New("can't send message because the client is closed")
+	}
+	outgoingMsg := OutgoingEventMessage{
+		event: &Event{
+			Type: "",
+			Payload: bytes,
+		},
+		toAll: toAll,
+	}
 	c.outgoingMsg <- outgoingMsg
 	return
 }
