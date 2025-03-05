@@ -222,14 +222,14 @@ func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
 	return deviceMS.GetAddress(), &meta, err
 }
 
-func (board *MS1) getFirmware(logger chan any, RefBlChip string) ([]byte, error) {
+func (board *MS1) getFirmware(address string, logger chan any, RefBlChip string) ([]byte, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return nil, err
 	}	
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
-	err = deviceMS.SetAddress(board.address)
+	err = deviceMS.SetAddress(address)
 	if err != nil {
 		return nil, err
 	}
