@@ -1038,7 +1038,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
-	bytes, err := board.getFirmware(logger, msg.RefBlChip)
+	bytes, err := board.getFirmware(msg.Address, logger, msg.RefBlChip)
 	// разблокировка платы!
 	dev.Mu.Unlock()
 	if err != nil {
