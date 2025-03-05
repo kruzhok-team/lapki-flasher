@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -23,6 +24,7 @@ var ms1backtrackStatus = map[ms1.UploadStage]string{
 	ms1.PUSH_FIRMWARE:       "PUSH_FIRMWARE",
 	ms1.PULL_FIRMWARE:       "PULL_FIRMWARE",
 	ms1.VERIFY_FIRMWARE:     "VERIFY_FIRMWARE",
+	ms1.GET_FIRMWARE: 		 "GET_FIRMWARE",
 }
 
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
@@ -58,18 +60,7 @@ func (board *MS1) Flash(filePath string, logger chan any) (string, error) {
 		}
 	}
 	if logger != nil {
-		devLogger := device.ActivateLog()
-		go func() {
-			for log := range devLogger {
-				logger <- FlashBacktrackMsMessage{
-					UploadStage: ms1backtrackStatus[log.UploadStage],
-					NoPacks:     log.NoPacks,
-					CurPack:     log.CurPack,
-					TotalPacks:  log.TotalPacks,
-				}
-			}
-			close(logger)
-		}()
+		collectLogs(device, logger)
 	}
 	packs, err := device.WriteFirmware(filePath, board.verify)
 	if err != nil {
@@ -118,6 +109,9 @@ func (board *MS1) ping() error {
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	err = deviceMS.SetAddress(board.address)
+	if err != nil {
+		return err
+	}
 	_, err = deviceMS.Ping()
 	if err != nil {
 		return err
@@ -138,26 +132,29 @@ func (board *MS1) getAddress() (string, error) {
 		return "", err
 	}
 	if !updated {
-		return "", errors.New("Не удалось обновить устройство.")
+		return "", errors.New("не удалось обновить устройство")
 	}
 	return deviceMS.GetAddress(), nil
 }
 
-func (board *MS1) getMetaData() (ms1.Meta, error) {
+func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
-		return ms1.Meta{}, err
+		return nil, err
 	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
-	deviceMS.SetAddress(board.address)
+	err = deviceMS.SetAddress(board.address)
+	if (err != nil) {
+		return nil, err
+	}
 	meta, err := deviceMS.GetMeta()
 	if err != nil {
 		printLog("meta data:", meta, " error:", err.Error())
-		return meta, err
+		return &meta, err
 	}
 	printLog("meta data:", meta)
-	return meta, nil
+	return &meta, nil
 }
 
 /*
@@ -178,11 +175,127 @@ func getMSType(RefBlHw string) string {
 	case "da047a039c8acff1":
 		return "tjc-ms1-btn-a2"
 	case "58e2581437a30762":
-		return "tjc-ms1-btn-a3"
+		return "tjc-ms1-btn-a2"
 	case "c4ef6036603a600f":
 		return "tjc-ms1-lmp-a2"
 	case "274b36772c9ea32a":
 		return "tjc-ms1-lmp-a4"
 	}
 	return ""
+}
+
+func metaToJSON(meta *ms1.Meta) MetaSubMessage {
+	return MetaSubMessage{
+		RefBlHw:       meta.RefBlHw,
+		RefBlFw:       meta.RefBlFw,
+		RefBlUserCode: meta.RefBlUserCode,
+		RefBlChip:     meta.RefBlChip,
+		RefBlProtocol: meta.RefBlProtocol,
+		RefCgHw:       meta.RefCgHw,
+		RefCgFw:       meta.RefCgFw,
+		RefCgProtocol: meta.RefCgProtocol,
+	}
+}
+
+/*
+Получение адреса и затем метаданных.
+Если адрес не удалось получить, то вернётся пустая строка,  nil и ошибкой.
+Если метаданные не удалось получить то вернётся адрес, nil и ошибка.
+*/
+func (board *MS1) getAddressAndMeta() (string, *ms1.Meta, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return "", nil, err
+	}
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	// получение адреса
+	_, err, updated := deviceMS.GetId(true, true)
+	if err != nil {
+		return "", nil, err
+	}
+	if !updated {
+		return "", nil, errors.New("не удалось обновить устройство")
+	}
+	// получение метаданных
+	meta, err := deviceMS.GetMeta()
+	return deviceMS.GetAddress(), &meta, err
+}
+
+func (board *MS1) getFirmware(address string, logger chan any, RefBlChip string) ([]byte, error) {
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return nil, err
+	}	
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	err = deviceMS.SetAddress(address)
+	if err != nil {
+		return nil, err
+	}
+	if logger != nil {
+		collectLogs(deviceMS, logger)
+	}
+	frames := 0
+	if RefBlChip == "" {
+		// Присылать ли клиенту метаданные?
+		meta, err := deviceMS.GetMeta()
+		if err != nil {
+			printLog("getFirmware: no meta:", err.Error())
+		} else {
+			RefBlChip = meta.RefBlChip
+		}
+	}
+	frames = getFirmwareFrames(RefBlChip)
+	if frames == 0 {
+		printLog("getFirmware: no meta: can't identify RefBlChip, setting frames value as 400")
+		frames = 400
+	}
+	
+	var b bytes.Buffer
+	err = deviceMS.GetFirmware(&b, frames)
+	return b.Bytes(), err
+}
+
+func collectLogs(deviceMS *ms1.Device, logger chan any){
+	devLogger := deviceMS.ActivateLog()
+	go func() {
+		for log := range devLogger {
+			logger <- FlashBacktrackMsMessage{
+				UploadStage: ms1backtrackStatus[log.UploadStage],
+				NoPacks:     log.NoPacks,
+				CurPack:     log.CurPack,
+				TotalPacks:  log.TotalPacks,
+			}
+		}
+		close(logger)
+	}()
+}
+
+/*
+Функция возвращет максимальное количество фреймов, содержащих прошивку по параметру метаданных RefBlChip.
+Если не удаётся найти подходящее значение по RefBlChip, то возвращется 0.
+*/
+func getFirmwareFrames(RefBlChip string) int {
+	/*
+	# bootloader REF_CHIP
+
+	Указывает на контроллер, здесь то, что нужно для компиляции прошивки (вид контроллера, память, число страниц, первая страница).
+
+	- 0xb2cc4e728f9bf8f6: STM32G030F6, 8KB RAM, 0x7-я первая страница, всего 16 страниц, страницы по 2КБ.
+	- 0xb4272ba421624bbe: STM32G030K8/STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, но доступны только 17 (до 16U включительно), страницы по 2КБ.
+	- 0x387857a4b687c7f3: STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, страницы по 2КБ.
+	*/
+
+	// В одной странице 16 фреймов.
+	framesPerPage := 16
+	switch(RefBlChip) {
+	case "387857a4b687c7f3":
+		return (32-7)*framesPerPage
+	case "b4272ba421624bbe":
+		return (17-7)*framesPerPage
+	case "b2cc4e728f9bf8f6":
+		return (16-7)*framesPerPage
+	}
+	return 0
 }

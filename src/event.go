@@ -107,8 +107,7 @@ type DeviceIdMessage struct {
 	ID string `json:"deviceID"`
 }
 
-type MSMetaDataMessage struct {
-	ID            string `json:"deviceID"`
+type MetaSubMessage struct {
 	RefBlHw       string `json:"RefBlHw"`       // Описывает физическое окружение контроллера (плату)
 	RefBlFw       string `json:"RefBlFw"`       // Указывает на версию прошивки загрузчика
 	RefBlUserCode string `json:"RefBlUserCode"` //
@@ -117,7 +116,12 @@ type MSMetaDataMessage struct {
 	RefCgHw       string `json:"RefCgHw"`       // Указывает на аппаратное исполнение
 	RefCgFw       string `json:"RefCgFw"`       // Указывает на версию прошивки кибергена
 	RefCgProtocol string `json:"RefCgProtocol"` // Указывает на возможности протокола кибергена
-	MSType        string `json:"type"`          // тип устройства (определяется по RefBlHw)
+}
+
+type MSMetaDataMessage struct {
+	ID     string         `json:"deviceID"`
+	Meta   MetaSubMessage `json:"meta"`
+	MSType string         `json:"type"` // тип устройства (определяется по RefBlHw)
 }
 
 type FlashBacktrackMsMessage struct {
@@ -128,6 +132,30 @@ type FlashBacktrackMsMessage struct {
 	CurPack    uint16 `json:"CurPack"`
 	TotalPacks uint16 `json:"TotalPacks"`
 }
+
+type MSAddressAndMetaMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	MSType    string         `json:"type"` // тип устройства (определяется по RefBlHw)
+	ErrorMsg  string         `json:"errorMsg"`
+	ErrorCode int            `json:"errorCode"`
+	Meta      MetaSubMessage `json:"meta"`
+}
+
+type MSOperationReportMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	Comment   string         `json:"comment"`
+	Code 	  int            `json:"code"`
+}
+
+type MSGetFirmwareMessage struct {
+	ID        string         `json:"deviceID"`
+	Address   string         `json:"address"`
+	BlockSize int 			 `json:"blockSize"`
+	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
+}
+
 
 // типы сообщений (событий)
 const (
@@ -189,6 +217,18 @@ const (
 	MSMetaDataMsg = "ms-meta-data"
 	// сообщение в случае, если не удалось извлечь метаданные по запросу клиента
 	MSMetaDataErrorMsg = "ms-meta-data-error"
+	// Получение адреса и метаданных платы
+	MSGetAddressAndMetaMsg = "ms-get-address-and-meta"
+	// Результат выполнения команды ms-get-address-and-meta
+	MSAddressAndMetaMsg = "ms-address-and-meta"
+	// Запрос от клиента на выгрузку прошивки из платы МС-ТЮК
+	MSGetFirmwareMsg = "ms-get-firmware"
+	// Одобрение на запрос выгрузки прошивки
+	MSGetFirmwareApproveMsg = "ms-get-firmware-approve"
+	// Запрос от клиента на получение блока с бинарными данными
+	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block"
+	// Отчёт о завершении процесса выгрузки прошивки
+	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
 )
 
 // отправить клиенту список всех устройств
@@ -348,7 +388,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg
 		if err != nil {
-			c.StopFlashing()
+			c.StopFlashingSync()
 			return ErrAvrdude
 		}
 		FlashDone(c)
@@ -360,7 +400,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
-	c.StopFlashing()
+	c.StopFlashingSync()
 	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
 	c.avrMsg = ""
 }
@@ -761,18 +801,17 @@ func MSResetSend(deviceID string, code int, comment string, client *WebSocketCon
 	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
 }
 
-const (
-	META_ERROR        = 1
-	META_NO_DEVICE    = 2
-	META_WRONG_DEVICE = 3
-	META_JSON_ERROR   = 4
-)
-
 func MSMetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
 	DeviceCommentCode(MSMetaDataErrorMsg, deviceID, code, comment, client)
 }
 
 func MSGetMetaData(event Event, c *WebSocketConnection) error {
+	const (
+		META_ERROR        = 1
+		META_NO_DEVICE    = 2
+		META_WRONG_DEVICE = 3
+		META_JSON_ERROR   = 4
+	)
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
@@ -810,16 +849,243 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
-		ID:            msg.ID,
-		RefBlHw:       meta.RefBlHw,
-		RefBlFw:       meta.RefBlFw,
-		RefBlUserCode: meta.RefBlUserCode,
-		RefBlChip:     meta.RefBlChip,
-		RefBlProtocol: meta.RefBlProtocol,
-		RefCgHw:       meta.RefCgHw,
-		RefCgFw:       meta.RefCgFw,
-		RefCgProtocol: meta.RefCgProtocol,
-		MSType:        getMSType(meta.RefBlHw),
+		ID:     msg.ID,
+		Meta:   metaToJSON(meta),
+		MSType: getMSType(meta.RefBlHw),
 	}, false)
+	return nil
+}
+
+func MSAddressAndMeta(msg MSAddressAndMetaMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(MSAddressAndMetaMsg, msg, false)
+}
+
+func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
+	const (
+		NO_ERROR  = 0
+		NO_ADDR   = 1
+		NO_META   = 2
+		NO_DEV    = 3
+		WRONG_DEV = 4
+	)
+	var msg MSGetAddressMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  err.Error(),
+			ErrorCode: NO_ADDR,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  "",
+			ErrorCode: NO_DEV,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		MSAddressAndMeta(MSAddressAndMetaMessage{
+			ID:        msg.ID,
+			ErrorMsg:  "",
+			ErrorCode: WRONG_DEV,
+			MSType:    "",
+			Address:   "",
+			Meta:      MetaSubMessage{},
+		}, c)
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if !board.IsConnected() {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  "",
+				ErrorCode: NO_DEV,
+				MSType:    "",
+				Address:   "",
+				Meta:      MetaSubMessage{},
+			}, c)
+		}
+	}
+	addr, meta, err := board.getAddressAndMeta()
+	if err != nil {
+		if addr == "" {
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  err.Error(),
+				ErrorCode: NO_ADDR,
+				MSType:    "",
+				Address:   "",
+				Meta:      MetaSubMessage{},
+			}, c)
+		} else {
+			MSAddressAndMeta(MSAddressAndMetaMessage{
+				ID:        msg.ID,
+				ErrorMsg:  err.Error(),
+				ErrorCode: NO_META,
+				MSType:    "",
+				Address:   addr,
+				Meta:      MetaSubMessage{},
+			}, c)
+		}
+		return err
+	}
+	MSAddressAndMeta(MSAddressAndMetaMessage{
+		ID:        msg.ID,
+		ErrorMsg:  "",
+		ErrorCode: NO_ERROR,
+		MSType:    getMSType(meta.RefBlHw),
+		Address:   addr,
+		Meta:      metaToJSON(meta),
+	}, c)
+	return nil
+}
+
+const (
+	GET_FIRMWARE_DONE  = 0
+	GET_FIRMWARE_NO_DEV   = 1
+	GET_FIRMWARE_WRONG_DEV = 2
+	GET_FIRMWARE_ERROR = 3
+	GET_FIRMWARE_CLIENT_BUSY = 4
+	GET_FIRMWARE_DEVICE_BUSY = 5
+	GET_FIRMWARE_INCORRECT_BLOCK_SIZE = 6
+	GET_FIRMWARE_TIMEOUT = 7
+)
+
+func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
+	c.sendOutgoingEventMessage(MSGetFirmwareFinishMsg, msg, false)
+}
+
+// обработка запроса на выгрузку прошивки из устройства
+func GetFirmwareStart(event Event, c *WebSocketConnection) error {
+	var msg MSGetFirmwareMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				Comment: err.Error(),
+				Code: GET_FIRMWARE_ERROR,
+			}, c)
+		return err
+	}
+	if c.IsFlashing() {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_CLIENT_BUSY,
+			}, c)
+		return nil
+	}
+	if (msg.BlockSize < 1) {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
+			}, c)
+		return nil
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_NO_DEV,
+			}, c)
+		return nil
+	}
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	dev.Mu.Lock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MSGetFirmwareFinish(MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_NO_DEV,
+			}, c)
+			return nil
+		}
+	}
+	if dev.IsFlashBlocked() {
+		MSGetFirmwareFinish(
+			MSOperationReportMessage{
+				ID: msg.ID,
+				Address: msg.Address,
+				Code: GET_FIRMWARE_DEVICE_BUSY,
+			}, c)
+		return nil
+	}
+	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
+	c.FlashingBoard = dev
+	c.FlashingDevId = msg.ID
+	c.FlashingAddress = msg.Address
+	c.FlashingBoard.SetLock(true)
+
+	board := dev.Board.(*MS1)
+	logger := make(chan any)
+	go LogSend(c, logger)
+	bytes, err := board.getFirmware(msg.Address, logger, msg.RefBlChip)
+	// разблокировка платы!
+	dev.Mu.Unlock()
+	if err != nil {
+		close(logger)
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: msg.ID,
+			Address: msg.Address,
+			Comment: err.Error(),
+			Code: GET_FIRMWARE_ERROR,
+		}, c)
+		c.StopFlashingSync()
+		return err
+	}
+	c.Transmission.set(bytes, msg.BlockSize)
+	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
+	return nil
+}
+
+func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
+	if c.Transmission.isFinish() {
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: c.FlashingDevId,
+			Address: c.FlashingAddress,
+			Code: GET_FIRMWARE_DONE,
+		}, c)
+		c.StopFlashingSync()
+		return nil
+	}
+	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
+	if err != nil {
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: c.FlashingDevId,
+			Address: c.FlashingAddress,
+			Comment: err.Error(),
+			Code: GET_FIRMWARE_ERROR,
+		}, c)
+		return err
+	}
 	return nil
 }
