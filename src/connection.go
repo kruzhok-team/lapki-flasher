@@ -122,7 +122,7 @@ func (c *WebSocketConnection) closeChan() {
 }
 
 // разблокирует устройство и разрешает клиенту прошивать другие устройства, удаляет файл и другие данные FileWriter
-func (c *WebSocketConnection) StopFlashing() {
+func (c *WebSocketConnection) StopFlashingSync() {
 	if c.FlashingBoard != nil {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil

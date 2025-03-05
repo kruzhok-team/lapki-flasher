@@ -387,7 +387,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
 		c.avrMsg = avrMsg
 		if err != nil {
-			c.StopFlashing()
+			c.StopFlashingSync()
 			return ErrAvrdude
 		}
 		FlashDone(c)
@@ -399,7 +399,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
-	c.StopFlashing()
+	c.StopFlashingSync()
 	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
 	c.avrMsg = ""
 }
@@ -1048,7 +1048,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			Comment: err.Error(),
 			Code: GET_FIRMWARE_ERROR,
 		}, c)
-		c.StopFlashing()
+		c.StopFlashingSync()
 		return err
 	}
 	c.Transmission.set(bytes, msg.BlockSize)
@@ -1076,7 +1076,7 @@ func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 			Address: c.FlashingAddress,
 			Code: GET_FIRMWARE_DONE,
 		}, c)
-		c.StopFlashing()
+		c.StopFlashingSync()
 	}
 	return nil
 }
