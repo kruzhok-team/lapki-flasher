@@ -1059,7 +1059,13 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 	if c.Transmission.isFinish() {
-		return nil;
+		MSGetFirmwareFinish(MSOperationReportMessage{
+			ID: c.FlashingDevId,
+			Address: c.FlashingAddress,
+			Code: GET_FIRMWARE_DONE,
+		}, c)
+		c.StopFlashingSync()
+		return nil
 	}
 	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
 	if err != nil {
@@ -1070,14 +1076,6 @@ func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 			Code: GET_FIRMWARE_ERROR,
 		}, c)
 		return err
-	}
-	if (c.Transmission.isFinish()) {
-		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: c.FlashingDevId,
-			Address: c.FlashingAddress,
-			Code: GET_FIRMWARE_DONE,
-		}, c)
-		c.StopFlashingSync()
 	}
 	return nil
 }
