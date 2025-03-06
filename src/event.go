@@ -156,6 +156,10 @@ type MSGetFirmwareMessage struct {
 	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
 }
 
+type MSAddressesMessage struct {
+	ID string 			`json:"deviceID"`
+	Addresses []string 	`json:"addresses"`
+}
 
 // типы сообщений (событий)
 const (
@@ -229,6 +233,12 @@ const (
 	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block"
 	// Отчёт о завершении процесса выгрузки прошивки
 	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
+	// Запрос от клиента на получение адресов, подключенных плат МС-ТЮК
+	MSGetConnectedBoardsMsg = "ms-get-connected-boards"
+	// Сообщение с подключенными адресами плат МС-ТЮК
+	MSConnectedBoardsMsg = "ms-connected-boards"
+	// Ошибка получения адресов подключенных плат
+	MSGetConnectedBoardsErrorMsg = "ms-get-connected-boards-error"
 )
 
 // отправить клиенту список всех устройств
@@ -1087,5 +1097,77 @@ func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 		}, c)
 		return err
 	}
+	return nil
+}
+
+func MSConnectedBoards(addresses MSAddressesMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSConnectedBoardsMsg, addresses, false)
+}
+
+func MSGetConnectedBoardsError(report DeviceCommentCodeMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSGetConnectedBoardsErrorMsg, report, false)
+}
+
+func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
+	const (
+		GET_BOARDS_ERROR        	  = 1
+		GET_BOARDS_ERROR_NO_DEVICE    = 2
+		GET_BOARDS_ERROR_WRONG_DEVICE = 3
+	)
+	var msg MSAddressesMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			Code: GET_BOARDS_ERROR,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID: msg.ID,
+			Code: GET_BOARDS_ERROR_NO_DEVICE,
+		}, c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID: msg.ID,
+			Code: GET_BOARDS_ERROR_WRONG_DEVICE,
+		}, c)
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+				ID: msg.ID,
+				Code: GET_BOARDS_ERROR_NO_DEVICE,
+			}, c)
+			return nil
+		}
+	}
+	connectedBoards, err := board.getConnectedBoards(msg.Addresses)
+	if err != nil {
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID: msg.ID,
+			Code: GET_BOARDS_ERROR,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	MSConnectedBoards(MSAddressesMessage{
+		ID: msg.ID,
+		Addresses: connectedBoards,
+	}, c)
 	return nil
 }

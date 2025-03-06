@@ -62,6 +62,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSGetAddressAndMetaMsg] = MSGetAddressAndMeta
 	m.handlers[MSGetFirmwareMsg] = GetFirmwareStart
 	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
+	m.handlers[MSGetConnectedBoardsMsg] = MSGetConnectedBoards
 }
 
 // обработка нового соединения
