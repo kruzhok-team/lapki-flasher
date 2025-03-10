@@ -60,12 +60,6 @@ func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
 	for c.getNumQueries() > c.getMaxQueries() {
 	}
 	go func() {
-		// откладываем таймер, так как обновление все равно произойдёт для всех
-		// FIXME: почему это действие не входит в handlers?
-		if event.Type == GetListMsg {
-			m.updateTicker.Stop()
-			defer m.updateTicker.Start()
-		}
 		c.incNumQueries()
 		handler, exists := m.handlers[event.Type]
 		if exists {
