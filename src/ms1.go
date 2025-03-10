@@ -299,3 +299,48 @@ func getFirmwareFrames(RefBlChip string) int {
 	}
 	return 0
 }
+
+// Возвращение всех плат, которые откликнулись на пинг
+func (board *MS1) getConnectedBoards(addresses []string, client *WebSocketConnection) ([]string, error) {
+	const (
+		GET_BOARDS_BACKTRACK_PING     = 0
+		GET_BOARDS_BACKTRACK_REPLY    = 1
+		GET_BOARDS_BACKTRACK_NO_REPLY = 2
+		GET_BOARDS_BACKTRACK_WRONG_ADDR = 3
+	)
+	portMS, err := ms1.MkSerial(board.getFlashPort())
+	if err != nil {
+		return nil, err
+	}	
+	defer portMS.Close()
+	deviceMS := ms1.NewDevice(portMS)
+	connectedBoards := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		err = deviceMS.SetAddress(address)
+		if err != nil {
+			MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
+				Address: address,
+				Code: GET_BOARDS_BACKTRACK_WRONG_ADDR,
+			}, client)
+			continue
+		}
+		MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
+			Address: address,
+			Code: GET_BOARDS_BACKTRACK_PING,
+		}, client)
+		_, err = deviceMS.Ping()
+		if err != nil {
+			MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
+				Address: address,
+				Code: GET_BOARDS_BACKTRACK_NO_REPLY,
+			}, client)
+			continue
+		}
+		MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
+			Address: address,
+			Code: GET_BOARDS_BACKTRACK_REPLY,
+		}, client)
+		connectedBoards = append(connectedBoards, address)
+	}
+	return connectedBoards, nil
+}
