@@ -161,6 +161,11 @@ type MSAddressesMessage struct {
 	Addresses []string 	`json:"addresses"`
 }
 
+type MSGetConnectedBacktrackMessage struct {
+	Address string 		`json:"address"`
+	Code int 			`json:"code"`
+}
+
 // типы сообщений (событий)
 const (
 	// запрос на получение списка всех устройств
@@ -239,6 +244,8 @@ const (
 	MSConnectedBoardsMsg = "ms-connected-boards"
 	// Ошибка получения адресов подключенных плат
 	MSGetConnectedBoardsErrorMsg = "ms-get-connected-boards-error"
+	// Обратная связь процесса получения подключенных плат
+	MSGetConnectedBoardsBackTrackMsg = "ms-get-connected-boards-backtrack"
 )
 
 // отправить клиенту список всех устройств
@@ -1108,6 +1115,11 @@ func MSGetConnectedBoardsError(report DeviceCommentCodeMessage, client *WebSocke
 	client.sendOutgoingEventMessage(MSGetConnectedBoardsErrorMsg, report, false)
 }
 
+func MSGetConnectedBoardsBacktrack(report MSGetConnectedBacktrackMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSGetConnectedBoardsBackTrackMsg, report, false)
+}
+
+
 func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	const (
 		GET_BOARDS_ERROR        	  = 1
@@ -1156,7 +1168,7 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	connectedBoards, err := board.getConnectedBoards(msg.Addresses)
+	connectedBoards, err := board.getConnectedBoards(msg.Addresses, c)
 	if err != nil {
 		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
 			ID: msg.ID,
