@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -38,9 +39,10 @@ type WebSocketConnection struct {
 	// количество запросов, которые обрабатываются в данный момент
 	numQueries int
 	Transmission *DataTransmission
+	Manager *WebSocketManager
 }
 
-func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int) *WebSocketConnection {
+func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m *WebSocketManager, maxQueries int) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
@@ -49,27 +51,33 @@ func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int
 	c.FileWriter = newFlashFileWriter()
 	c.avrMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
-	c.getListCooldown = getListCoolDown
+	c.getListCooldown = newCooldown(getListCooldownDuration, m)
 	c.maxQueries = maxQueries
 	c.numQueries = 0
 	c.Transmission = newDataTransmission()
+	c.Manager = m
 	return &c
 }
 
-func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
+func (c *WebSocketConnection) addQuerry(event Event) {
 	for c.getNumQueries() > c.getMaxQueries() {
 	}
 	go func() {
 		c.incNumQueries()
-		handler, exists := m.handlers[event.Type]
-		if exists {
-			err := handler(event, c)
-			errorHandler(err, c)
-		} else {
-			errorHandler(ErrEventNotSupported, c)
-		}
+		c.handleEvent(event)
 		c.decNumQueries()
 	}()
+}
+
+func(c *WebSocketConnection) handleEvent(event Event) {
+	manager := c.Manager
+	handler, exists := manager.handlers[event.Type]
+	if exists {
+		err := handler(event, c)
+		errorHandler(err, c)
+	} else {
+		errorHandler(ErrEventNotSupported, c)
+	}
 }
 
 func (c *WebSocketConnection) getNumQueries() int {

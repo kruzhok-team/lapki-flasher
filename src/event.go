@@ -253,7 +253,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 	printLog("get-list")
 
 	// откладываем таймер, так как обновление все равно произойдёт для всех
-	manager := c.getListCooldown.manager
+	manager := c.Manager
 	manager.updateTicker.Stop()
 	defer manager.updateTicker.Start()
 

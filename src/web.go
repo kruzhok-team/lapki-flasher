@@ -73,7 +73,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn, newCooldown(getListCooldownDuration, m), maxThreadsPerClient)
+	c := NewWebSocket(conn, getListCooldownDuration, m, maxThreadsPerClient)
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
@@ -130,7 +130,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 				continue
 			}
 		}
-		c.addQuerry(m, event)
+		c.addQuerry(event)
 	}
 }
 
