@@ -63,6 +63,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSGetFirmwareMsg] = GetFirmwareStart
 	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
 	m.handlers[MSGetConnectedBoardsMsg] = MSGetConnectedBoards
+	m.handlers[requestPackMsg] = RequestPack
 }
 
 // обработка нового соединения

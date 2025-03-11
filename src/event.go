@@ -246,6 +246,8 @@ const (
 	MSGetConnectedBoardsErrorMsg = "ms-get-connected-boards-error"
 	// Обратная связь процесса получения подключенных плат
 	MSGetConnectedBoardsBackTrackMsg = "ms-get-connected-boards-backtrack"
+	// запрос на выполнение операций по очереди
+	requestPackMsg = "requests-pack"
 )
 
 // отправить клиенту список всех устройств
@@ -1187,5 +1189,17 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 		ID: msg.ID,
 		Addresses: connectedBoards,
 	}, c)
+	return nil
+}
+
+func RequestPack(event Event, c *WebSocketConnection) error {
+	var requests []Event
+	err := json.Unmarshal(event.Payload, &requests)
+	if err != nil {
+		return ErrUnmarshal
+	}
+	for _, req := range requests {
+		c.handleEvent(req)
+	}
 	return nil
 }
