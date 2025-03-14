@@ -49,11 +49,6 @@ type MSBinStartMessage struct {
 	Verification bool   `json:"verification"` // если true, то загрузчик потратит дополнительное время на проверку прошивки
 }
 
-type FlashBlockMessage struct {
-	BlockID int    `json:"blockID"`
-	Data    []byte `json:"data"`
-}
-
 type DeviceUpdateDeleteMessage struct {
 	ID string `json:"deviceID"`
 }
@@ -164,6 +159,15 @@ type MSAddressesMessage struct {
 type MSGetConnectedBacktrackMessage struct {
 	Address string 		`json:"address"`
 	Code int 			`json:"code"`
+}
+
+type FlashNexBlockMessage struct {
+	ID string 		`json:"ID"`
+}
+
+type FlashDoneMessage struct {
+	ID string 		  `json:"ID"`
+	FlasherMsg string `json:"flasherMsg"`
 }
 
 // типы сообщений (событий)
@@ -292,9 +296,6 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
 	log.Println("Flash-start")
-	if c.IsFlashing() {
-		return ErrFlashNotFinished
-	}
 	var deviceID string
 	var fileSize int
 	var address string    // адрес, только для МС-ТЮК
@@ -343,6 +344,9 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 	}
 	if dev.IsFlashBlocked() {
+		if c.FlashingDevId == deviceID {
+			return ErrFlashNotFinished
+		}
 		return ErrFlashBlocked
 	}
 	boardToFlashName := strings.ToLower(dev.Name)
