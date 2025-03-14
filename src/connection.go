@@ -32,7 +32,7 @@ type WebSocketConnection struct {
 	getListCooldown *Cooldown
 	// true, если все каналы (кроме этого) закрыты
 	mu sync.Mutex
-	// true каналы для передпчи данных между горутинами открыты
+	// true каналы для передачи данных между горутинами открыты
 	closed bool
 	// максимальное количество одновременно обрабатываемых запросов
 	maxQueries int
