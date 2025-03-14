@@ -19,28 +19,22 @@ type OutgoingEventMessage struct {
 }
 
 type WebSocketConnection struct {
-	wsc        *websocket.Conn
-	FileWriter *FlashFileWriter
+	wsc *websocket.Conn
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *Device
 	FlashingDevId string
-	// Адрес МС-ТЮК, в который загружается/выгружается прошивка
-	FlashingAddress string
 	// сообщение от прошивающей программы
 	flasherMsg      string
 	outgoingMsg     chan OutgoingEventMessage
 	getListCooldown *Cooldown
-	// true, если все каналы (кроме этого) закрыты
-	mu sync.Mutex
-	// true каналы для передачи данных между горутинами открыты
-	closed bool
+	mu              sync.Mutex
+	closed          bool
 	// максимальное количество одновременно обрабатываемых запросов
 	maxQueries int
 	// количество запросов, которые обрабатываются в данный момент
-	numQueries   int
-	Transmission *DataTransmission
-	Manager      *WebSocketManager
-	binDataChan  chan []byte
+	numQueries  int
+	Manager     *WebSocketManager
+	binDataChan chan []byte
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m *WebSocketManager, maxQueries int) *WebSocketConnection {
@@ -48,14 +42,11 @@ func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m 
 	c.wsc = wsc
 	c.FlashingBoard = nil
 	c.FlashingDevId = ""
-	c.FlashingAddress = ""
-	c.FileWriter = newFlashFileWriter()
 	c.flasherMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.getListCooldown = newCooldown(getListCooldownDuration, m)
 	c.maxQueries = maxQueries
 	c.numQueries = 0
-	c.Transmission = newDataTransmission()
 	c.Manager = m
 	c.binDataChan = make(chan []byte)
 	return &c
@@ -105,7 +96,8 @@ func (c *WebSocketConnection) decNumQueries() {
 	c.numQueries--
 }
 
-func (c *WebSocketConnection) IsFlashing() bool {
+// true, если ожидается передача данных через binDataChan
+func (c *WebSocketConnection) IsBinChanBusy() bool {
 	return c.FlashingBoard != nil
 }
 
@@ -131,9 +123,6 @@ func (c *WebSocketConnection) StopFlashingSync() {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
 		c.FlashingDevId = ""
-		c.FlashingAddress = ""
-		c.FileWriter.Clear()
-		c.Transmission.Clear()
 	}
 }
 

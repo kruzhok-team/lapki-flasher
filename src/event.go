@@ -441,7 +441,7 @@ func LogSend(client *WebSocketConnection, logger chan any) {
 // принятие блока с бинарными данными файла
 func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	// FIXME: cделать функцию sync?
-	if !c.IsFlashing() {
+	if !c.IsBinChanBusy() {
 		return ErrFlashNotStarted
 	}
 	c.binDataChan <- event.Payload
@@ -1027,7 +1027,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			}, c)
 		return err
 	}
-	if c.IsFlashing() {
+	if c.IsBinChanBusy() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
 				ID:      msg.ID,
@@ -1086,14 +1086,12 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
 	c.FlashingBoard = dev
 	c.FlashingDevId = msg.ID
-	c.FlashingAddress = msg.Address
 	c.FlashingBoard.SetLock(true)
 	transmission := newDataTransmission()
 	defer func() {
 		c.FlashingBoard.SetLock(false)
 		c.FlashingBoard = nil
 		c.FlashingDevId = ""
-		c.FlashingAddress = ""
 		transmission.Clear()
 	}()
 
@@ -1117,8 +1115,8 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
 			MSGetFirmwareFinish(MSOperationReportMessage{
-				ID:      c.FlashingDevId,
-				Address: c.FlashingAddress,
+				ID:      msg.ID,
+				Address: msg.Address,
 				Code:    GET_FIRMWARE_DONE,
 			}, c)
 			return nil
@@ -1128,7 +1126,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 }
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
-	if !c.IsFlashing() {
+	if !c.IsBinChanBusy() {
 		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
 		return ErrFlashNotStarted
 	}
