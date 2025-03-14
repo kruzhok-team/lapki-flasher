@@ -415,7 +415,7 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 		logger := make(chan any)
 		go LogSend(c, logger)
 		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
-		c.avrMsg = avrMsg
+		c.flasherMsg = avrMsg
 		if err != nil {
 			c.StopFlashingSync()
 			return ErrAvrdude
@@ -430,8 +430,8 @@ func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 // отправить сообщение о том, что прошивка прошла успешна
 func FlashDone(c *WebSocketConnection) {
 	c.StopFlashingSync()
-	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
-	c.avrMsg = ""
+	c.sendOutgoingEventMessage(FlashDoneMsg, c.flasherMsg, false)
+	c.flasherMsg = ""
 }
 
 // запрос на следующий блок с бинаными данными файла

@@ -26,8 +26,8 @@ type WebSocketConnection struct {
 	FlashingDevId string
 	// Адрес МС-ТЮК, в который загружается/выгружается прошивка 
 	FlashingAddress string
-	// сообщение от avrdude
-	avrMsg          string
+	// сообщение от прошивающей программы
+	flasherMsg      string
 	outgoingMsg     chan OutgoingEventMessage
 	getListCooldown *Cooldown
 	// true, если все каналы (кроме этого) закрыты
@@ -49,7 +49,7 @@ func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m 
 	c.FlashingDevId = ""
 	c.FlashingAddress = ""
 	c.FileWriter = newFlashFileWriter()
-	c.avrMsg = ""
+	c.flasherMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
 	c.getListCooldown = newCooldown(getListCooldownDuration, m)
 	c.maxQueries = maxQueries
