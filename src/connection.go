@@ -24,7 +24,7 @@ type WebSocketConnection struct {
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *Device
 	FlashingDevId string
-	// Адрес МС-ТЮК, в который загружается/выгружается прошивка 
+	// Адрес МС-ТЮК, в который загружается/выгружается прошивка
 	FlashingAddress string
 	// сообщение от прошивающей программы
 	flasherMsg      string
@@ -37,10 +37,10 @@ type WebSocketConnection struct {
 	// максимальное количество одновременно обрабатываемых запросов
 	maxQueries int
 	// количество запросов, которые обрабатываются в данный момент
-	numQueries int
+	numQueries   int
 	Transmission *DataTransmission
-	Manager *WebSocketManager
-	binDataChan chan []byte 
+	Manager      *WebSocketManager
+	binDataChan  chan []byte
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m *WebSocketManager, maxQueries int) *WebSocketConnection {
@@ -71,7 +71,7 @@ func (c *WebSocketConnection) addQuerry(event Event) {
 	}()
 }
 
-func(c *WebSocketConnection) handleEvent(event Event) {
+func (c *WebSocketConnection) handleEvent(event Event) {
 	manager := c.Manager
 	handler, exists := manager.handlers[event.Type]
 	if exists {
@@ -133,7 +133,7 @@ func (c *WebSocketConnection) StopFlashingSync() {
 		c.FlashingDevId = ""
 		c.FlashingAddress = ""
 		c.FileWriter.Clear()
-		c.Transmission.clear()
+		c.Transmission.Clear()
 	}
 }
 
@@ -166,7 +166,7 @@ func (c *WebSocketConnection) sendBinaryMessage(bytes []byte, toAll bool) (err e
 	}
 	outgoingMsg := OutgoingEventMessage{
 		event: &Event{
-			Type: "",
+			Type:    "",
 			Payload: bytes,
 		},
 		toAll: toAll,

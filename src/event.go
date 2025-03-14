@@ -1058,6 +1058,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
 	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
 	updated := dev.Board.Update()
 	if updated {
 		if dev.Board.IsConnected() {
@@ -1087,13 +1088,19 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	c.FlashingDevId = msg.ID
 	c.FlashingAddress = msg.Address
 	c.FlashingBoard.SetLock(true)
+	transmission := newDataTransmission()
+	defer func() {
+		c.FlashingBoard.SetLock(false)
+		c.FlashingBoard = nil
+		c.FlashingDevId = ""
+		c.FlashingAddress = ""
+		transmission.Clear()
+	}()
 
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
 	bytes, err := board.getFirmware(msg.Address, logger, msg.RefBlChip)
-	// разблокировка платы!
-	dev.Mu.Unlock()
 	if err != nil {
 		close(logger)
 		MSGetFirmwareFinish(MSOperationReportMessage{
@@ -1102,34 +1109,34 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			Comment: err.Error(),
 			Code:    GET_FIRMWARE_ERROR,
 		}, c)
-		c.StopFlashingSync()
 		return err
 	}
-	c.Transmission.set(bytes, msg.BlockSize)
+	transmission.set(bytes, msg.BlockSize)
 	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
-	return nil
+	for {
+		if transmission.isFinish() {
+			c.binDataChan <- []byte{}
+			MSGetFirmwareFinish(MSOperationReportMessage{
+				ID:      c.FlashingDevId,
+				Address: c.FlashingAddress,
+				Code:    GET_FIRMWARE_DONE,
+			}, c)
+			return nil
+		}
+		c.binDataChan <- transmission.popBlock()
+	}
 }
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
-	if c.Transmission.isFinish() {
-		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID:      c.FlashingDevId,
-			Address: c.FlashingAddress,
-			Code:    GET_FIRMWARE_DONE,
-		}, c)
-		c.StopFlashingSync()
+	if !c.IsFlashing() {
+		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
+		return ErrFlashNotStarted
+	}
+	bin := <-c.binDataChan
+	if len(bin) == 0 {
 		return nil
 	}
-	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
-	if err != nil {
-		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID:      c.FlashingDevId,
-			Address: c.FlashingAddress,
-			Comment: err.Error(),
-			Code:    GET_FIRMWARE_ERROR,
-		}, c)
-		return err
-	}
+	c.sendBinaryMessage(bin, false)
 	return nil
 }
 
