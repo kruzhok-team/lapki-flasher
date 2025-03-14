@@ -138,35 +138,35 @@ type MSAddressAndMetaMessage struct {
 }
 
 type MSOperationReportMessage struct {
-	ID        string         `json:"deviceID"`
-	Address   string         `json:"address"`
-	Comment   string         `json:"comment"`
-	Code 	  int            `json:"code"`
+	ID      string `json:"deviceID"`
+	Address string `json:"address"`
+	Comment string `json:"comment"`
+	Code    int    `json:"code"`
 }
 
 type MSGetFirmwareMessage struct {
-	ID        string         `json:"deviceID"`
-	Address   string         `json:"address"`
-	BlockSize int 			 `json:"blockSize"`
-	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
+	ID        string `json:"deviceID"`
+	Address   string `json:"address"`
+	BlockSize int    `json:"blockSize"`
+	RefBlChip string `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
 }
 
 type MSAddressesMessage struct {
-	ID string 			`json:"deviceID"`
-	Addresses []string 	`json:"addresses"`
+	ID        string   `json:"deviceID"`
+	Addresses []string `json:"addresses"`
 }
 
 type MSGetConnectedBacktrackMessage struct {
-	Address string 		`json:"address"`
-	Code int 			`json:"code"`
+	Address string `json:"address"`
+	Code    int    `json:"code"`
 }
 
 type FlashNexBlockMessage struct {
-	ID string 		`json:"ID"`
+	ID string `json:"ID"`
 }
 
 type FlashDoneMessage struct {
-	ID string 		  `json:"ID"`
+	ID         string `json:"ID"`
 	FlasherMsg string `json:"flasherMsg"`
 }
 
@@ -343,6 +343,10 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			return ErrFlashDisconnected
 		}
 	}
+	// FIXME:
+	// Это условие возможно никогда не сработает из-за блокировки mutex.
+	// Если два клиента попытаются прошить одно и то же устройство, то один из них будет ждать своей очереди.
+	// Нужно подумать, стоит ли перенести это условие в другое место, или просто его убрать.
 	if dev.IsFlashBlocked() {
 		if c.FlashingDevId == deviceID {
 			return ErrFlashNotFinished
@@ -382,9 +386,42 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = dev
 	c.FlashingBoard.SetLock(true)
-	c.FileWriter.Start(fileSize, ext)
+	//c.FileWriter.Start(fileSize, ext)
 
+	FileWriter := newFlashFileWriter()
+	FileWriter.Start(fileSize, ext)
+	defer func() {
+		FileWriter.Clear()
+		c.FlashingBoard.SetLock(false)
+		c.FlashingBoard = nil
+		c.flasherMsg = ""
+	}()
 	FlashNextBlock(c)
+	for {
+		binData, isOpen := <-c.binDataChan
+		if !isOpen {
+			//TODO
+			break
+		}
+		fileCreated, err := FileWriter.AddBlock(binData)
+		if err != nil {
+			return err
+		}
+		if fileCreated {
+			logger := make(chan any)
+			go LogSend(c, logger)
+			flasherMsg, err := dev.Board.Flash(FileWriter.GetFilePath(), logger)
+			c.flasherMsg = flasherMsg
+			if err != nil {
+				return ErrAvrdude
+			}
+			err = c.sendOutgoingEventMessage(FlashDoneMsg, c.flasherMsg, false)
+			c.flasherMsg = ""
+			return err
+		} else {
+			FlashNextBlock(c)
+		}
+	}
 	return nil
 }
 
@@ -403,35 +440,12 @@ func LogSend(client *WebSocketConnection, logger chan any) {
 
 // принятие блока с бинарными данными файла
 func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
+	// FIXME: cделать функцию sync?
 	if !c.IsFlashing() {
 		return ErrFlashNotStarted
 	}
-
-	fileCreated, err := c.FileWriter.AddBlock(event.Payload)
-	if err != nil {
-		return err
-	}
-	if fileCreated {
-		logger := make(chan any)
-		go LogSend(c, logger)
-		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
-		c.flasherMsg = avrMsg
-		if err != nil {
-			c.StopFlashingSync()
-			return ErrAvrdude
-		}
-		FlashDone(c)
-	} else {
-		FlashNextBlock(c)
-	}
+	c.binDataChan <- event.Payload
 	return nil
-}
-
-// отправить сообщение о том, что прошивка прошла успешна
-func FlashDone(c *WebSocketConnection) {
-	c.StopFlashingSync()
-	c.sendOutgoingEventMessage(FlashDoneMsg, c.flasherMsg, false)
-	c.flasherMsg = ""
 }
 
 // запрос на следующий блок с бинаными данными файла
@@ -987,14 +1001,14 @@ func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
 }
 
 const (
-	GET_FIRMWARE_DONE  = 0
-	GET_FIRMWARE_NO_DEV   = 1
-	GET_FIRMWARE_WRONG_DEV = 2
-	GET_FIRMWARE_ERROR = 3
-	GET_FIRMWARE_CLIENT_BUSY = 4
-	GET_FIRMWARE_DEVICE_BUSY = 5
+	GET_FIRMWARE_DONE                 = 0
+	GET_FIRMWARE_NO_DEV               = 1
+	GET_FIRMWARE_WRONG_DEV            = 2
+	GET_FIRMWARE_ERROR                = 3
+	GET_FIRMWARE_CLIENT_BUSY          = 4
+	GET_FIRMWARE_DEVICE_BUSY          = 5
 	GET_FIRMWARE_INCORRECT_BLOCK_SIZE = 6
-	GET_FIRMWARE_TIMEOUT = 7
+	GET_FIRMWARE_TIMEOUT              = 7
 )
 
 func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
@@ -1009,25 +1023,25 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
 				Comment: err.Error(),
-				Code: GET_FIRMWARE_ERROR,
+				Code:    GET_FIRMWARE_ERROR,
 			}, c)
 		return err
 	}
 	if c.IsFlashing() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_CLIENT_BUSY,
+				Code:    GET_FIRMWARE_CLIENT_BUSY,
 			}, c)
 		return nil
 	}
-	if (msg.BlockSize < 1) {
+	if msg.BlockSize < 1 {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
+				Code:    GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
 			}, c)
 		return nil
 	}
@@ -1035,9 +1049,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	if !exists {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_NO_DEV,
+				Code:    GET_FIRMWARE_NO_DEV,
 			}, c)
 		return nil
 	}
@@ -1052,9 +1066,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
 			MSGetFirmwareFinish(MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_NO_DEV,
+				Code:    GET_FIRMWARE_NO_DEV,
 			}, c)
 			return nil
 		}
@@ -1062,9 +1076,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	if dev.IsFlashBlocked() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_DEVICE_BUSY,
+				Code:    GET_FIRMWARE_DEVICE_BUSY,
 			}, c)
 		return nil
 	}
@@ -1083,10 +1097,10 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	if err != nil {
 		close(logger)
 		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: msg.ID,
+			ID:      msg.ID,
 			Address: msg.Address,
 			Comment: err.Error(),
-			Code: GET_FIRMWARE_ERROR,
+			Code:    GET_FIRMWARE_ERROR,
 		}, c)
 		c.StopFlashingSync()
 		return err
@@ -1099,9 +1113,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 	if c.Transmission.isFinish() {
 		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: c.FlashingDevId,
+			ID:      c.FlashingDevId,
 			Address: c.FlashingAddress,
-			Code: GET_FIRMWARE_DONE,
+			Code:    GET_FIRMWARE_DONE,
 		}, c)
 		c.StopFlashingSync()
 		return nil
@@ -1109,10 +1123,10 @@ func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
 	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
 	if err != nil {
 		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: c.FlashingDevId,
+			ID:      c.FlashingDevId,
 			Address: c.FlashingAddress,
 			Comment: err.Error(),
-			Code: GET_FIRMWARE_ERROR,
+			Code:    GET_FIRMWARE_ERROR,
 		}, c)
 		return err
 	}
@@ -1131,10 +1145,9 @@ func MSGetConnectedBoardsBacktrack(report MSGetConnectedBacktrackMessage, client
 	client.sendOutgoingEventMessage(MSGetConnectedBoardsBackTrackMsg, report, false)
 }
 
-
 func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	const (
-		GET_BOARDS_ERROR        	  = 1
+		GET_BOARDS_ERROR              = 1
 		GET_BOARDS_ERROR_NO_DEVICE    = 2
 		GET_BOARDS_ERROR_WRONG_DEVICE = 3
 	)
@@ -1142,7 +1155,7 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
 		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
-			Code: GET_BOARDS_ERROR,
+			Code:    GET_BOARDS_ERROR,
 			Comment: err.Error(),
 		}, c)
 		return err
@@ -1151,7 +1164,7 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
 		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
-			ID: msg.ID,
+			ID:   msg.ID,
 			Code: GET_BOARDS_ERROR_NO_DEVICE,
 		}, c)
 		return nil
@@ -1161,7 +1174,7 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
 		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
-			ID: msg.ID,
+			ID:   msg.ID,
 			Code: GET_BOARDS_ERROR_WRONG_DEVICE,
 		}, c)
 		return nil
@@ -1174,7 +1187,7 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
 			MSGetConnectedBoardsError(DeviceCommentCodeMessage{
-				ID: msg.ID,
+				ID:   msg.ID,
 				Code: GET_BOARDS_ERROR_NO_DEVICE,
 			}, c)
 			return nil
@@ -1183,14 +1196,14 @@ func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
 	connectedBoards, err := board.getConnectedBoards(msg.Addresses, c)
 	if err != nil {
 		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
-			ID: msg.ID,
-			Code: GET_BOARDS_ERROR,
+			ID:      msg.ID,
+			Code:    GET_BOARDS_ERROR,
 			Comment: err.Error(),
 		}, c)
 		return err
 	}
 	MSConnectedBoards(MSAddressesMessage{
-		ID: msg.ID,
+		ID:        msg.ID,
 		Addresses: connectedBoards,
 	}, c)
 	return nil

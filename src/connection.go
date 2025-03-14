@@ -40,6 +40,7 @@ type WebSocketConnection struct {
 	numQueries int
 	Transmission *DataTransmission
 	Manager *WebSocketManager
+	binDataChan chan []byte 
 }
 
 func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m *WebSocketManager, maxQueries int) *WebSocketConnection {
@@ -56,6 +57,7 @@ func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m 
 	c.numQueries = 0
 	c.Transmission = newDataTransmission()
 	c.Manager = m
+	c.binDataChan = make(chan []byte)
 	return &c
 }
 
