@@ -2,19 +2,19 @@ package main
 
 // пишет данные в файл,
 type DataTransmission struct {
-	curByte int
-	bytes []byte
+	curByte   int
+	bytes     []byte
 	blockSize int
 	arraySize int
 }
 
 func newDataTransmission() *DataTransmission {
 	var transmission DataTransmission
-	transmission.clear()
+	transmission.Clear()
 	return &transmission
 }
 
-func(transmission *DataTransmission) clear() {
+func (transmission *DataTransmission) Clear() {
 	transmission.blockSize = 0
 	transmission.bytes = []byte{}
 	transmission.curByte = 0
@@ -28,9 +28,9 @@ func (trasmission *DataTransmission) set(bytes []byte, blockSize int) {
 	trasmission.blockSize = blockSize
 }
 
-func (transmission *DataTransmission) popBlock() []byte{
+func (transmission *DataTransmission) popBlock() []byte {
 	startIndex := transmission.curByte
-	endIndex := min(startIndex + transmission.blockSize, transmission.arraySize)
+	endIndex := min(startIndex+transmission.blockSize, transmission.arraySize)
 	transmission.curByte = endIndex
 	return transmission.bytes[startIndex:endIndex]
 }

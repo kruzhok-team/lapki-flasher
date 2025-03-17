@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,64 +19,58 @@ type OutgoingEventMessage struct {
 }
 
 type WebSocketConnection struct {
-	wsc        *websocket.Conn
-	FileWriter *FlashFileWriter
+	wsc *websocket.Conn
 	// устройство, на которое должна установиться прошивка
 	FlashingBoard *Device
 	FlashingDevId string
-	// Адрес МС-ТЮК, в который загружается/выгружается прошивка 
-	FlashingAddress string
-	// сообщение от avrdude
-	avrMsg          string
+	// сообщение от прошивающей программы
+	flasherMsg      string
 	outgoingMsg     chan OutgoingEventMessage
 	getListCooldown *Cooldown
-	// true, если все каналы (кроме этого) закрыты
-	mu sync.Mutex
-	// true каналы для передпчи данных между горутинами открыты
-	closed bool
+	mu              sync.Mutex
+	closed          bool
 	// максимальное количество одновременно обрабатываемых запросов
 	maxQueries int
 	// количество запросов, которые обрабатываются в данный момент
-	numQueries int
-	Transmission *DataTransmission
+	numQueries  int
+	Manager     *WebSocketManager
+	binDataChan chan []byte
 }
 
-func NewWebSocket(wsc *websocket.Conn, getListCoolDown *Cooldown, maxQueries int) *WebSocketConnection {
+func NewWebSocket(wsc *websocket.Conn, getListCooldownDuration time.Duration, m *WebSocketManager, maxQueries int) *WebSocketConnection {
 	var c WebSocketConnection
 	c.wsc = wsc
 	c.FlashingBoard = nil
 	c.FlashingDevId = ""
-	c.FlashingAddress = ""
-	c.FileWriter = newFlashFileWriter()
-	c.avrMsg = ""
+	c.flasherMsg = ""
 	c.outgoingMsg = make(chan OutgoingEventMessage)
-	c.getListCooldown = getListCoolDown
+	c.getListCooldown = newCooldown(getListCooldownDuration, m)
 	c.maxQueries = maxQueries
 	c.numQueries = 0
-	c.Transmission = newDataTransmission()
+	c.Manager = m
+	c.binDataChan = make(chan []byte)
 	return &c
 }
 
-func (c *WebSocketConnection) addQuerry(m *WebSocketManager, event Event) {
+func (c *WebSocketConnection) addQuerry(event Event) {
 	for c.getNumQueries() > c.getMaxQueries() {
 	}
 	go func() {
-		// откладываем таймер, так как обновление все равно произойдёт для всех
-		// FIXME: почему это действие не входит в handlers?
-		if event.Type == GetListMsg {
-			m.updateTicker.Stop()
-			defer m.updateTicker.Start()
-		}
 		c.incNumQueries()
-		handler, exists := m.handlers[event.Type]
-		if exists {
-			err := handler(event, c)
-			errorHandler(err, c)
-		} else {
-			errorHandler(ErrEventNotSupported, c)
-		}
+		c.handleEvent(event)
 		c.decNumQueries()
 	}()
+}
+
+func (c *WebSocketConnection) handleEvent(event Event) {
+	manager := c.Manager
+	handler, exists := manager.handlers[event.Type]
+	if exists {
+		err := handler(event, c)
+		errorHandler(err, c)
+	} else {
+		errorHandler(ErrEventNotSupported, c)
+	}
 }
 
 func (c *WebSocketConnection) getNumQueries() int {
@@ -101,7 +96,8 @@ func (c *WebSocketConnection) decNumQueries() {
 	c.numQueries--
 }
 
-func (c *WebSocketConnection) IsFlashing() bool {
+// true, если ожидается передача данных через binDataChan
+func (c *WebSocketConnection) IsBinChanBusy() bool {
 	return c.FlashingBoard != nil
 }
 
@@ -127,9 +123,6 @@ func (c *WebSocketConnection) StopFlashingSync() {
 		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
 		c.FlashingDevId = ""
-		c.FlashingAddress = ""
-		c.FileWriter.Clear()
-		c.Transmission.clear()
 	}
 }
 
@@ -162,7 +155,7 @@ func (c *WebSocketConnection) sendBinaryMessage(bytes []byte, toAll bool) (err e
 	}
 	outgoingMsg := OutgoingEventMessage{
 		event: &Event{
-			Type: "",
+			Type:    "",
 			Payload: bytes,
 		},
 		toAll: toAll,
