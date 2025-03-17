@@ -386,7 +386,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
 	c.FlashingBoard = dev
 	c.FlashingBoard.SetLock(true)
-	//c.FileWriter.Start(fileSize, ext)
 
 	FileWriter := newFlashFileWriter()
 	FileWriter.Start(fileSize, ext)
