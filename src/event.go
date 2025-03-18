@@ -834,7 +834,7 @@ func MSReset(event Event, c *WebSocketConnection) error {
 		}
 	}
 	board.address = msg.Address
-	err = board.reset()
+	err = board.Reset()
 	if err != nil {
 		MSResetSend(msg.ID, 2, err.Error(), c)
 		return err

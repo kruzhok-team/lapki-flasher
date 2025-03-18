@@ -86,7 +86,7 @@ func (board *MS1) GetWebMessage(name string, deviceID string) any {
 	}
 }
 
-func (board *MS1) reset() error {
+func (board *MS1) Reset() error {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return err
