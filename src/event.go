@@ -256,6 +256,10 @@ const (
 	pingMsg = "ping"
 	// ответ на пинг устройства
 	pongMsg = "pong"
+	// перезагрузка устройства
+	resetMsg = "reset"
+	// результат операции reset
+	resetResultMsg = "reset-result"
 )
 
 // отправить клиенту список всех устройств
@@ -1226,6 +1230,69 @@ func RequestPack(event Event, c *WebSocketConnection) error {
 	for _, req := range requests {
 		c.handleEvent(req)
 	}
+	return nil
+}
+
+//TODO: сделать функции reset и ping общими для МС-ТЮК
+
+func Reset(event Event, c *WebSocketConnection) error {
+	const (
+		RESET_OK  = 0
+		NO_DEV    = 1
+		RESET_ERR = 2
+		WRONG_DEV = 3
+		JSON_ERR  = 4
+	)
+	resetResult := func(resetResultMessage DeviceCommentCodeMessage) {
+		c.sendOutgoingEventMessage(resetResultMsg, resetResultMessage, false)
+	}
+	var msg DeviceIdMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		resetResult(DeviceCommentCodeMessage{
+			Code:    JSON_ERR,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		resetResult(DeviceCommentCodeMessage{
+			ID:   msg.ID,
+			Code: NO_DEV,
+		})
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			resetResult(DeviceCommentCodeMessage{
+				ID:   msg.ID,
+				Code: NO_DEV,
+			})
+			return nil
+		}
+	}
+	err = dev.Board.Reset()
+	if err != nil {
+		resetResult(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    RESET_ERR,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	resetResult(DeviceCommentCodeMessage{
+		ID:   msg.ID,
+		Code: RESET_OK,
+	})
 	return nil
 }
 

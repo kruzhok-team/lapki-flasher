@@ -39,7 +39,7 @@ func CopyArduino(board *Arduino) *Arduino {
 }
 
 func (board *Arduino) avrdude(args ...string) ([]byte, error) {
-	defaultArgs := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName, "-U"}
+	defaultArgs := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName}
 	if configPath != "" {
 		defaultArgs = append(defaultArgs, "-C", configPath)
 	}
@@ -102,7 +102,7 @@ func (board *Arduino) Flash(filePath string, logger chan any) (string, error) {
 		return board.flashBootloader(filePath, logger)
 	}
 	flashFile := "flash:w:" + getAbolutePath(filePath) + ":a"
-	stdout, err := board.avrdude(flashFile)
+	stdout, err := board.avrdude("-U", flashFile)
 	avrdudeMessage := handleFlashResult(string(stdout), err)
 	return avrdudeMessage, err
 }
