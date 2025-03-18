@@ -44,3 +44,7 @@ func (board *FakeMS) GetWebMessage(name string, deviceID string) any {
 func (board *FakeMS) Update() bool {
 	return false
 }
+
+func (board *FakeMS) Ping() error {
+	return nil
+}

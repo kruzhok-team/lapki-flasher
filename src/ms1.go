@@ -24,7 +24,7 @@ var ms1backtrackStatus = map[ms1.UploadStage]string{
 	ms1.PUSH_FIRMWARE:       "PUSH_FIRMWARE",
 	ms1.PULL_FIRMWARE:       "PULL_FIRMWARE",
 	ms1.VERIFY_FIRMWARE:     "VERIFY_FIRMWARE",
-	ms1.GET_FIRMWARE: 		 "GET_FIRMWARE",
+	ms1.GET_FIRMWARE:        "GET_FIRMWARE",
 }
 
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
@@ -101,7 +101,7 @@ func (board *MS1) reset() error {
 	return nil
 }
 
-func (board *MS1) ping() error {
+func (board *MS1) Ping() error {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func (board *MS1) getMetaData() (*ms1.Meta, error) {
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	err = deviceMS.SetAddress(board.address)
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 	meta, err := deviceMS.GetMeta()
@@ -226,7 +226,7 @@ func (board *MS1) getFirmware(address string, logger chan any, RefBlChip string)
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return nil, err
-	}	
+	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	err = deviceMS.SetAddress(address)
@@ -251,13 +251,13 @@ func (board *MS1) getFirmware(address string, logger chan any, RefBlChip string)
 		printLog("getFirmware: no meta: can't identify RefBlChip, setting frames value as 400")
 		frames = 400
 	}
-	
+
 	var b bytes.Buffer
 	err = deviceMS.GetFirmware(&b, frames)
 	return b.Bytes(), err
 }
 
-func collectLogs(deviceMS *ms1.Device, logger chan any){
+func collectLogs(deviceMS *ms1.Device, logger chan any) {
 	devLogger := deviceMS.ActivateLog()
 	go func() {
 		for log := range devLogger {
@@ -278,24 +278,24 @@ func collectLogs(deviceMS *ms1.Device, logger chan any){
 */
 func getFirmwareFrames(RefBlChip string) int {
 	/*
-	# bootloader REF_CHIP
+		# bootloader REF_CHIP
 
-	Указывает на контроллер, здесь то, что нужно для компиляции прошивки (вид контроллера, память, число страниц, первая страница).
+		Указывает на контроллер, здесь то, что нужно для компиляции прошивки (вид контроллера, память, число страниц, первая страница).
 
-	- 0xb2cc4e728f9bf8f6: STM32G030F6, 8KB RAM, 0x7-я первая страница, всего 16 страниц, страницы по 2КБ.
-	- 0xb4272ba421624bbe: STM32G030K8/STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, но доступны только 17 (до 16U включительно), страницы по 2КБ.
-	- 0x387857a4b687c7f3: STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, страницы по 2КБ.
+		- 0xb2cc4e728f9bf8f6: STM32G030F6, 8KB RAM, 0x7-я первая страница, всего 16 страниц, страницы по 2КБ.
+		- 0xb4272ba421624bbe: STM32G030K8/STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, но доступны только 17 (до 16U включительно), страницы по 2КБ.
+		- 0x387857a4b687c7f3: STM32G030C8, 8KB RAM, 0x7-я первая страница, всего 32 страницы, страницы по 2КБ.
 	*/
 
 	// В одной странице 16 фреймов.
 	framesPerPage := 16
-	switch(RefBlChip) {
+	switch RefBlChip {
 	case "387857a4b687c7f3":
-		return (32-7)*framesPerPage
+		return (32 - 7) * framesPerPage
 	case "b4272ba421624bbe":
-		return (17-7)*framesPerPage
+		return (17 - 7) * framesPerPage
 	case "b2cc4e728f9bf8f6":
-		return (16-7)*framesPerPage
+		return (16 - 7) * framesPerPage
 	}
 	return 0
 }
@@ -303,15 +303,15 @@ func getFirmwareFrames(RefBlChip string) int {
 // Возвращение всех плат, которые откликнулись на пинг
 func (board *MS1) getConnectedBoards(addresses []string, client *WebSocketConnection) ([]string, error) {
 	const (
-		GET_BOARDS_BACKTRACK_PING     = 0
-		GET_BOARDS_BACKTRACK_REPLY    = 1
-		GET_BOARDS_BACKTRACK_NO_REPLY = 2
+		GET_BOARDS_BACKTRACK_PING       = 0
+		GET_BOARDS_BACKTRACK_REPLY      = 1
+		GET_BOARDS_BACKTRACK_NO_REPLY   = 2
 		GET_BOARDS_BACKTRACK_WRONG_ADDR = 3
 	)
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return nil, err
-	}	
+	}
 	defer portMS.Close()
 	deviceMS := ms1.NewDevice(portMS)
 	connectedBoards := make([]string, 0, len(addresses))
@@ -320,25 +320,25 @@ func (board *MS1) getConnectedBoards(addresses []string, client *WebSocketConnec
 		if err != nil {
 			MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
 				Address: address,
-				Code: GET_BOARDS_BACKTRACK_WRONG_ADDR,
+				Code:    GET_BOARDS_BACKTRACK_WRONG_ADDR,
 			}, client)
 			continue
 		}
 		MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
 			Address: address,
-			Code: GET_BOARDS_BACKTRACK_PING,
+			Code:    GET_BOARDS_BACKTRACK_PING,
 		}, client)
 		_, err = deviceMS.Ping()
 		if err != nil {
 			MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
 				Address: address,
-				Code: GET_BOARDS_BACKTRACK_NO_REPLY,
+				Code:    GET_BOARDS_BACKTRACK_NO_REPLY,
 			}, client)
 			continue
 		}
 		MSGetConnectedBoardsBacktrack(MSGetConnectedBacktrackMessage{
 			Address: address,
-			Code: GET_BOARDS_BACKTRACK_REPLY,
+			Code:    GET_BOARDS_BACKTRACK_REPLY,
 		}, client)
 		connectedBoards = append(connectedBoards, address)
 	}

@@ -121,3 +121,13 @@ func (board *Arduino) GetWebMessage(name string, deviceID string) any {
 		PortName:   board.portName,
 	}
 }
+
+func (board *Arduino) Ping() error {
+	args := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName, "-n"}
+	if configPath != "" {
+		args = append(args, "-C", configPath)
+	}
+	cmd := exec.Command(avrdudePath, args...)
+	err := cmd.Run()
+	return err
+}

@@ -47,3 +47,7 @@ func (board *FakeBoard) GetWebMessage(name string, deviceID string) any {
 		PortName:   board.portName,
 	}
 }
+
+func (board *FakeBoard) Ping() error {
+	return nil
+}
