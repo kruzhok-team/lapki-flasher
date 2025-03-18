@@ -131,3 +131,7 @@ func (board *Arduino) Ping() error {
 	err := cmd.Run()
 	return err
 }
+
+func (board *Arduino) Reset() error {
+	return nil
+}

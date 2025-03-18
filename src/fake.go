@@ -51,3 +51,7 @@ func (board *FakeBoard) GetWebMessage(name string, deviceID string) any {
 func (board *FakeBoard) Ping() error {
 	return nil
 }
+
+func (board *FakeBoard) Reset() error {
+	return nil
+}

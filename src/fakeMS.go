@@ -48,3 +48,7 @@ func (board *FakeMS) Update() bool {
 func (board *FakeMS) Ping() error {
 	return nil
 }
+
+func (board *FakeMS) Reset() error {
+	return nil
+}
