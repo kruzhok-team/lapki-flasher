@@ -68,6 +68,10 @@ func (temp *BoardTemplate) IsArduinoDevice() bool {
 	return temp.Type == "arduino"
 }
 
+func (temp *BoardTemplate) IsBlgMbDevice() bool {
+	return temp.Type == "blg-mb"
+}
+
 // находит шаблон платы по его id
 func findTemplateByID(boardID int) *BoardTemplate {
 	var template BoardTemplate

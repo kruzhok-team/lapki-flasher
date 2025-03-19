@@ -18,7 +18,7 @@ func (board *BlgMb) GetSerialPort() string {
 
 func (board *BlgMb) GetWebMessageType() string {
 	// TODO
-	return ""
+	return DeviceMsg
 }
 
 func (board *BlgMb) GetWebMessage(name string, deviceID string) any {

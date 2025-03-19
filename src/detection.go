@@ -25,6 +25,7 @@ type Detector struct {
 	dontAddTypes map[int]void
 
 	boardActions *list.List
+	blgMbList    []*Device // костыль для кибермишки
 }
 
 func NewDetector() *Detector {
@@ -58,6 +59,19 @@ func (d *Detector) Update() (
 	defer d.mu.Unlock()
 
 	detectedBoards = detectBoards(d.boardTemplates)
+
+	printLog(d.blgMbList, len(d.blgMbList))
+	// костыль для кибермишки
+	for _, blgMbDev := range d.blgMbList {
+		printLog("blgMbDev")
+		if blgMbDev.Board.IsConnected() {
+			if detectedBoards == nil {
+				detectedBoards = map[string]*Device{"blg-mb-1": blgMbDev}
+			} else {
+				detectedBoards["blg-mb-1"] = blgMbDev
+			}
+		}
+	}
 
 	// добавление фальшивых плат к действительно обнаруженным
 	if fakeBoardsNum > 0 || fakeMSNum > 0 {
@@ -244,7 +258,9 @@ pathToList - путь к json-файлу со списком устройств.
 func (d *Detector) initDeviceList(pathToList string) error {
 	if pathToList == "" {
 		err := json.Unmarshal(boardTemplatesRaw, &d.boardTemplates)
-		return err
+		if err != nil {
+			return err
+		}
 	} else {
 		jsonFile, err := os.Open(pathToList)
 		if err != nil {
@@ -261,6 +277,11 @@ func (d *Detector) initDeviceList(pathToList string) error {
 		if err != nil {
 			//log.Println("Can't unmarshal json file with custom device list. Standard device list will be used instead.", err.Error())
 			return err
+		}
+	}
+	for _, temp := range d.boardTemplates {
+		if temp.IsBlgMbDevice() {
+			d.blgMbList = append(d.blgMbList, newDevice(temp.Name, temp.ID, &BlgMb{}))
 		}
 	}
 	return nil
