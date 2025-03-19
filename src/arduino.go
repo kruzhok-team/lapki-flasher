@@ -38,6 +38,16 @@ func CopyArduino(board *Arduino) *Arduino {
 	}
 }
 
+func (board *Arduino) avrdude(args ...string) ([]byte, error) {
+	defaultArgs := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName}
+	if configPath != "" {
+		defaultArgs = append(defaultArgs, "-C", configPath)
+	}
+	defaultArgs = append(defaultArgs, args...)
+	cmd := exec.Command(avrdudePath, defaultArgs...)
+	return cmd.CombinedOutput()
+}
+
 // подключено ли устройство
 func (board *Arduino) IsConnected() bool {
 	return board.portName != NOT_FOUND
@@ -92,13 +102,7 @@ func (board *Arduino) Flash(filePath string, logger chan any) (string, error) {
 		return board.flashBootloader(filePath, logger)
 	}
 	flashFile := "flash:w:" + getAbolutePath(filePath) + ":a"
-	// без опции "-D" не может прошить Arduino Mega
-	args := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName, "-U", flashFile}
-	if configPath != "" {
-		args = append(args, "-C", configPath)
-	}
-	cmd := exec.Command(avrdudePath, args...)
-	stdout, err := cmd.CombinedOutput()
+	stdout, err := board.avrdude("-U", flashFile)
 	avrdudeMessage := handleFlashResult(string(stdout), err)
 	return avrdudeMessage, err
 }
@@ -120,4 +124,14 @@ func (board *Arduino) GetWebMessage(name string, deviceID string) any {
 		SerialID:   board.serialID,
 		PortName:   board.portName,
 	}
+}
+
+func (board *Arduino) Ping() error {
+	_, err := board.avrdude("-n")
+	return err
+}
+
+func (board *Arduino) Reset() error {
+	_, err := board.avrdude("-r")
+	return err
 }

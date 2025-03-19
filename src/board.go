@@ -50,6 +50,8 @@ type Board interface {
 	Update() bool
 	GetWebMessageType() string
 	GetWebMessage(name string, deviceID string) any
+	Ping() error
+	Reset() error
 }
 
 type Device struct {
