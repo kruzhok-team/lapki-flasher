@@ -284,7 +284,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func SendDevice(deviceID string, board *Device, toAll bool, c *WebSocketConnection) error {
-	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.Name, deviceID), toAll)
+	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.TypeDesc.Name, deviceID), toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
 	}
@@ -361,7 +361,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 		return ErrFlashBlocked
 	}
-	boardToFlashName := strings.ToLower(dev.Name)
+	boardToFlashName := strings.ToLower(dev.TypeDesc.Name)
 	for _, boardName := range notSupportedBoards {
 		if boardToFlashName == strings.ToLower(boardName) {
 			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)

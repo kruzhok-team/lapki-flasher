@@ -213,7 +213,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 							possibleSerialID = ""
 						}
 						detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
-						devs[device] = newDevice(boardTemplate.Name, boardTemplate.ID, detectedBoard)
+						devs[device] = newDevice(boardTemplate, detectedBoard)
 						printLog("Arduino device was found:", detectedBoard, device)
 					} else {
 						//TODO
@@ -252,7 +252,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 			pathesToDevices[i] = pack[i].pathToDevice
 		}
 		ms1 := NewMS1(portNames, MS1OS{pathesToDevices: pathesToDevices})
-		devs[pack[0].pathToDevice] = newDevice(pack[0].template.Name, pack[0].template.ID, ms1)
+		devs[pack[0].pathToDevice] = newDevice(*pack[0].template, ms1)
 	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))

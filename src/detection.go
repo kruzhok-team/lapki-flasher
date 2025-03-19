@@ -102,7 +102,7 @@ func (d *Detector) Update() (
 			}
 			oldBoard.Mu.Unlock()
 		} else {
-			if _, ok := d.dontAddTypes[newBoard.typeID]; ok {
+			if _, ok := d.dontAddTypes[newBoard.TypeDesc.ID]; ok {
 				notAddedDevices[deviceID] = newBoard
 			} else {
 				d.boards[deviceID] = newBoard
@@ -197,16 +197,20 @@ func (d *Detector) generateFakeBoards() {
 	d.fakeBoards = make(map[string]*Device)
 
 	// фальшивые параметры для фальшивых плат
-	id := -1
-	name := "Fake Board"
 	controller := "Fake Controller"
 	programmer := "Fake Programmer"
-
+	fakeArduinoTemp := BoardTemplate{
+		ID:                 -1,
+		Name:               "Fake Board",
+		PidVid:             []PidVidType{},
+		Type:               "Fake arduino",
+		FlashFileExtension: "hex",
+	}
 	// генерация фальшивых ардуино-подобных устройств
 	for i := 0; i < fakeBoardsNum; i++ {
 		fakeID := fmt.Sprintf("fakeid-%d", i)
 		fakePort := fmt.Sprintf("fakecom-%d", i)
-		newFakeBoard := newDevice(name, id, &FakeBoard{
+		newFakeBoard := newDevice(fakeArduinoTemp, &FakeBoard{
 			controller: controller,
 			programmer: programmer,
 			portName:   fakePort,
@@ -215,8 +219,13 @@ func (d *Detector) generateFakeBoards() {
 		d.fakeBoards[fakeID] = newFakeBoard
 	}
 
-	nameMS := "Fake ms1"
-	idMS := -2
+	fakeMsTemp := BoardTemplate{
+		ID:                 -2,
+		Name:               "Fake ms1",
+		PidVid:             []PidVidType{},
+		Type:               "Fake ms",
+		FlashFileExtension: "bin",
+	}
 	// генерация фальшивых МС-ТЮК
 	for i := 0; i < fakeMSNum; i++ {
 		fakeID := fmt.Sprintf("fakeidms-%d", i)
@@ -231,8 +240,7 @@ func (d *Detector) generateFakeBoards() {
 		}
 		fakeAddress += fakeID
 		newFakeBoard := newDevice(
-			nameMS,
-			idMS,
+			fakeMsTemp,
 			&FakeMS{
 				portNames:     fakePorts,
 				fakeAddress:   fakeAddress,
@@ -281,7 +289,7 @@ func (d *Detector) initDeviceList(pathToList string) error {
 	}
 	for _, temp := range d.boardTemplates {
 		if temp.IsBlgMbDevice() {
-			d.blgMbList = append(d.blgMbList, newDevice(temp.Name, temp.ID, &BlgMb{}))
+			d.blgMbList = append(d.blgMbList, newDevice(temp, &BlgMb{}))
 		}
 	}
 	return nil

@@ -168,8 +168,7 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 						goto SKIP
 					}
 					detectedDevice := newDevice(
-						boardTemplate.Name,
-						boardTemplate.ID,
+						boardTemplate,
 						board,
 					)
 					boards[ID] = detectedDevice

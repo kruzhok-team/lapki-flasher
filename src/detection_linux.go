@@ -118,7 +118,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
 						continue
 					}
-					devs[id] = newDevice(boardTemplate.Name, boardTemplate.ID, board)
+					devs[id] = newDevice(boardTemplate, board)
 				}
 
 			}
