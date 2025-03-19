@@ -45,5 +45,12 @@
     "productIDs": ["55D5"],
     "vendorIDs": ["1A86"],
     "isMSDevice": true
+  },
+  {
+    "ID": 5,
+    "name": "Кибермишка",
+    "productIDs": ["AC01"],
+    "vendorIDs": ["1209"],
+    "isMSDevice": false
   }
 ]
