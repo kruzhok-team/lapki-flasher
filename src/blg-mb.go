@@ -1,6 +1,9 @@
 package main
 
-import "errors"
+import (
+	"errors"
+	"os/exec"
+)
 
 type BlgMb struct {
 }
@@ -32,7 +35,8 @@ func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
 }
 
 func (board *BlgMb) Ping() error {
-	return errors.New("операция пинг не поддерживается для этого устройства")
+	cmd := exec.Command(blgMbUploaderPath, "-p")
+	return cmd.Run()
 }
 
 func (board *BlgMb) Reset() error {
