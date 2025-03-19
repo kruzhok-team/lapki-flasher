@@ -64,6 +64,8 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
 	m.handlers[MSGetConnectedBoardsMsg] = MSGetConnectedBoards
 	m.handlers[requestPackMsg] = RequestPack
+	m.handlers[pingMsg] = Ping
+	m.handlers[resetMsg] = Reset
 }
 
 // обработка нового соединения
