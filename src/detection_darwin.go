@@ -93,87 +93,92 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 	for _, entry := range plistArr {
 		isFound := false
 		for _, boardTemplate := range boardTemplates {
-			for _, productID := range boardTemplate.ProductIDs {
+			for _, pidvid := range boardTemplate.PidVid {
+				productID := pidvid.ProductID
 				PID, err := strconv.ParseInt(productID, 16, 64)
 				if err != nil {
 					printLog("conv of product id to decimal is failed: ", err.Error())
 					continue
 				}
-				for _, vendorID := range boardTemplate.VendorIDs {
-					VID, err := strconv.ParseInt(vendorID, 16, 64)
-					if err != nil {
-						printLog("conv of vendor id to decimal is failed: ", err.Error())
-						continue
-					}
-					if entry.ProductID == PID && entry.VendorID == VID {
-						var board Board
-						var ID string
-						if boardTemplate.IsMSDevice {
-							// TODO
-							portsMap := make(map[string]struct{}, 4)
-							ID = strconv.FormatInt(collectMSBoardInfo(entry, portsMap), 10)
-							if ID == "" || ID == "0" {
-								printLog("can't find ID!")
-								goto SKIP
-							}
-							portsLen := len(portsMap)
-							if portsLen != 4 {
-								log.Println("Error: incorrect number of ports for ms1 device:", portsLen)
-								goto SKIP
-							}
-							ports := make([]string, portsLen)
-							i := 0
-							for port, _ := range portsMap {
-								ports[i] = port
-								i++
-							}
-							sort.Slice(ports, func(i, j int) bool {
-								len_1 := len(ports[i])
-								len_2 := len(ports[j])
-								if len_1 != len_2 {
-									return len_1 < len_2
-								} else {
-									return ports[i] < ports[j]
-								}
-							})
-							board = NewMS1(
-								[4]string{ports[0], ports[1], ports[2], ports[3]},
-								MS1OS{},
-							)
-						} else {
-							arduino := NewArduinoFromTemp(
-								boardTemplate,
-								NOT_FOUND,
-								ArduinoOS{},
-								NOT_FOUND,
-							)
-							ID = strconv.FormatInt(collectArduinoBoardInfo(entry, arduino), 10)
-							if arduino.serialID != "" {
-								ID = arduino.serialID
-							}
-							if ID == "" || ID == "0" {
-								printLog("can't find ID!")
-								goto SKIP
-							}
-							if arduino.portName == NOT_FOUND {
-								printLog("can't find port name!")
-								goto SKIP
-							}
-							arduino.ardOS.ID = ID
-							board = arduino
-						}
-						detectedDevice := newDevice(
-							boardTemplate.Name,
-							boardTemplate.ID,
-							board,
-						)
-						boards[ID] = detectedDevice
-						printLog("Found device", ID, detectedDevice)
-						isFound = true
-						goto SKIP
-
-					}
+				vendorID := pidvid.VendorID
+				VID, err := strconv.ParseInt(vendorID, 16, 64)
+				if err != nil {
+					printLog("conv of vendor id to decimal is failed: ", err.Error())
+					continue
 				}
+				if entry.ProductID == PID && entry.VendorID == VID {
+					var board Board
+					var ID string
+					if boardTemplate.IsMSDevice() {
+						// TODO
+						portsMap := make(map[string]struct{}, 4)
+						ID = strconv.FormatInt(collectMSBoardInfo(entry, portsMap), 10)
+						if ID == "" || ID == "0" {
+							printLog("can't find ID!")
+							goto SKIP
+						}
+						portsLen := len(portsMap)
+						if portsLen != 4 {
+							log.Println("Error: incorrect number of ports for ms1 device:", portsLen)
+							goto SKIP
+						}
+						ports := make([]string, portsLen)
+						i := 0
+						for port, _ := range portsMap {
+							ports[i] = port
+							i++
+						}
+						sort.Slice(ports, func(i, j int) bool {
+							len_1 := len(ports[i])
+							len_2 := len(ports[j])
+							if len_1 != len_2 {
+								return len_1 < len_2
+							} else {
+								return ports[i] < ports[j]
+							}
+						})
+						board = NewMS1(
+							[4]string{ports[0], ports[1], ports[2], ports[3]},
+							MS1OS{},
+						)
+					} else if boardTemplate.IsArduinoDevice() {
+						arduino := NewArduinoFromTemp(
+							boardTemplate,
+							NOT_FOUND,
+							ArduinoOS{},
+							NOT_FOUND,
+						)
+						ID = strconv.FormatInt(collectArduinoBoardInfo(entry, arduino), 10)
+						if arduino.serialID != "" {
+							ID = arduino.serialID
+						}
+						if ID == "" || ID == "0" {
+							printLog("can't find ID!")
+							goto SKIP
+						}
+						if arduino.portName == NOT_FOUND {
+							printLog("can't find port name!")
+							goto SKIP
+						}
+						arduino.ardOS.ID = ID
+						board = arduino
+					} else {
+						//TODO
+						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
+						goto SKIP
+					}
+					detectedDevice := newDevice(
+						boardTemplate.Name,
+						boardTemplate.ID,
+						board,
+					)
+					boards[ID] = detectedDevice
+					printLog("Found device", ID, detectedDevice)
+					isFound = true
+					goto SKIP
+
+				}
+
 			}
 		}
 	SKIP:
