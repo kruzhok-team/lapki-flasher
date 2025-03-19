@@ -92,9 +92,13 @@
   },
   {
     "ID": 5,
-    "name": "Кибермишка",
-    "productIDs": ["AC01"],
-    "vendorIDs": ["1209"],
-    "isMSDevice": false
+    "name": "КиберМишка",
+    "pidvid": [
+      {
+        "productID": "AC01",
+        "vendorID": "1209"
+      }
+    ],
+    "type": "blg-mb"
   }
 ]
