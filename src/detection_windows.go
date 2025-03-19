@@ -144,11 +144,30 @@ func getInstanceId(substring string) []string {
 	return pathesToDevices
 }
 
+func getLibusbDevs() []string {
+	const LIBUSB_PATH = "SYSTEM\\CurrentControlSet\\Services\\libusb0\\enum"
+	key, values, err := getRegistryValues(LIBUSB_PATH)
+	if err != nil {
+		printLog(err.Error())
+		return nil
+	}
+	defer handleCloseRegistryKey(key, LIBUSB_PATH)
+	devs := []string{}
+	for _, valueName := range values {
+		value, _, err := key.GetStringValue(valueName)
+		if err != nil {
+			continue
+		}
+		devs = append(devs, value)
+	}
+	return devs
+}
+
 // находит все подключённые платы
 func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	//startTime := time.Now()
 	devs := make(map[string]*Device)
-	presentUSBDevices := getInstanceId("")
+	presentUSBDevices := append(getInstanceId(""), getLibusbDevs()...)
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
@@ -176,6 +195,10 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 				// нашли подходящее устройство
 				//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
 				if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
+					if boardTemplate.IsBlgMbDevice() {
+						devs[device] = newDevice(boardTemplate, &BlgMb{})
+						continue
+					}
 					portName := findPortName(&device)
 					if portName == NOT_FOUND {
 						printLog(device)

@@ -162,10 +162,12 @@ func IOREGscan(plistArr []IOREG, boardTemplates []BoardTemplate, boards map[stri
 						}
 						arduino.ardOS.ID = ID
 						board = arduino
+					} else if boardTemplate.IsBlgMbDevice() {
+						ID = productID + vendorID + "blg-mb"
+						board = &BlgMb{}
 					} else {
-						//TODO
 						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
-						goto SKIP
+						continue
 					}
 					detectedDevice := newDevice(
 						boardTemplate,
