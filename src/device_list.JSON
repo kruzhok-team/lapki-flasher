@@ -12,7 +12,7 @@
         "vendorID": "2341"
       }
     ],
-    "type": "Arduino",
+    "type": "arduino",
     "typePayload": {
       "controller": "ATmega32U4",
       "programmer": "avr109",
@@ -32,7 +32,7 @@
         "vendorID": "2341"
       }
     ],
-    "type": "Arduino",
+    "type": "arduino",
     "typePayload": {
       "controller": "ATmega32U4",
       "programmer": "avr109",
@@ -56,7 +56,7 @@
         "vendorID": "1a86"
       }
     ],
-    "type": "Arduino",
+    "type": "arduino",
     "typePayload": {
       "controller": "ATmega328P",
       "programmer": "arduino",
@@ -72,7 +72,7 @@
         "vendorID": "2a03"
       }
     ],
-    "type": "Arduino",
+    "type": "arduino",
     "typePayload": {
       "controller": "ATmega2560",
       "programmer": "wiring",
