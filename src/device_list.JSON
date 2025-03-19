@@ -2,48 +2,92 @@
   {
     "ID": 0,
     "name": "Arduino Micro",
-    "productIDs": ["8037"],
-    "vendorIDs": ["2a03", "2341"],
-    "controller": "ATmega32U4",
-    "programmer": "avr109",
-    "bootloaderID": 1,
-    "isMSDevice": false
+    "pidvid": [
+      {
+        "productID": "8037",
+        "vendorID": "2a03"
+      },
+      {
+        "productID": "8037",
+        "vendorID": "2341"
+      }
+    ],
+    "type": "Arduino",
+    "typePayload": {
+      "controller": "ATmega32U4",
+      "programmer": "avr109",
+      "bootloaderID": 1
+    }
   },
   {
     "ID": 1,
     "name": "Arduino Micro (bootloader)",
-    "productIDs": ["0037"],
-    "vendorIDs": ["2a03", "2341"],
-    "controller": "ATmega32U4",
-    "programmer": "avr109",
-    "bootloaderID": -1,
-    "isMSDevice": false
+    "pidvid": [
+      {
+        "productID": "0037",
+        "vendorID": "2a03"
+      },
+      {
+        "productID": "0037",
+        "vendorID": "2341"
+      }
+    ],
+    "type": "Arduino",
+    "typePayload": {
+      "controller": "ATmega32U4",
+      "programmer": "avr109",
+      "bootloaderID": -1
+    }
   },
   {
     "ID": 2,
     "name": "Arduino Uno",
-    "productIDs": ["0043", "7523"],
-    "vendorIDs": ["2a03", "2341", "1a86"],
-    "controller": "ATmega328P",
-    "programmer": "arduino",
-    "bootloaderID": -1,
-    "isMSDevice": false
+    "pidvid": [
+      {
+        "productID": "0043",
+        "vendorID": "2a03"
+      },
+      {
+        "productID": "0043",
+        "vendorID": "2341"
+      },
+      {
+        "productID": "7523",
+        "vendorID": "1a86"
+      }
+    ],
+    "type": "Arduino",
+    "typePayload": {
+      "controller": "ATmega328P",
+      "programmer": "arduino",
+      "bootloaderID": -1
+    }
   },
   {
     "ID": 3,
     "name": "Arduino Mega",
-    "productIDs": ["0042"],
-    "vendorIDs": ["2341"],
-    "controller": "ATmega2560",
-    "programmer": "wiring",
-    "bootloaderID": -1,
-    "isMSDevice": false
+    "pidvid": [
+      {
+        "productID": "0042",
+        "vendorID": "2a03"
+      }
+    ],
+    "type": "Arduino",
+    "typePayload": {
+      "controller": "ATmega2560",
+      "programmer": "wiring",
+      "bootloaderID": -1
+    }
   },
   {
     "ID": 4,
     "name": "МС-ТЮК",
-    "productIDs": ["55D5"],
-    "vendorIDs": ["1A86"],
-    "isMSDevice": true
+    "pidvid": [
+      {
+        "productID": "55D5",
+        "vendorID": "1A86"
+      }
+    ],
+    "type": "tjc-ms"
   }
 ]
