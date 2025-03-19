@@ -35,6 +35,12 @@ type MSDeviceMessage struct {
 	PortNames [4]string `json:"portNames,omitempty"`
 }
 
+// минимальная информация об устройстве
+type SimpleDeviceMessage struct {
+	ID   string `json:"deviceID"`
+	Name string `json:"name,omitempty"`
+}
+
 // тип данных для flash-start (для arduino-подобных устройств)
 type FlashStartMessage struct {
 	ID       string `json:"deviceID"`
@@ -178,6 +184,8 @@ const (
 	DeviceMsg = "device"
 	// описание МС-ТЮК
 	MSDeviceMsg = "ms-device"
+	// описание кибермишки
+	BlgMbDeviceMsg = "blg-mb-device"
 	// запрос на прошивку устройства
 	FlashStartMsg = "flash-start"
 	// прошивка прошла успешна

@@ -17,13 +17,11 @@ func (board *BlgMb) GetSerialPort() string {
 }
 
 func (board *BlgMb) GetWebMessageType() string {
-	// TODO
-	return DeviceMsg
+	return BlgMbDeviceMsg
 }
 
 func (board *BlgMb) GetWebMessage(name string, deviceID string) any {
-	// TODO
-	return DeviceMessage{
+	return SimpleDeviceMessage{
 		ID:   deviceID,
 		Name: name,
 	}
