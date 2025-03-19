@@ -60,10 +60,8 @@ func (d *Detector) Update() (
 
 	detectedBoards = detectBoards(d.boardTemplates)
 
-	printLog(d.blgMbList, len(d.blgMbList))
 	// костыль для кибермишки
 	for _, blgMbDev := range d.blgMbList {
-		printLog("blgMbDev")
 		if blgMbDev.Board.IsConnected() {
 			if detectedBoards == nil {
 				detectedBoards = map[string]*Device{"blg-mb-1": blgMbDev}
