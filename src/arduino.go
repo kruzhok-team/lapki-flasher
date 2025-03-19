@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os/exec"
 	"time"
@@ -16,15 +17,27 @@ type Arduino struct {
 }
 
 func NewArduinoFromTemp(temp BoardTemplate, portName string, ardOS ArduinoOS, serialID string) *Arduino {
-	arduino := Arduino{
-		controller:   temp.Controller,
-		programmer:   temp.Programmer,
-		bootloaderID: temp.BootloaderID,
+	var arduinoPayload ArduinoPayload
+	err := json.Unmarshal(temp.TypePayload, &arduinoPayload)
+	if err != nil {
+		printLog("Error, wrong arduino payload!")
+		return &Arduino{
+			controller:   "Unknown",
+			programmer:   "Unknown",
+			bootloaderID: -1,
+			serialID:     serialID,
+			portName:     portName,
+			ardOS:        ardOS,
+		}
+	}
+	return &Arduino{
+		controller:   arduinoPayload.Controller,
+		programmer:   arduinoPayload.Programmer,
+		bootloaderID: arduinoPayload.BootloaderID,
 		serialID:     serialID,
 		portName:     portName,
 		ardOS:        ardOS,
 	}
-	return &arduino
 }
 
 func CopyArduino(board *Arduino) *Arduino {
