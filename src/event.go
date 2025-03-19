@@ -368,27 +368,17 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			return nil
 		}
 	}
-	// расширение для файла прошивки
-	var ext string
 	switch dev.Board.(type) {
 	case *Arduino:
 		if dev.SerialMonitor.isOpen() {
 			return ErrFlashOpenSerialMonitor
 		}
-		if event.Type == FlashStartMsg {
-			ext = "hex"
-		} else {
-			// TODO
-		}
 	case *MS1:
 		if event.Type == MSBinStartMsg {
-			ext = "bin"
 			if address != "" {
 				dev.Board.(*MS1).address = address
 			}
 			dev.Board.(*MS1).verify = verification
-		} else {
-			// TODO
 		}
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
@@ -396,7 +386,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	c.FlashingBoard.SetLock(true)
 
 	FileWriter := newFlashFileWriter()
-	FileWriter.Start(fileSize, ext)
+	FileWriter.Start(fileSize, dev.TypeDesc.FlashFileExtension)
 	defer func() {
 		FileWriter.Clear()
 		c.FlashingBoard.SetLock(false)
