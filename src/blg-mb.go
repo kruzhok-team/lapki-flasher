@@ -30,8 +30,10 @@ func (board *BlgMb) GetWebMessage(name string, deviceID string) any {
 }
 
 func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
-	// TODO
-	return "", nil
+	cmd := exec.Command(blgMbUploaderPath, "-w", "-f", filePath)
+	stdout, err := cmd.CombinedOutput()
+	msg := handleFlashResult(string(stdout), err)
+	return msg, err
 }
 
 func (board *BlgMb) Ping() error {
