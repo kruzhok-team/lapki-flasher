@@ -10,7 +10,7 @@ require (
 require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/tjgq/ticker v0.0.0-20140913211110-8b4870134629
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.31.0
 )
 
 require (
@@ -27,5 +27,5 @@ require (
 
 require (
 	github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f // indirect
-	go.bug.st/serial v1.6.2 // indirect
+	go.bug.st/serial v1.6.3 // indirect
 )

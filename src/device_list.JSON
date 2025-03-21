@@ -17,7 +17,8 @@
       "controller": "ATmega32U4",
       "programmer": "avr109",
       "bootloaderID": 1
-    }
+    },
+    "flashFileExtension": "hex"
   },
   {
     "ID": 1,
@@ -37,7 +38,8 @@
       "controller": "ATmega32U4",
       "programmer": "avr109",
       "bootloaderID": -1
-    }
+    },
+    "flashFileExtension": "hex"
   },
   {
     "ID": 2,
@@ -61,7 +63,8 @@
       "controller": "ATmega328P",
       "programmer": "arduino",
       "bootloaderID": -1
-    }
+    },
+    "flashFileExtension": "hex"
   },
   {
     "ID": 3,
@@ -77,7 +80,8 @@
       "controller": "ATmega2560",
       "programmer": "wiring",
       "bootloaderID": -1
-    }
+    },
+    "flashFileExtension": "hex"
   },
   {
     "ID": 4,
@@ -88,6 +92,19 @@
         "vendorID": "1A86"
       }
     ],
-    "type": "tjc-ms"
+    "type": "tjc-ms",
+    "flashFileExtension": "bin"
+  },
+  {
+    "ID": 5,
+    "name": "КиберМишка",
+    "pidvid": [
+      {
+        "productID": "AC01",
+        "vendorID": "1209"
+      }
+    ],
+    "type": "blg-mb",
+    "flashFileExtension": "bin"
   }
 ]

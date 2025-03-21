@@ -66,6 +66,10 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 				vid := pidvid.VendorID
 				pid := pidvid.ProductID
 				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) && strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
+					if boardTemplate.IsBlgMbDevice() {
+						devs[pid+vid+"blg-mb"] = newDevice(boardTemplate, &BlgMb{})
+						continue
+					}
 					ports := findPortName(desc)
 					portsNum := len(ports)
 					if portsNum < 1 || ports[0] == NOT_FOUND {
@@ -114,11 +118,10 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 							serialID,
 						)
 					} else {
-						//TODO
 						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
 						continue
 					}
-					devs[id] = newDevice(boardTemplate.Name, boardTemplate.ID, board)
+					devs[id] = newDevice(boardTemplate, board)
 				}
 
 			}

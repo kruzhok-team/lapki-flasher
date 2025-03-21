@@ -20,11 +20,12 @@ type ArduinoPayload struct {
 }
 
 type BoardTemplate struct {
-	ID          int             `json:"ID"`
-	PidVid      []PidVidType    `json:"pidvid"`
-	Name        string          `json:"name"`
-	Type        string          `json:"type"`
-	TypePayload json.RawMessage `json:"typePayload"`
+	ID                 int             `json:"ID"`
+	PidVid             []PidVidType    `json:"pidvid"`
+	Name               string          `json:"name"`
+	Type               string          `json:"type"`
+	TypePayload        json.RawMessage `json:"typePayload"`
+	FlashFileExtension string          `json:"flashFileExtension"`
 }
 
 type Board interface {
@@ -39,18 +40,16 @@ type Board interface {
 }
 
 type Device struct {
-	Name          string
-	typeID        int
+	TypeDesc      *BoardTemplate
 	Mu            sync.Mutex
 	Flashing      bool
 	Board         Board
 	SerialMonitor SerialMonitor
 }
 
-func newDevice(name string, typeID int, board Board) *Device {
+func newDevice(typeDesc BoardTemplate, board Board) *Device {
 	device := Device{
-		Name:     name,
-		typeID:   typeID,
+		TypeDesc: &typeDesc,
 		Board:    board,
 		Flashing: false,
 		SerialMonitor: SerialMonitor{
@@ -66,6 +65,10 @@ func (temp *BoardTemplate) IsMSDevice() bool {
 
 func (temp *BoardTemplate) IsArduinoDevice() bool {
 	return temp.Type == "arduino"
+}
+
+func (temp *BoardTemplate) IsBlgMbDevice() bool {
+	return temp.Type == "blg-mb"
 }
 
 // находит шаблон платы по его id
