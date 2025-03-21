@@ -399,7 +399,6 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		FileWriter.Clear()
 		c.FlashingBoard.SetLock(false)
 		c.FlashingBoard = nil
-		c.flasherMsg = ""
 	}()
 	FlashNextBlock(c)
 	for {
