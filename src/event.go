@@ -320,7 +320,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg FlashStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -328,7 +328,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg MSBinStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -336,7 +336,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		verification = msg.Verification
 	}
 	if fileSize < 1 {
-		return nil
+		return ErrIncorrectFileSize
 	}
 	if fileSize > maxFileSize {
 		return ErrFlashLargeFile
@@ -410,7 +410,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 		fileCreated, err := FileWriter.AddBlock(binData)
 		if err != nil {
-			return err
+			return ErrFileWriter
 		}
 		if fileCreated {
 			logger := make(chan any)
