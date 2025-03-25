@@ -94,7 +94,7 @@ func (board *Arduino) flashBootloader(filePath string, logger chan any) (string,
 		sameTypeCnt := 0
 		var bootloaderDevice *Device
 		for _, dev := range notAddedDevices {
-			if dev.typeID == bootloaderType {
+			if dev.TypeDesc.ID == bootloaderType {
 				bootloaderDevice = dev
 				sameTypeCnt++
 				if sameTypeCnt > 1 {

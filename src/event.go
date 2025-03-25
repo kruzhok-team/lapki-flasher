@@ -35,6 +35,12 @@ type MSDeviceMessage struct {
 	PortNames [4]string `json:"portNames,omitempty"`
 }
 
+// минимальная информация об устройстве
+type SimpleDeviceMessage struct {
+	ID   string `json:"deviceID"`
+	Name string `json:"name,omitempty"`
+}
+
 // тип данных для flash-start (для arduino-подобных устройств)
 type FlashStartMessage struct {
 	ID       string `json:"deviceID"`
@@ -178,6 +184,8 @@ const (
 	DeviceMsg = "device"
 	// описание МС-ТЮК
 	MSDeviceMsg = "ms-device"
+	// описание кибермишки
+	BlgMbDeviceMsg = "blg-mb-device"
 	// запрос на прошивку устройства
 	FlashStartMsg = "flash-start"
 	// прошивка прошла успешна
@@ -284,7 +292,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func SendDevice(deviceID string, board *Device, toAll bool, c *WebSocketConnection) error {
-	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.Name, deviceID), toAll)
+	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.TypeDesc.Name, deviceID), toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
 	}
@@ -312,7 +320,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg FlashStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -320,7 +328,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg MSBinStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -328,7 +336,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		verification = msg.Verification
 	}
 	if fileSize < 1 {
-		return nil
+		return ErrIncorrectFileSize
 	}
 	if fileSize > maxFileSize {
 		return ErrFlashLargeFile
@@ -361,34 +369,24 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 		return ErrFlashBlocked
 	}
-	boardToFlashName := strings.ToLower(dev.Name)
+	boardToFlashName := strings.ToLower(dev.TypeDesc.Name)
 	for _, boardName := range notSupportedBoards {
 		if boardToFlashName == strings.ToLower(boardName) {
 			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
 			return nil
 		}
 	}
-	// расширение для файла прошивки
-	var ext string
 	switch dev.Board.(type) {
 	case *Arduino:
 		if dev.SerialMonitor.isOpen() {
 			return ErrFlashOpenSerialMonitor
 		}
-		if event.Type == FlashStartMsg {
-			ext = "hex"
-		} else {
-			// TODO
-		}
 	case *MS1:
 		if event.Type == MSBinStartMsg {
-			ext = "bin"
 			if address != "" {
 				dev.Board.(*MS1).address = address
 			}
 			dev.Board.(*MS1).verify = verification
-		} else {
-			// TODO
 		}
 	}
 	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
@@ -396,12 +394,11 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	c.FlashingBoard.SetLock(true)
 
 	FileWriter := newFlashFileWriter()
-	FileWriter.Start(fileSize, ext)
+	FileWriter.Start(fileSize, dev.TypeDesc.FlashFileExtension)
 	defer func() {
 		FileWriter.Clear()
 		c.FlashingBoard.SetLock(false)
 		c.FlashingBoard = nil
-		c.flasherMsg = ""
 	}()
 	FlashNextBlock(c)
 	for {
@@ -412,7 +409,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 		fileCreated, err := FileWriter.AddBlock(binData)
 		if err != nil {
-			return err
+			return ErrFileWriter
 		}
 		if fileCreated {
 			logger := make(chan any)
