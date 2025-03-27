@@ -59,7 +59,7 @@ jobs:
       with:
         name: mac-build
         path: |
-          src/lapki-arm64
+          src/flasher-arm64
 
     - name: Build amd64
       run: CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -C src -o flasher_amd64 
@@ -68,7 +68,7 @@ jobs:
       with:
         name: mac-build
         path: |
-          src/lapki-amd64
+          src/flasher-amd64
 
     - name: Build universal
       run: lipo -create -output src/lapki-flasher src/flasher_arm64 src/flasher_amd64
