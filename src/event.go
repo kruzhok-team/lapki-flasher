@@ -345,59 +345,66 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if !exists {
 		return ErrFlashWrongID
 	}
-	// плата блокируется!!!
-	// не нужно использовать sync функции внутри блока
-	dev.Mu.Lock()
-	defer dev.Mu.Unlock()
-	updated := dev.Board.Update()
-	if updated {
-		if dev.Board.IsConnected() {
-			DeviceUpdatePort(deviceID, dev, c)
-		} else {
-			detector.DeleteBoard(deviceID)
-			DeviceUpdateDelete(deviceID, c)
-			return ErrFlashDisconnected
-		}
-	}
-	// FIXME:
-	// Это условие возможно никогда не сработает из-за блокировки mutex.
-	// Если два клиента попытаются прошить одно и то же устройство, то один из них будет ждать своей очереди.
-	// Нужно подумать, стоит ли перенести это условие в другое место, или просто его убрать.
-	if dev.IsFlashBlocked() {
-		if c.FlashingDevId == deviceID {
-			return ErrFlashNotFinished
-		}
-		return ErrFlashBlocked
-	}
-	boardToFlashName := strings.ToLower(dev.TypeDesc.Name)
-	for _, boardName := range notSupportedBoards {
-		if boardToFlashName == strings.ToLower(boardName) {
-			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
-			return nil
-		}
-	}
-	switch dev.Board.(type) {
-	case *Arduino:
-		if dev.SerialMonitor.isOpen() {
-			return ErrFlashOpenSerialMonitor
-		}
-	case *MS1:
-		if event.Type == MSBinStartMsg {
-			if address != "" {
-				dev.Board.(*MS1).address = address
+	check := func() error {
+		// плата блокируется!!!
+		// не нужно использовать sync функции внутри блока
+		dev.Mu.Lock()
+		defer dev.Mu.Unlock()
+		updated := dev.Board.Update()
+		if updated {
+			if dev.Board.IsConnected() {
+				DeviceUpdatePort(deviceID, dev, c)
+			} else {
+				detector.DeleteBoard(deviceID)
+				DeviceUpdateDelete(deviceID, c)
+				return ErrFlashDisconnected
 			}
-			dev.Board.(*MS1).verify = verification
 		}
-	}
-	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-	c.FlashingBoard = dev
-	c.FlashingBoard.SetLock(true)
+		// FIXME:
+		// Это условие возможно никогда не сработает из-за блокировки mutex.
+		// Если два клиента попытаются прошить одно и то же устройство, то один из них будет ждать своей очереди.
+		// Нужно подумать, стоит ли перенести это условие в другое место, или просто его убрать.
+		if dev.IsFlashBlocked() {
+			if c.FlashingDevId == deviceID {
+				return ErrFlashNotFinished
+			}
+			return ErrFlashBlocked
+		}
+		boardToFlashName := strings.ToLower(dev.TypeDesc.Name)
+		for _, boardName := range notSupportedBoards {
+			if boardToFlashName == strings.ToLower(boardName) {
+				c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
+				return nil
+			}
+		}
+		switch dev.Board.(type) {
+		case *Arduino:
+			if dev.SerialMonitor.isOpen() {
+				return ErrFlashOpenSerialMonitor
+			}
+		case *MS1:
+			if event.Type == MSBinStartMsg {
+				if address != "" {
+					dev.Board.(*MS1).address = address
+				}
+				dev.Board.(*MS1).verify = verification
+			}
+		}
+		// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
+		c.FlashingBoard = dev
+		c.FlashingBoard.SetLock(true)
 
+		return nil
+	}
+	err := check()
+	if err != nil {
+		return err
+	}
 	FileWriter := newFlashFileWriter()
 	FileWriter.Start(fileSize, dev.TypeDesc.FlashFileExtension)
 	defer func() {
 		FileWriter.Clear()
-		c.FlashingBoard.SetLock(false)
+		c.FlashingBoard.SetLockSync(false)
 		c.FlashingBoard = nil
 	}()
 	FlashNextBlock(c)
