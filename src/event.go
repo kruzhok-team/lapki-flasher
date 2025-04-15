@@ -312,9 +312,9 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
 	log.Println("Flash-start")
-	if !c.IsBinChanBusySync() {
+	if c.IsBinChanBusySync() {
 		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
-		return ErrFlashNotStarted
+		return ErrFlashNotFinished
 	}
 	var deviceID string
 	var fileSize int
