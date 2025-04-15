@@ -97,8 +97,41 @@ func (c *WebSocketConnection) decNumQueries() {
 }
 
 // true, если ожидается передача данных через binDataChan
-func (c *WebSocketConnection) IsBinChanBusy() bool {
+func (c *WebSocketConnection) IsBinChanBusySync() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.FlashingBoard != nil
+}
+
+func (c *WebSocketConnection) SetFlashingBoard(dev *Device, ID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.FlashingBoard = dev
+	c.FlashingDevId = ID
+}
+
+func (c *WebSocketConnection) GetFlashingBoardSync() *Device {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.FlashingBoard
+}
+
+func (c *WebSocketConnection) GetFlashingDevIdSync() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.FlashingDevId
+}
+
+func (c *WebSocketConnection) GetFlasherMessageSync() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.flasherMsg
+}
+
+func (c *WebSocketConnection) SetFlasherMessageSync(msg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.flasherMsg = msg
 }
 
 func (c *WebSocketConnection) isClosedChan() bool {

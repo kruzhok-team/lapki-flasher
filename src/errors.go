@@ -54,9 +54,9 @@ func errorHandler(err error, c *WebSocketConnection) {
 		c.StopFlashingSync()
 	case ErrAvrdude:
 		c.StopFlashingSync()
-		payload = c.flasherMsg
+		payload = c.GetFlasherMessageSync()
 		defer func() {
-			c.flasherMsg = ""
+			c.SetFlasherMessageSync("")
 		}()
 	}
 	c.sendOutgoingEventMessage(msgType, payload, false)

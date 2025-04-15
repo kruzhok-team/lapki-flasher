@@ -312,6 +312,10 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
 	log.Println("Flash-start")
+	if !c.IsBinChanBusySync() {
+		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
+		return ErrFlashNotStarted
+	}
 	var deviceID string
 	var fileSize int
 	var address string    // адрес, только для МС-ТЮК
@@ -391,7 +395,8 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			}
 		}
 		// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-		c.FlashingBoard = dev
+		// это sync функция, но она блокирует клиент, а не устройство
+		c.SetFlashingBoard(dev, deviceID)
 		c.FlashingBoard.SetLock(true)
 
 		return nil
@@ -411,11 +416,11 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		}
 		if c.FlashingBoard != nil {
 			c.FlashingBoard.SetLockSync(false)
-			c.FlashingBoard = nil
 		} else {
 			// Сообщение для дебага, если это сообщение появилось, то значит, что-то пошло не так
 			println("WARNING! FlashingBoard is nil")
 		}
+		c.SetFlashingBoard(nil, "")
 	}()
 	FlashNextBlock(c)
 	for {
@@ -436,8 +441,8 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 			if err != nil {
 				return ErrAvrdude
 			}
-			err = c.sendOutgoingEventMessage(FlashDoneMsg, c.flasherMsg, false)
-			c.flasherMsg = ""
+			err = c.sendOutgoingEventMessage(FlashDoneMsg, c.GetFlasherMessageSync(), false)
+			c.SetFlasherMessageSync("")
 			return err
 		} else {
 			FlashNextBlock(c)
@@ -462,7 +467,7 @@ func LogSend(client *WebSocketConnection, logger chan any) {
 // принятие блока с бинарными данными файла
 func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
 	// FIXME: cделать функцию sync?
-	if !c.IsBinChanBusy() {
+	if !c.IsBinChanBusySync() {
 		return ErrFlashNotStarted
 	}
 	c.binDataChan <- event.Payload
@@ -1048,7 +1053,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			}, c)
 		return err
 	}
-	if c.IsBinChanBusy() {
+	if c.IsBinChanBusySync() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
 				ID:      msg.ID,
@@ -1105,14 +1110,17 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		return nil
 	}
 	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
-	c.FlashingBoard = dev
-	c.FlashingDevId = msg.ID
+	c.SetFlashingBoard(dev, msg.ID)
 	c.FlashingBoard.SetLock(true)
 	transmission := newDataTransmission()
 	defer func() {
-		c.FlashingBoard.SetLock(false)
-		c.FlashingBoard = nil
-		c.FlashingDevId = ""
+		if c.GetFlashingBoardSync() != nil {
+			c.FlashingBoard.SetLock(false)
+		} else {
+			// Сообщение для дебага, если это сообщение появилось, то значит, что-то пошло не так
+			println("WARNING! FlashingBoard is nil")
+		}
+		c.SetFlashingBoard(nil, "")
 		transmission.Clear()
 	}()
 
@@ -1147,7 +1155,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 }
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
-	if !c.IsBinChanBusy() {
+	if !c.IsBinChanBusySync() {
 		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
 		return ErrFlashNotStarted
 	}
