@@ -403,9 +403,19 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	FileWriter := newFlashFileWriter()
 	FileWriter.Start(fileSize, dev.TypeDesc.FlashFileExtension)
 	defer func() {
-		FileWriter.Clear()
-		c.FlashingBoard.SetLockSync(false)
-		c.FlashingBoard = nil
+		if FileWriter != nil {
+			FileWriter.Clear()
+		} else {
+			// Сообщение для дебага, если это сообщение появилось, то значит, что-то пошло не так
+			println("WARNING! FileWriter is nil")
+		}
+		if c.FlashingBoard != nil {
+			c.FlashingBoard.SetLockSync(false)
+			c.FlashingBoard = nil
+		} else {
+			// Сообщение для дебага, если это сообщение появилось, то значит, что-то пошло не так
+			println("WARNING! FlashingBoard is nil")
+		}
 	}()
 	FlashNextBlock(c)
 	for {
