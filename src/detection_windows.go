@@ -144,11 +144,30 @@ func getInstanceId(substring string) []string {
 	return pathesToDevices
 }
 
+func getLibusbDevs() []string {
+	const LIBUSB_PATH = "SYSTEM\\CurrentControlSet\\Services\\libusb0\\enum"
+	key, values, err := getRegistryValues(LIBUSB_PATH)
+	if err != nil {
+		printLog(err.Error())
+		return nil
+	}
+	defer handleCloseRegistryKey(key, LIBUSB_PATH)
+	devs := []string{}
+	for _, valueName := range values {
+		value, _, err := key.GetStringValue(valueName)
+		if err != nil {
+			continue
+		}
+		devs = append(devs, value)
+	}
+	return devs
+}
+
 // находит все подключённые платы
 func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	//startTime := time.Now()
 	devs := make(map[string]*Device)
-	presentUSBDevices := getInstanceId("")
+	presentUSBDevices := append(getInstanceId(""), getLibusbDevs()...)
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
@@ -168,53 +187,61 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 		device := strings.TrimSpace(line)
 		deviceLen := len(device)
 		for _, boardTemplate := range boardTemplates {
-			for _, vendorID := range boardTemplate.VendorIDs {
-				for _, productID := range boardTemplate.ProductIDs {
-					pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
-					pathLen := len(pathPattern)
-					// нашли подходящее устройство
-					//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
-					if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
-						portName := findPortName(&device)
-						if portName == NOT_FOUND {
-							printLog(device)
+			for _, pidvid := range boardTemplate.PidVid {
+				vendorID := pidvid.VendorID
+				productID := pidvid.ProductID
+				pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
+				pathLen := len(pathPattern)
+				// нашли подходящее устройство
+				//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
+				if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
+					if boardTemplate.IsBlgMbDevice() {
+						devs[device] = newDevice(boardTemplate, &BlgMb{})
+						continue
+					}
+					portName := findPortName(&device)
+					if portName == NOT_FOUND {
+						printLog(device)
+						continue
+					}
+					if boardTemplate.IsMSDevice() {
+						// сбор МС-ТЮК "по-частям"
+
+						// поиск "FriendlyName"
+
+						keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s", device)
+						key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
+						if err != nil {
+							printLog("can't open key for ms1-device.", err.Error())
 							continue
 						}
-						if boardTemplate.IsMSDevice {
-							// сбор МС-ТЮК "по-частям"
-
-							// поиск "FriendlyName"
-
-							keyPath := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Enum\\%s", device)
-							key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyPath, registry.QUERY_VALUE)
-							if err != nil {
-								printLog("can't open key for ms1-device.", err.Error())
-								continue
-							}
-							friendlyName, _, err := key.GetStringValue("FriendlyName")
-							if err != nil {
-								printLog("can't get FriendlyName property for ms1-device.", err.Error())
-								key.Close()
-								continue
-							}
+						friendlyName, _, err := key.GetStringValue("FriendlyName")
+						if err != nil {
+							printLog("can't get FriendlyName property for ms1-device.", err.Error())
 							key.Close()
-							ms1parts = append(ms1parts, ms1Part{
-								template:     &boardTemplate,
-								portName:     portName,
-								pathToDevice: device,
-								friendlyName: friendlyName,
-							})
-						} else {
-							// поиск серийного номера
-							serialIndex := strings.LastIndex(device, "\\")
-							possibleSerialID := device[serialIndex+1:]
-							if strings.Contains(possibleSerialID, "&") {
-								possibleSerialID = ""
-							}
-							detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
-							devs[device] = newDevice(boardTemplate.Name, boardTemplate.ID, detectedBoard)
-							printLog("Arduino device was found:", detectedBoard, device)
+							continue
 						}
+						key.Close()
+						ms1parts = append(ms1parts, ms1Part{
+							template:     &boardTemplate,
+							portName:     portName,
+							pathToDevice: device,
+							friendlyName: friendlyName,
+						})
+					} else if boardTemplate.IsArduinoDevice() {
+						// поиск серийного номера
+						serialIndex := strings.LastIndex(device, "\\")
+						possibleSerialID := device[serialIndex+1:]
+						if strings.Contains(possibleSerialID, "&") {
+							possibleSerialID = ""
+						}
+						detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
+						devs[device] = newDevice(boardTemplate, detectedBoard)
+						printLog("Arduino device was found:", detectedBoard, device)
+					} else {
+						//TODO
+						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
+						continue
 					}
 				}
 			}
@@ -248,7 +275,7 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 			pathesToDevices[i] = pack[i].pathToDevice
 		}
 		ms1 := NewMS1(portNames, MS1OS{pathesToDevices: pathesToDevices})
-		devs[pack[0].pathToDevice] = newDevice(pack[0].template.Name, pack[0].template.ID, ms1)
+		devs[pack[0].pathToDevice] = newDevice(*pack[0].template, ms1)
 	}
 	//endTime := time.Now()
 	//printLog("Detection time: ", endTime.Sub(startTime))

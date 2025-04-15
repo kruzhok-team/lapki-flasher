@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os/exec"
 	"time"
@@ -16,15 +17,27 @@ type Arduino struct {
 }
 
 func NewArduinoFromTemp(temp BoardTemplate, portName string, ardOS ArduinoOS, serialID string) *Arduino {
-	arduino := Arduino{
-		controller:   temp.Controller,
-		programmer:   temp.Programmer,
-		bootloaderID: temp.BootloaderID,
+	var arduinoPayload ArduinoPayload
+	err := json.Unmarshal(temp.TypePayload, &arduinoPayload)
+	if err != nil {
+		printLog("Error, wrong arduino payload!")
+		return &Arduino{
+			controller:   "Unknown",
+			programmer:   "Unknown",
+			bootloaderID: -1,
+			serialID:     serialID,
+			portName:     portName,
+			ardOS:        ardOS,
+		}
+	}
+	return &Arduino{
+		controller:   arduinoPayload.Controller,
+		programmer:   arduinoPayload.Programmer,
+		bootloaderID: arduinoPayload.BootloaderID,
 		serialID:     serialID,
 		portName:     portName,
 		ardOS:        ardOS,
 	}
-	return &arduino
 }
 
 func CopyArduino(board *Arduino) *Arduino {
@@ -36,6 +49,16 @@ func CopyArduino(board *Arduino) *Arduino {
 		portName:     board.portName,
 		ardOS:        board.ardOS,
 	}
+}
+
+func (board *Arduino) avrdude(args ...string) ([]byte, error) {
+	defaultArgs := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName}
+	if configPath != "" {
+		defaultArgs = append(defaultArgs, "-C", configPath)
+	}
+	defaultArgs = append(defaultArgs, args...)
+	cmd := exec.Command(avrdudePath, defaultArgs...)
+	return cmd.CombinedOutput()
 }
 
 // подключено ли устройство
@@ -71,7 +94,7 @@ func (board *Arduino) flashBootloader(filePath string, logger chan any) (string,
 		sameTypeCnt := 0
 		var bootloaderDevice *Device
 		for _, dev := range notAddedDevices {
-			if dev.typeID == bootloaderType {
+			if dev.TypeDesc.ID == bootloaderType {
 				bootloaderDevice = dev
 				sameTypeCnt++
 				if sameTypeCnt > 1 {
@@ -92,13 +115,7 @@ func (board *Arduino) Flash(filePath string, logger chan any) (string, error) {
 		return board.flashBootloader(filePath, logger)
 	}
 	flashFile := "flash:w:" + getAbolutePath(filePath) + ":a"
-	// без опции "-D" не может прошить Arduino Mega
-	args := []string{"-D", "-p", board.controller, "-c", board.programmer, "-P", board.portName, "-U", flashFile}
-	if configPath != "" {
-		args = append(args, "-C", configPath)
-	}
-	cmd := exec.Command(avrdudePath, args...)
-	stdout, err := cmd.CombinedOutput()
+	stdout, err := board.avrdude("-U", flashFile)
 	avrdudeMessage := handleFlashResult(string(stdout), err)
 	return avrdudeMessage, err
 }
@@ -120,4 +137,14 @@ func (board *Arduino) GetWebMessage(name string, deviceID string) any {
 		SerialID:   board.serialID,
 		PortName:   board.portName,
 	}
+}
+
+func (board *Arduino) Ping() error {
+	_, err := board.avrdude("-n")
+	return err
+}
+
+func (board *Arduino) Reset() error {
+	_, err := board.avrdude("-r")
+	return err
 }

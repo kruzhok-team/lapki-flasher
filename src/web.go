@@ -62,6 +62,10 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSGetAddressAndMetaMsg] = MSGetAddressAndMeta
 	m.handlers[MSGetFirmwareMsg] = GetFirmwareStart
 	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
+	m.handlers[MSGetConnectedBoardsMsg] = MSGetConnectedBoards
+	m.handlers[requestPackMsg] = RequestPack
+	m.handlers[pingMsg] = Ping
+	m.handlers[resetMsg] = Reset
 }
 
 // обработка нового соединения
@@ -72,7 +76,7 @@ func (m *WebSocketManager) serveWS(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := NewWebSocket(conn, newCooldown(getListCooldownDuration, m), maxThreadsPerClient)
+	c := NewWebSocket(conn, getListCooldownDuration, m, maxThreadsPerClient)
 	m.addClient(c)
 	defer func() {
 		m.updateTicker.Stop()
@@ -129,7 +133,7 @@ func (m *WebSocketManager) readerHandler(c *WebSocketConnection) {
 				continue
 			}
 		}
-		c.addQuerry(m, event)
+		c.addQuerry(event)
 	}
 }
 
@@ -241,7 +245,7 @@ func UpdateList(c *WebSocketConnection, m *WebSocketManager) {
 				case PORT_UPDATE:
 					m.sendMessageToAll(DeviceUpdatePortMsg, newDeviceUpdatePortMessage(boardWithAction.board, boardWithAction.boardID))
 				case ADD:
-					m.sendMessageToAll(dev.Board.GetWebMessageType(), dev.Board.GetWebMessage(dev.Name, boardWithAction.boardID))
+					m.sendMessageToAll(dev.Board.GetWebMessageType(), dev.Board.GetWebMessage(dev.TypeDesc.Name, boardWithAction.boardID))
 				case DELETE:
 					m.sendMessageToAll(DeviceUpdateDeleteMsg, newDeviceUpdateDeleteMessage(boardWithAction.boardID))
 				default:

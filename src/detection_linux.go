@@ -62,62 +62,68 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	_, err := ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		// this function is called for every device present.
 		for _, boardTemplate := range boardTemplates {
-			for _, vid := range boardTemplate.VendorIDs {
-				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) {
-					for _, pid := range boardTemplate.ProductIDs {
-						if strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
-							ports := findPortName(desc)
-							portsNum := len(ports)
-							if portsNum < 1 || ports[0] == NOT_FOUND {
-								printLog("can't find port", ports)
-								continue
-							}
-							properties, err := findProperty(ports[0], USEC_INITIALIZED, ID_SERIAL)
-							if err != nil {
-								printLog("can't find ID", err.Error())
-								continue
-							}
-							serialID := properties[1]
-							var id string
-							// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
-							if serialID != NOT_FOUND && !boardTemplate.IsMSDevice {
-								id = serialID
-							} else {
-								id = properties[0]
-							}
-							var board Board
-							if boardTemplate.IsMSDevice {
-								if portsNum != 4 {
-									printLog("Number of ports for ms1 should be equal to 4. Number of ports for this device:", portsNum)
-									continue
-								}
-								board = NewMS1(
-									[4]string{
-										ports[0],
-										ports[1],
-										ports[2],
-										ports[3],
-									},
-									MS1OS{
-										deviceID: id,
-									},
-								)
-							} else {
-								board = NewArduinoFromTemp(
-									boardTemplate,
-									ports[0],
-									ArduinoOS{
-										deviceID:  id,
-										productID: pid,
-										vendorID:  vid,
-									},
-									serialID,
-								)
-							}
-							devs[id] = newDevice(boardTemplate.Name, boardTemplate.ID, board)
-						}
+			for _, pidvid := range boardTemplate.PidVid {
+				vid := pidvid.VendorID
+				pid := pidvid.ProductID
+				if strings.ToLower(desc.Vendor.String()) == strings.ToLower(vid) && strings.ToLower(pid) == strings.ToLower(desc.Product.String()) {
+					if boardTemplate.IsBlgMbDevice() {
+						devs[pid+vid+"blg-mb"] = newDevice(boardTemplate, &BlgMb{})
+						continue
 					}
+					ports := findPortName(desc)
+					portsNum := len(ports)
+					if portsNum < 1 || ports[0] == NOT_FOUND {
+						printLog("can't find port", ports)
+						continue
+					}
+					properties, err := findProperty(ports[0], USEC_INITIALIZED, ID_SERIAL)
+					if err != nil {
+						printLog("can't find ID", err.Error())
+						continue
+					}
+					serialID := properties[1]
+					var id string
+					// на данный момент у всех МС-ТЮК одинаковый serialID, поэтому мы его игнорируем
+					if serialID != NOT_FOUND && !boardTemplate.IsMSDevice() {
+						id = serialID
+					} else {
+						id = properties[0]
+					}
+					var board Board
+					if boardTemplate.IsMSDevice() {
+						if portsNum != 4 {
+							printLog("Number of ports for ms1 should be equal to 4. Number of ports for this device:", portsNum)
+							continue
+						}
+						board = NewMS1(
+							[4]string{
+								ports[0],
+								ports[1],
+								ports[2],
+								ports[3],
+							},
+							MS1OS{
+								deviceID: id,
+							},
+						)
+					} else if boardTemplate.IsArduinoDevice() {
+						board = NewArduinoFromTemp(
+							boardTemplate,
+							ports[0],
+							ArduinoOS{
+								deviceID:  id,
+								productID: pid,
+								vendorID:  vid,
+							},
+							serialID,
+						)
+					} else {
+						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
+						continue
+					}
+					devs[id] = newDevice(boardTemplate, board)
 				}
+
 			}
 		}
 		return false

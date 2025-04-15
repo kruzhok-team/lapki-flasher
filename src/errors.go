@@ -37,6 +37,10 @@ var (
 	ErrNotSupported = errors.New("flash-not-supported")
 	// нельзя начать прошивку, пока открыт монитор порта этого устройства
 	ErrFlashOpenSerialMonitor = errors.New("flash-open-serial-monitor")
+	// размер файла меньше 1 байта
+	ErrIncorrectFileSize = errors.New("incorrect-file-size")
+	// ошибка при записи блока бин. данных в файл
+	ErrFileWriter = errors.New("file-write-error")
 )
 
 func errorHandler(err error, c *WebSocketConnection) {
@@ -50,9 +54,9 @@ func errorHandler(err error, c *WebSocketConnection) {
 		c.StopFlashingSync()
 	case ErrAvrdude:
 		c.StopFlashingSync()
-		payload = c.avrMsg
+		payload = c.flasherMsg
 		defer func() {
-			c.avrMsg = ""
+			c.flasherMsg = ""
 		}()
 	}
 	c.sendOutgoingEventMessage(msgType, payload, false)

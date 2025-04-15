@@ -35,6 +35,12 @@ type MSDeviceMessage struct {
 	PortNames [4]string `json:"portNames,omitempty"`
 }
 
+// минимальная информация об устройстве
+type SimpleDeviceMessage struct {
+	ID   string `json:"deviceID"`
+	Name string `json:"name,omitempty"`
+}
+
 // тип данных для flash-start (для arduino-подобных устройств)
 type FlashStartMessage struct {
 	ID       string `json:"deviceID"`
@@ -47,11 +53,6 @@ type MSBinStartMessage struct {
 	FileSize     int    `json:"fileSize"`     // размер прошивки
 	Address      string `json:"address"`      // киберген
 	Verification bool   `json:"verification"` // если true, то загрузчик потратит дополнительное время на проверку прошивки
-}
-
-type FlashBlockMessage struct {
-	BlockID int    `json:"blockID"`
-	Data    []byte `json:"data"`
 }
 
 type DeviceUpdateDeleteMessage struct {
@@ -143,19 +144,37 @@ type MSAddressAndMetaMessage struct {
 }
 
 type MSOperationReportMessage struct {
-	ID        string         `json:"deviceID"`
-	Address   string         `json:"address"`
-	Comment   string         `json:"comment"`
-	Code 	  int            `json:"code"`
+	ID      string `json:"deviceID"`
+	Address string `json:"address"`
+	Comment string `json:"comment"`
+	Code    int    `json:"code"`
 }
 
 type MSGetFirmwareMessage struct {
-	ID        string         `json:"deviceID"`
-	Address   string         `json:"address"`
-	BlockSize int 			 `json:"blockSize"`
-	RefBlChip string         `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
+	ID        string `json:"deviceID"`
+	Address   string `json:"address"`
+	BlockSize int    `json:"blockSize"`
+	RefBlChip string `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
 }
 
+type MSAddressesMessage struct {
+	ID        string   `json:"deviceID"`
+	Addresses []string `json:"addresses"`
+}
+
+type MSGetConnectedBacktrackMessage struct {
+	Address string `json:"address"`
+	Code    int    `json:"code"`
+}
+
+type FlashNexBlockMessage struct {
+	ID string `json:"ID"`
+}
+
+type FlashDoneMessage struct {
+	ID         string `json:"ID"`
+	FlasherMsg string `json:"flasherMsg"`
+}
 
 // типы сообщений (событий)
 const (
@@ -165,6 +184,8 @@ const (
 	DeviceMsg = "device"
 	// описание МС-ТЮК
 	MSDeviceMsg = "ms-device"
+	// описание кибермишки
+	BlgMbDeviceMsg = "blg-mb-device"
 	// запрос на прошивку устройства
 	FlashStartMsg = "flash-start"
 	// прошивка прошла успешна
@@ -229,11 +250,35 @@ const (
 	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block"
 	// Отчёт о завершении процесса выгрузки прошивки
 	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
+	// Запрос от клиента на получение адресов, подключенных плат МС-ТЮК
+	MSGetConnectedBoardsMsg = "ms-get-connected-boards"
+	// Сообщение с подключенными адресами плат МС-ТЮК
+	MSConnectedBoardsMsg = "ms-connected-boards"
+	// Ошибка получения адресов подключенных плат
+	MSGetConnectedBoardsErrorMsg = "ms-get-connected-boards-error"
+	// Обратная связь процесса получения подключенных плат
+	MSGetConnectedBoardsBackTrackMsg = "ms-get-connected-boards-backtrack"
+	// запрос на выполнение операций по очереди
+	requestPackMsg = "requests-pack"
+	// пинг устройства по deviceID
+	pingMsg = "ping"
+	// ответ на пинг устройства
+	pongMsg = "pong"
+	// перезагрузка устройства
+	resetMsg = "reset"
+	// результат операции reset
+	resetResultMsg = "reset-result"
 )
 
 // отправить клиенту список всех устройств
 func GetList(event Event, c *WebSocketConnection) error {
 	printLog("get-list")
+
+	// откладываем таймер, так как обновление все равно произойдёт для всех
+	manager := c.Manager
+	manager.updateTicker.Stop()
+	defer manager.updateTicker.Start()
+
 	if c.getListCooldown.isBlocked() {
 		return ErrGetListCoolDown
 	}
@@ -247,7 +292,7 @@ func GetList(event Event, c *WebSocketConnection) error {
 // отправить клиенту описание устройства
 // lastGetListDevice - дополнительная переменная, берётся только первое значение, остальные будут игнорироваться
 func SendDevice(deviceID string, board *Device, toAll bool, c *WebSocketConnection) error {
-	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.Name, deviceID), toAll)
+	err := c.sendOutgoingEventMessage(board.Board.GetWebMessageType(), board.Board.GetWebMessage(board.TypeDesc.Name, deviceID), toAll)
 	if err != nil {
 		printLog("device() error:", err.Error())
 	}
@@ -267,9 +312,6 @@ func DeviceUpdateDelete(deviceID string, c *WebSocketConnection) {
 // подготовка к чтению файла с прошивкой и к его загрузке на устройство
 func FlashStart(event Event, c *WebSocketConnection) error {
 	log.Println("Flash-start")
-	if c.IsFlashing() {
-		return ErrFlashNotFinished
-	}
 	var deviceID string
 	var fileSize int
 	var address string    // адрес, только для МС-ТЮК
@@ -278,7 +320,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg FlashStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -286,7 +328,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		var msg MSBinStartMessage
 		err := json.Unmarshal(event.Payload, &msg)
 		if err != nil {
-			return err
+			return ErrUnmarshal
 		}
 		deviceID = msg.ID
 		fileSize = msg.FileSize
@@ -294,7 +336,7 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 		verification = msg.Verification
 	}
 	if fileSize < 1 {
-		return nil
+		return ErrIncorrectFileSize
 	}
 	if fileSize > maxFileSize {
 		return ErrFlashLargeFile
@@ -303,59 +345,94 @@ func FlashStart(event Event, c *WebSocketConnection) error {
 	if !exists {
 		return ErrFlashWrongID
 	}
-	// плата блокируется!!!
-	// не нужно использовать sync функции внутри блока
-	dev.Mu.Lock()
-	defer dev.Mu.Unlock()
-	updated := dev.Board.Update()
-	if updated {
-		if dev.Board.IsConnected() {
-			DeviceUpdatePort(deviceID, dev, c)
-		} else {
-			detector.DeleteBoard(deviceID)
-			DeviceUpdateDelete(deviceID, c)
-			return ErrFlashDisconnected
-		}
-	}
-	if dev.IsFlashBlocked() {
-		return ErrFlashBlocked
-	}
-	boardToFlashName := strings.ToLower(dev.Name)
-	for _, boardName := range notSupportedBoards {
-		if boardToFlashName == strings.ToLower(boardName) {
-			c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
-			return nil
-		}
-	}
-	// расширение для файла прошивки
-	var ext string
-	switch dev.Board.(type) {
-	case *Arduino:
-		if dev.SerialMonitor.isOpen() {
-			return ErrFlashOpenSerialMonitor
-		}
-		if event.Type == FlashStartMsg {
-			ext = "hex"
-		} else {
-			// TODO
-		}
-	case *MS1:
-		if event.Type == MSBinStartMsg {
-			ext = "bin"
-			if address != "" {
-				dev.Board.(*MS1).address = address
+	check := func() error {
+		// плата блокируется!!!
+		// не нужно использовать sync функции внутри блока
+		dev.Mu.Lock()
+		defer dev.Mu.Unlock()
+		updated := dev.Board.Update()
+		if updated {
+			if dev.Board.IsConnected() {
+				DeviceUpdatePort(deviceID, dev, c)
+			} else {
+				detector.DeleteBoard(deviceID)
+				DeviceUpdateDelete(deviceID, c)
+				return ErrFlashDisconnected
 			}
-			dev.Board.(*MS1).verify = verification
+		}
+		// FIXME:
+		// Это условие возможно никогда не сработает из-за блокировки mutex.
+		// Если два клиента попытаются прошить одно и то же устройство, то один из них будет ждать своей очереди.
+		// Нужно подумать, стоит ли перенести это условие в другое место, или просто его убрать.
+		if dev.IsFlashBlocked() {
+			if c.FlashingDevId == deviceID {
+				return ErrFlashNotFinished
+			}
+			return ErrFlashBlocked
+		}
+		boardToFlashName := strings.ToLower(dev.TypeDesc.Name)
+		for _, boardName := range notSupportedBoards {
+			if boardToFlashName == strings.ToLower(boardName) {
+				c.sendOutgoingEventMessage(ErrNotSupported.Error(), boardName, false)
+				return nil
+			}
+		}
+		switch dev.Board.(type) {
+		case *Arduino:
+			if dev.SerialMonitor.isOpen() {
+				return ErrFlashOpenSerialMonitor
+			}
+		case *MS1:
+			if event.Type == MSBinStartMsg {
+				if address != "" {
+					dev.Board.(*MS1).address = address
+				}
+				dev.Board.(*MS1).verify = verification
+			}
+		}
+		// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
+		c.FlashingBoard = dev
+		c.FlashingBoard.SetLock(true)
+
+		return nil
+	}
+	err := check()
+	if err != nil {
+		return err
+	}
+	FileWriter := newFlashFileWriter()
+	FileWriter.Start(fileSize, dev.TypeDesc.FlashFileExtension)
+	defer func() {
+		FileWriter.Clear()
+		c.FlashingBoard.SetLockSync(false)
+		c.FlashingBoard = nil
+	}()
+	FlashNextBlock(c)
+	for {
+		binData, isOpen := <-c.binDataChan
+		if !isOpen {
+			//TODO
+			break
+		}
+		fileCreated, err := FileWriter.AddBlock(binData)
+		if err != nil {
+			return ErrFileWriter
+		}
+		if fileCreated {
+			logger := make(chan any)
+			go LogSend(c, logger)
+			flasherMsg, err := dev.Board.Flash(FileWriter.GetFilePath(), logger)
+			c.flasherMsg = flasherMsg
+			if err != nil {
+				return ErrAvrdude
+			}
+			err = c.sendOutgoingEventMessage(FlashDoneMsg, c.flasherMsg, false)
+			c.flasherMsg = ""
+			return err
 		} else {
-			// TODO
+			FlashNextBlock(c)
 		}
 	}
-	// блокировка устройства и клиента для прошивки, необходимо разблокировать после завершения прошивки
-	c.FlashingBoard = dev
-	c.FlashingBoard.SetLock(true)
-	c.FileWriter.Start(fileSize, ext)
-
-	FlashNextBlock(c)
 	return nil
 }
 
@@ -374,35 +451,12 @@ func LogSend(client *WebSocketConnection, logger chan any) {
 
 // принятие блока с бинарными данными файла
 func FlashBinaryBlock(event Event, c *WebSocketConnection) error {
-	if !c.IsFlashing() {
+	// FIXME: cделать функцию sync?
+	if !c.IsBinChanBusy() {
 		return ErrFlashNotStarted
 	}
-
-	fileCreated, err := c.FileWriter.AddBlock(event.Payload)
-	if err != nil {
-		return err
-	}
-	if fileCreated {
-		logger := make(chan any)
-		go LogSend(c, logger)
-		avrMsg, err := c.FlashingBoard.Board.Flash(c.FileWriter.GetFilePath(), logger)
-		c.avrMsg = avrMsg
-		if err != nil {
-			c.StopFlashingSync()
-			return ErrAvrdude
-		}
-		FlashDone(c)
-	} else {
-		FlashNextBlock(c)
-	}
+	c.binDataChan <- event.Payload
 	return nil
-}
-
-// отправить сообщение о том, что прошивка прошла успешна
-func FlashDone(c *WebSocketConnection) {
-	c.StopFlashingSync()
-	c.sendOutgoingEventMessage(FlashDoneMsg, c.avrMsg, false)
-	c.avrMsg = ""
 }
 
 // запрос на следующий блок с бинаными данными файла
@@ -691,7 +745,7 @@ func MSPing(event Event, c *WebSocketConnection) error {
 		}
 	}
 	board.address = msg.Address
-	err = board.ping()
+	err = board.Ping()
 	if err != nil {
 		MSPingResult(msg.ID, 2, err.Error(), c)
 		return err
@@ -788,7 +842,7 @@ func MSReset(event Event, c *WebSocketConnection) error {
 		}
 	}
 	board.address = msg.Address
-	err = board.reset()
+	err = board.Reset()
 	if err != nil {
 		MSResetSend(msg.ID, 2, err.Error(), c)
 		return err
@@ -958,14 +1012,14 @@ func MSGetAddressAndMeta(event Event, c *WebSocketConnection) error {
 }
 
 const (
-	GET_FIRMWARE_DONE  = 0
-	GET_FIRMWARE_NO_DEV   = 1
-	GET_FIRMWARE_WRONG_DEV = 2
-	GET_FIRMWARE_ERROR = 3
-	GET_FIRMWARE_CLIENT_BUSY = 4
-	GET_FIRMWARE_DEVICE_BUSY = 5
+	GET_FIRMWARE_DONE                 = 0
+	GET_FIRMWARE_NO_DEV               = 1
+	GET_FIRMWARE_WRONG_DEV            = 2
+	GET_FIRMWARE_ERROR                = 3
+	GET_FIRMWARE_CLIENT_BUSY          = 4
+	GET_FIRMWARE_DEVICE_BUSY          = 5
 	GET_FIRMWARE_INCORRECT_BLOCK_SIZE = 6
-	GET_FIRMWARE_TIMEOUT = 7
+	GET_FIRMWARE_TIMEOUT              = 7
 )
 
 func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
@@ -980,25 +1034,25 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
 				Comment: err.Error(),
-				Code: GET_FIRMWARE_ERROR,
+				Code:    GET_FIRMWARE_ERROR,
 			}, c)
 		return err
 	}
-	if c.IsFlashing() {
+	if c.IsBinChanBusy() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_CLIENT_BUSY,
+				Code:    GET_FIRMWARE_CLIENT_BUSY,
 			}, c)
 		return nil
 	}
-	if (msg.BlockSize < 1) {
+	if msg.BlockSize < 1 {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
+				Code:    GET_FIRMWARE_INCORRECT_BLOCK_SIZE,
 			}, c)
 		return nil
 	}
@@ -1006,15 +1060,16 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	if !exists {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_NO_DEV,
+				Code:    GET_FIRMWARE_NO_DEV,
 			}, c)
 		return nil
 	}
 	// плата блокируется!!!
 	// не нужно использовать sync функции внутри блока
 	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
 	updated := dev.Board.Update()
 	if updated {
 		if dev.Board.IsConnected() {
@@ -1023,9 +1078,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
 			MSGetFirmwareFinish(MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_NO_DEV,
+				Code:    GET_FIRMWARE_NO_DEV,
 			}, c)
 			return nil
 		}
@@ -1033,59 +1088,275 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 	if dev.IsFlashBlocked() {
 		MSGetFirmwareFinish(
 			MSOperationReportMessage{
-				ID: msg.ID,
+				ID:      msg.ID,
 				Address: msg.Address,
-				Code: GET_FIRMWARE_DEVICE_BUSY,
+				Code:    GET_FIRMWARE_DEVICE_BUSY,
 			}, c)
 		return nil
 	}
 	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
 	c.FlashingBoard = dev
 	c.FlashingDevId = msg.ID
-	c.FlashingAddress = msg.Address
 	c.FlashingBoard.SetLock(true)
+	transmission := newDataTransmission()
+	defer func() {
+		c.FlashingBoard.SetLock(false)
+		c.FlashingBoard = nil
+		c.FlashingDevId = ""
+		transmission.Clear()
+	}()
 
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
 	bytes, err := board.getFirmware(msg.Address, logger, msg.RefBlChip)
-	// разблокировка платы!
-	dev.Mu.Unlock()
 	if err != nil {
 		close(logger)
 		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: msg.ID,
+			ID:      msg.ID,
 			Address: msg.Address,
 			Comment: err.Error(),
-			Code: GET_FIRMWARE_ERROR,
+			Code:    GET_FIRMWARE_ERROR,
 		}, c)
-		c.StopFlashingSync()
 		return err
 	}
-	c.Transmission.set(bytes, msg.BlockSize)
+	transmission.set(bytes, msg.BlockSize)
 	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
-	return nil
+	for {
+		if transmission.isFinish() {
+			c.binDataChan <- []byte{}
+			MSGetFirmwareFinish(MSOperationReportMessage{
+				ID:      msg.ID,
+				Address: msg.Address,
+				Code:    GET_FIRMWARE_DONE,
+			}, c)
+			return nil
+		}
+		c.binDataChan <- transmission.popBlock()
+	}
 }
 
 func GetFirmwareNextBlock(event Event, c *WebSocketConnection) error {
-	if c.Transmission.isFinish() {
-		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: c.FlashingDevId,
-			Address: c.FlashingAddress,
-			Code: GET_FIRMWARE_DONE,
-		}, c)
-		c.StopFlashingSync()
+	if !c.IsBinChanBusy() {
+		//FIXME: на клиенте нужно не забыть обработать случай, когда ошибка приходит от выгрузки прошивки, а не от загрузки
+		return ErrFlashNotStarted
+	}
+	bin := <-c.binDataChan
+	if len(bin) == 0 {
 		return nil
 	}
-	err := c.sendBinaryMessage(c.Transmission.popBlock(), false)
+	c.sendBinaryMessage(bin, false)
+	return nil
+}
+
+func MSConnectedBoards(addresses MSAddressesMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSConnectedBoardsMsg, addresses, false)
+}
+
+func MSGetConnectedBoardsError(report DeviceCommentCodeMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSGetConnectedBoardsErrorMsg, report, false)
+}
+
+func MSGetConnectedBoardsBacktrack(report MSGetConnectedBacktrackMessage, client *WebSocketConnection) {
+	client.sendOutgoingEventMessage(MSGetConnectedBoardsBackTrackMsg, report, false)
+}
+
+func MSGetConnectedBoards(event Event, c *WebSocketConnection) error {
+	const (
+		GET_BOARDS_ERROR              = 1
+		GET_BOARDS_ERROR_NO_DEVICE    = 2
+		GET_BOARDS_ERROR_WRONG_DEVICE = 3
+	)
+	var msg MSAddressesMessage
+	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
-		MSGetFirmwareFinish(MSOperationReportMessage{
-			ID: c.FlashingDevId,
-			Address: c.FlashingAddress,
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			Code:    GET_BOARDS_ERROR,
 			Comment: err.Error(),
-			Code: GET_FIRMWARE_ERROR,
 		}, c)
 		return err
 	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID:   msg.ID,
+			Code: GET_BOARDS_ERROR_NO_DEVICE,
+		}, c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board, isMS1 := dev.Board.(*MS1)
+	if !isMS1 {
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID:   msg.ID,
+			Code: GET_BOARDS_ERROR_WRONG_DEVICE,
+		}, c)
+		return nil
+	}
+	updated := board.Update()
+	if updated {
+		if board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+				ID:   msg.ID,
+				Code: GET_BOARDS_ERROR_NO_DEVICE,
+			}, c)
+			return nil
+		}
+	}
+	connectedBoards, err := board.getConnectedBoards(msg.Addresses, c)
+	if err != nil {
+		MSGetConnectedBoardsError(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    GET_BOARDS_ERROR,
+			Comment: err.Error(),
+		}, c)
+		return err
+	}
+	MSConnectedBoards(MSAddressesMessage{
+		ID:        msg.ID,
+		Addresses: connectedBoards,
+	}, c)
+	return nil
+}
+
+func RequestPack(event Event, c *WebSocketConnection) error {
+	var requests []Event
+	err := json.Unmarshal(event.Payload, &requests)
+	if err != nil {
+		return ErrUnmarshal
+	}
+	for _, req := range requests {
+		c.handleEvent(req)
+	}
+	return nil
+}
+
+//TODO: сделать функции reset и ping общими для МС-ТЮК
+
+func Reset(event Event, c *WebSocketConnection) error {
+	const (
+		RESET_OK  = 0
+		NO_DEV    = 1
+		RESET_ERR = 2
+		WRONG_DEV = 3
+		JSON_ERR  = 4
+	)
+	resetResult := func(resetResultMessage DeviceCommentCodeMessage) {
+		c.sendOutgoingEventMessage(resetResultMsg, resetResultMessage, false)
+	}
+	var msg DeviceIdMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		resetResult(DeviceCommentCodeMessage{
+			Code:    JSON_ERR,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		resetResult(DeviceCommentCodeMessage{
+			ID:   msg.ID,
+			Code: NO_DEV,
+		})
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			resetResult(DeviceCommentCodeMessage{
+				ID:   msg.ID,
+				Code: NO_DEV,
+			})
+			return nil
+		}
+	}
+	err = dev.Board.Reset()
+	if err != nil {
+		resetResult(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    RESET_ERR,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	resetResult(DeviceCommentCodeMessage{
+		ID:   msg.ID,
+		Code: RESET_OK,
+	})
+	return nil
+}
+
+func Ping(event Event, c *WebSocketConnection) error {
+	const (
+		PONG      = 0
+		NO_DEV    = 1
+		NO_PONG   = 2
+		WRONG_DEV = 3
+		JSON_ERR  = 4
+	)
+	pong := func(pongMessage DeviceCommentCodeMessage) {
+		c.sendOutgoingEventMessage(pongMsg, pongMessage, false)
+	}
+	var msg DeviceIdMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		pong(DeviceCommentCodeMessage{
+			Code:    JSON_ERR,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		pong(DeviceCommentCodeMessage{
+			ID:   msg.ID,
+			Code: NO_DEV,
+		})
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			DeviceUpdatePort(msg.ID, dev, c)
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			pong(DeviceCommentCodeMessage{
+				ID:   msg.ID,
+				Code: NO_DEV,
+			})
+			return nil
+		}
+	}
+	err = dev.Board.Ping()
+	if err != nil {
+		pong(DeviceCommentCodeMessage{
+			ID:      msg.ID,
+			Code:    NO_PONG,
+			Comment: err.Error(),
+		})
+		return err
+	}
+	pong(DeviceCommentCodeMessage{
+		ID:   msg.ID,
+		Code: PONG,
+	})
 	return nil
 }
