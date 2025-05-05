@@ -55,7 +55,7 @@ jobs:
     - name: Build arm64
       run: CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -C src -o flasher-arm64
     - name: Build amd64
-      run: CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -C src -o flasher-amd64
+      run: CGO_ENABLED=1 CGO_CFLAGS="-mmacosx-version-min=10.12" CGO_LDFLAGS="-mmacosx-version-min=10.12" GOOS=darwin GOARCH=amd64 go build -C src -o flasher-amd64
     - name: Build universal
       run: lipo -create -output src/lapki-flasher src/flasher-arm64 src/flasher-amd64
 
