@@ -6,6 +6,7 @@ import (
 )
 
 type BlgMb struct {
+	serialID string
 }
 
 func (board *BlgMb) IsConnected() bool {
