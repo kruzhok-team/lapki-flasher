@@ -193,16 +193,10 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 				pathPattern := fmt.Sprintf("USB\\VID_%s&PID_%s", vendorID, productID)
 				pathLen := len(pathPattern)
 				// нашли подходящее устройство
-				//printLog(strings.ToLower(device[:pathLen]), strings.ToLower(pathPattern))
 				if pathLen <= deviceLen && strings.EqualFold(device[:pathLen], pathPattern) {
-					if boardTemplate.IsBlgMbDevice() {
-						devs[device] = newDevice(boardTemplate, &BlgMb{})
-						continue
-					}
 					portName := findPortName(&device)
 					if portName == NOT_FOUND {
-						printLog(device)
-						continue
+						printLog("WARNING: No port for device:", device)
 					}
 					if boardTemplate.IsMSDevice() {
 						// сбор МС-ТЮК "по-частям"
@@ -228,20 +222,24 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 							pathToDevice: device,
 							friendlyName: friendlyName,
 						})
-					} else if boardTemplate.IsArduinoDevice() {
+					} else {
 						// поиск серийного номера
 						serialIndex := strings.LastIndex(device, "\\")
 						possibleSerialID := device[serialIndex+1:]
 						if strings.Contains(possibleSerialID, "&") {
 							possibleSerialID = ""
 						}
-						detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
-						devs[device] = newDevice(boardTemplate, detectedBoard)
-						printLog("Arduino device was found:", detectedBoard, device)
-					} else {
-						//TODO
-						printLog("no searching algorithm for this type of device!", boardTemplate.Type)
-						continue
+						if boardTemplate.IsArduinoDevice() {
+							detectedBoard := NewArduinoFromTemp(boardTemplate, portName, ArduinoOS{pathToDevice: device}, possibleSerialID)
+							devs[device] = newDevice(boardTemplate, detectedBoard)
+							printLog("Arduino device was found:", detectedBoard, device)
+						} else if boardTemplate.IsBlgMbDevice() {
+							devs[device] = newDevice(boardTemplate, &BlgMb{serialID: possibleSerialID})
+							printLog("CyberBear device was found:", device)
+						} else {
+							//TODO
+							printLog("no searching algorithm for this type of device!", boardTemplate.Type)
+						}
 					}
 				}
 			}
