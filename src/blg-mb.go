@@ -29,7 +29,7 @@ func (board *BlgMb) GetWebMessage(name string, deviceID string) any {
 }
 
 func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
-	cmd := exec.Command(blgMbUploaderPath, "load", "-f", filePath)
+	cmd := exec.Command(blgMbUploaderPath, "-m", "b1", "load", "-f", filePath)
 	stdout, err := cmd.CombinedOutput()
 	msg := handleFlashResult(string(stdout), err)
 	return msg, err
