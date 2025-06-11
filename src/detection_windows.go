@@ -144,14 +144,14 @@ func getInstanceId(substring string) []string {
 	return pathesToDevices
 }
 
-func getLibusbDevs() []string {
-	const LIBUSB_PATH = "SYSTEM\\CurrentControlSet\\Services\\libusb0\\enum"
-	key, values, err := getRegistryValues(LIBUSB_PATH)
+func getDevs(serviceName string) []string {
+	SERVICE_ENUM_PATH := fmt.Sprintf("SYSTEM\\CurrentControlSet\\Services\\%s\\enum", serviceName)
+	key, values, err := getRegistryValues(SERVICE_ENUM_PATH)
 	if err != nil {
 		printLog(err.Error())
 		return nil
 	}
-	defer handleCloseRegistryKey(key, LIBUSB_PATH)
+	defer handleCloseRegistryKey(key, SERVICE_ENUM_PATH)
 	devs := []string{}
 	for _, valueName := range values {
 		value, _, err := key.GetStringValue(valueName)
@@ -167,7 +167,7 @@ func getLibusbDevs() []string {
 func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 	//startTime := time.Now()
 	devs := make(map[string]*Device)
-	presentUSBDevices := append(getInstanceId(""), getLibusbDevs()...)
+	presentUSBDevices := append(getInstanceId(""), append(getDevs("libusb0"), getDevs("WINUSB")...)...)
 	// нет usb-устройств
 	if presentUSBDevices == nil {
 		return nil
