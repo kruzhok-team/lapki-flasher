@@ -128,6 +128,16 @@ func detectBoards(boardTemplates []BoardTemplate) map[string]*Device {
 		}
 		return false
 	})
+	// TODO: поиск серийников
+	// for _, blg := range blgDevs {
+	// 	printLog(blg.SerialNumber())
+	// 	serialID, err := blg.SerialNumber()
+	// 	if err != nil {
+	// 		devs["blg-mb"] = newDevice(boardTemplates[5], &BlgMb{serialID: ""})
+	// 		continue
+	// 	}
+	// 	devs[serialID] = newDevice(boardTemplates[5], &BlgMb{serialID: serialID})
+	// }
 	if err != nil {
 		log.Printf("OpenDevices(): %v\n", err)
 		return nil

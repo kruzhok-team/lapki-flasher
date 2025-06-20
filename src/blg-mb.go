@@ -6,6 +6,7 @@ import (
 )
 
 type BlgMb struct {
+	serialID string
 }
 
 func (board *BlgMb) IsConnected() bool {
@@ -28,15 +29,14 @@ func (board *BlgMb) GetWebMessage(name string, deviceID string) any {
 }
 
 func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
-	cmd := exec.Command(blgMbUploaderPath, "-w", "-f", filePath)
+	cmd := exec.Command(blgMbUploaderPath, "-m", "b1", "load", "-f", filePath)
 	stdout, err := cmd.CombinedOutput()
 	msg := handleFlashResult(string(stdout), err)
 	return msg, err
 }
 
 func (board *BlgMb) Ping() error {
-	cmd := exec.Command(blgMbUploaderPath, "-p")
-	return cmd.Run()
+	return errors.New("операция пинг не поддерживается для этого устройства")
 }
 
 func (board *BlgMb) Reset() error {

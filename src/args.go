@@ -59,7 +59,7 @@ func setArgs() {
 	flag.StringVar(&avrdudePath, "avrdudePath", "avrdude", "путь к avrdude, используется системный путь по-умолчанию")
 	flag.StringVar(&configPath, "configPath", "", "путь к файлу конфигурации avrdude")
 	flag.StringVar(&deviceListPath, "deviceListPath", "", "путь к JSON-файлу со списком устройств. Если прописан, то заменяет стандартный список устройств, при условии, что не возникнет ошибок, связанных с чтением и открытием JSON-файла, иначе используется стандартный список устройств (по-умолчанию пустая строка, означающая, что будет используется, встроенный в загрузчик список)")
-	flag.StringVar(&blgMbUploaderPath, "blgMbUploaderPath", "blg-mb-1-uploader", "путь к программе для прошивки кибермишки")
+	flag.StringVar(&blgMbUploaderPath, "blgMbUploaderPath", "blg-mb/cyberbear-loader", "путь к программе для прошивки кибермишки")
 	flag.IntVar(&maxMsgSize, "msgSize", 1024, "максмальный размер одного сообщения, передаваемого через веб-сокеты (в байтах)")
 	flag.IntVar(&maxFileSize, "fileSize", 2*1024*1024, "максимальный размер файла, загружаемого на сервер (в байтах)")
 	flag.IntVar(&maxThreadsPerClient, "thread", 3, "максимальное количество потоков (горутин) на обработку запросов на одного клиента")
