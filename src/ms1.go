@@ -27,6 +27,18 @@ var ms1backtrackStatus = map[ms1.UploadStage]string{
 	ms1.GET_FIRMWARE:        "GET_FIRMWARE",
 }
 
+var ms1Type = map[string]string{
+	"1e3204c1e573a118": "main-a3",
+	"028e53ca92358dd9": "main-a4",
+	"7669fba1c9175843": "mtrx-a2",
+	"47af73c71f3930ce": "mtrx-a3",
+	"da047a039c8acff1": "btn-a2",
+	"58e2581437a30762": "btn-a2",
+	"c4ef6036603a600f": "lmp-a2",
+	"274b36772c9ea32a": "lmp-a4",
+	"5027e18c66ac2bc3": "lmp8-a1",
+}
+
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
 	ms1 := MS1{
 		portNames: portNames,
@@ -163,27 +175,11 @@ func (board *MS1) getMetaData() (*ms1.Meta, error) {
 Возвращает пустую строку, если не удаётся определить тип устройства.
 */
 func getMSType(RefBlHw string) string {
-	switch RefBlHw {
-	case "1e3204c1e573a118":
-		return "tjc-ms1-main-a3"
-	case "028e53ca92358dd9":
-		return "tjc-ms1-main-a4"
-	case "7669fba1c9175843":
-		return "tjc-ms1-mtrx-a2"
-	case "47af73c71f3930ce":
-		return "tjc-ms1-mtrx-a3"
-	case "da047a039c8acff1":
-		return "tjc-ms1-btn-a2"
-	case "58e2581437a30762":
-		return "tjc-ms1-btn-a2"
-	case "c4ef6036603a600f":
-		return "tjc-ms1-lmp-a2"
-	case "274b36772c9ea32a":
-		return "tjc-ms1-lmp-a4"
-	case "5027e18c66ac2bc3":
-		return "tjc-ms1-lmp8-a1"
+	postfix := ms1Type[RefBlHw]
+	if postfix == "" {
+		return ""
 	}
-	return ""
+	return "tjc-ms1-" + ms1Type[RefBlHw]
 }
 
 func metaToJSON(meta *ms1.Meta) MetaSubMessage {
