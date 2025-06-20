@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"os/exec"
 )
 
@@ -44,11 +43,13 @@ func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
 }
 
 func (board *BlgMb) Ping() error {
-	return errors.New("операция пинг не поддерживается для этого устройства")
+	_, err := board.CyberBearLoader("identify")
+	return err
 }
 
 func (board *BlgMb) Reset() error {
-	return errors.New("операция перезагрузки не поддерживается для этого устройства")
+	_, err := board.CyberBearLoader("reboot")
+	return err
 }
 
 func (board *BlgMb) Update() bool {
