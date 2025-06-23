@@ -148,3 +148,7 @@ func (board *Arduino) Reset() error {
 	_, err := board.avrdude("-r")
 	return err
 }
+
+func (board *Arduino) GetMetaData() (any, error) {
+	return "", errors.New("операция получения метаданных недоступна для этого устройства")
+}

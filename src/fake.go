@@ -55,3 +55,7 @@ func (board *FakeBoard) Ping() error {
 func (board *FakeBoard) Reset() error {
 	return nil
 }
+
+func (board *FakeBoard) GetMetaData() (any, error) {
+	return "fake metadata", nil
+}

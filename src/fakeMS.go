@@ -52,3 +52,7 @@ func (board *FakeMS) Ping() error {
 func (board *FakeMS) Reset() error {
 	return nil
 }
+
+func (board *FakeMS) GetMetaData() (any, error) {
+	return "fake metadata", nil
+}

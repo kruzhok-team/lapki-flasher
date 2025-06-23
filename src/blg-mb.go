@@ -55,3 +55,7 @@ func (board *BlgMb) Reset() error {
 func (board *BlgMb) Update() bool {
 	return false
 }
+
+func (board *BlgMb) GetMetaData() (any, error) {
+	return "", nil
+}
