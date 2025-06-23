@@ -57,5 +57,6 @@ func (board *BlgMb) Update() bool {
 }
 
 func (board *BlgMb) GetMetaData() (any, error) {
-	return "", nil
+	stdout, stderr := board.CyberBearLoader("identify")
+	return string(stdout), stderr
 }
