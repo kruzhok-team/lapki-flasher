@@ -175,11 +175,11 @@ func (board *MS1) getMetaData() (*ms1.Meta, error) {
 Возвращает пустую строку, если не удаётся определить тип устройства.
 */
 func getMSType(RefBlHw string) string {
-	postfix := ms1Type[RefBlHw]
-	if postfix == "" {
+	postfix, ok := ms1Type[RefBlHw]
+	if !ok {
 		return ""
 	}
-	return "tjc-ms1-" + ms1Type[RefBlHw]
+	return "tjc-ms1-" + postfix
 }
 
 func metaToJSON(meta *ms1.Meta) MetaSubMessage {
