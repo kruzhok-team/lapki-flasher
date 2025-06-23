@@ -979,7 +979,7 @@ func GetMetaData(event Event, c *WebSocketConnection) error {
 		MetaDataError(msg.ID, META_ERROR, "метаданные не прошли проверку типа", c)
 		return nil
 	}
-	c.sendOutgoingEventMessage(MSMetaDataMsg, MetaDataMessage{
+	c.sendOutgoingEventMessage(MetaDataMsg, MetaDataMessage{
 		ID:   msg.ID,
 		Meta: meta,
 	}, false)
