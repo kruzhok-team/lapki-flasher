@@ -149,7 +149,8 @@ func (board *MS1) getAddress() (string, error) {
 	return deviceMS.GetAddress(), nil
 }
 
-func (board *MS1) getMetaData() (*ms1.Meta, error) {
+// Возвращает *ms1.Meta
+func (board *MS1) GetMetaData() (any, error) {
 	portMS, err := ms1.MkSerial(board.getFlashPort())
 	if err != nil {
 		return nil, err

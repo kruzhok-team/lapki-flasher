@@ -66,6 +66,7 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[requestPackMsg] = RequestPack
 	m.handlers[pingMsg] = Ping
 	m.handlers[resetMsg] = Reset
+	m.handlers[GetMetaDataMsg] = GetMetaData
 }
 
 // обработка нового соединения

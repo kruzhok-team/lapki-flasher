@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+
+	"github.com/polyus-nt/ms1-go/pkg/ms1"
 )
 
 // обработчик события
@@ -125,6 +127,11 @@ type MSMetaDataMessage struct {
 	MSType string         `json:"type"` // тип устройства (определяется по RefBlHw)
 }
 
+type MetaDataMessage struct {
+	ID   string `json:"deviceID"`
+	Meta string `json:"meta"`
+}
+
 type FlashBacktrackMsMessage struct {
 	UploadStage string `json:"UploadStage"`
 
@@ -232,12 +239,16 @@ const (
 	MSResetMsg = "ms-reset"
 	// результат выполнения сброса МС-ТЮК
 	MSResetResultMsg = "ms-reset-result"
+	// запрос на получение метаданных
+	GetMetaDataMsg = "get-meta-data"
 	// запрос на получение метаданных МС-ТЮК
 	MSGetMetaDataMsg = "ms-get-meta-data"
 	// сообщение с метаданными, предназначенными для клиента
+	MetaDataMsg = "meta-data"
+	// сообщение с метаданными, предназначенными для клиента (МС-ТЮК)
 	MSMetaDataMsg = "ms-meta-data"
 	// сообщение в случае, если не удалось извлечь метаданные по запросу клиента
-	MSMetaDataErrorMsg = "ms-meta-data-error"
+	MetaDataErrorMsg = "meta-data-error"
 	// Получение адреса и метаданных платы
 	MSGetAddressAndMetaMsg = "ms-get-address-and-meta"
 	// Результат выполнения команды ms-get-address-and-meta
@@ -870,34 +881,35 @@ func MSResetSend(deviceID string, code int, comment string, client *WebSocketCon
 	DeviceCommentCode(MSResetResultMsg, deviceID, code, comment, client)
 }
 
-func MSMetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
-	DeviceCommentCode(MSMetaDataErrorMsg, deviceID, code, comment, client)
+func MetaDataError(deviceID string, code int, comment string, client *WebSocketConnection) {
+	DeviceCommentCode(MetaDataErrorMsg, deviceID, code, comment, client)
 }
 
+const (
+	META_ERROR        = 1
+	META_NO_DEVICE    = 2
+	META_WRONG_DEVICE = 3
+	META_JSON_ERROR   = 4
+)
+
 func MSGetMetaData(event Event, c *WebSocketConnection) error {
-	const (
-		META_ERROR        = 1
-		META_NO_DEVICE    = 2
-		META_WRONG_DEVICE = 3
-		META_JSON_ERROR   = 4
-	)
 	var msg MSAddressMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
-		MSMetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
+		MetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
 		return err
 	}
 	dev, exists := detector.GetBoardSync(msg.ID)
 	if !exists {
 		DeviceUpdateDelete(msg.ID, c)
-		MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
+		MetaDataError(msg.ID, META_NO_DEVICE, "", c)
 		return nil
 	}
 	dev.Mu.Lock()
 	defer dev.Mu.Unlock()
 	board, isMS1 := dev.Board.(*MS1)
 	if !isMS1 {
-		MSMetaDataError(msg.ID, META_WRONG_DEVICE, "", c)
+		MetaDataError(msg.ID, META_WRONG_DEVICE, "", c)
 		return nil
 	}
 	updated := board.Update()
@@ -907,20 +919,69 @@ func MSGetMetaData(event Event, c *WebSocketConnection) error {
 		} else {
 			detector.DeleteBoard(msg.ID)
 			DeviceUpdateDelete(msg.ID, c)
-			MSMetaDataError(msg.ID, META_NO_DEVICE, "", c)
+			MetaDataError(msg.ID, META_NO_DEVICE, "", c)
 			return nil
 		}
 	}
 	board.address = msg.Address
-	meta, err := board.getMetaData()
+	value, err := board.GetMetaData()
 	if err != nil {
-		MSMetaDataError(msg.ID, META_ERROR, err.Error(), c)
+		MetaDataError(msg.ID, META_ERROR, err.Error(), c)
 		return err
+	}
+	meta, ok := value.(*ms1.Meta)
+	if !ok {
+		MetaDataError(msg.ID, META_ERROR, "метаданные не прошли проверку типа", c)
+		return nil
 	}
 	c.sendOutgoingEventMessage(MSMetaDataMsg, MSMetaDataMessage{
 		ID:     msg.ID,
 		Meta:   metaToJSON(meta),
 		MSType: getMSType(meta.RefBlHw),
+	}, false)
+	return nil
+}
+
+func GetMetaData(event Event, c *WebSocketConnection) error {
+	var msg DeviceIdMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		MetaDataError(msg.ID, META_JSON_ERROR, err.Error(), c)
+		return err
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceUpdateDelete(msg.ID, c)
+		MetaDataError(msg.ID, META_NO_DEVICE, "", c)
+		return nil
+	}
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	board := dev.Board
+	updated := board.Update()
+	if updated {
+		if board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			MetaDataError(msg.ID, META_NO_DEVICE, "", c)
+			return nil
+		}
+	}
+	value, err := board.GetMetaData()
+	if err != nil {
+		MetaDataError(msg.ID, META_ERROR, err.Error(), c)
+		return err
+	}
+	meta, ok := value.(string)
+	if !ok {
+		MetaDataError(msg.ID, META_ERROR, "метаданные не прошли проверку типа", c)
+		return nil
+	}
+	c.sendOutgoingEventMessage(MetaDataMsg, MetaDataMessage{
+		ID:   msg.ID,
+		Meta: meta,
 	}, false)
 	return nil
 }

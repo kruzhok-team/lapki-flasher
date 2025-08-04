@@ -37,6 +37,7 @@ type Board interface {
 	GetWebMessage(name string, deviceID string) any
 	Ping() error
 	Reset() error
+	GetMetaData() (any, error)
 }
 
 type Device struct {
