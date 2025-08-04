@@ -26,9 +26,11 @@ func (board *BlgMb) GetWebMessageType() string {
 }
 
 func (board *BlgMb) GetWebMessage(name string, deviceID string) any {
-	return SimpleDeviceMessage{
-		ID:   deviceID,
-		Name: name,
+	return BlgMbDeviceMessage{
+		ID:       deviceID,
+		Name:     name,
+		SerialID: board.serialID,
+		Version:  board.version,
 	}
 }
 
