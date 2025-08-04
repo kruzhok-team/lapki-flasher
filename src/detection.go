@@ -93,6 +93,11 @@ func (d *Detector) Update() (
 			} else {
 				d.boards[deviceID] = newBoard
 				d.boardActions.PushBack(ActionWithBoard{board: newBoard, boardID: deviceID, action: ADD})
+				switch oldBoard.Board.(type) {
+				case *BlgMb:
+					newBlgMb := newBoard.Board.(*BlgMb)
+					newBlgMb.GetVersion()
+				}
 			}
 		}
 	}
