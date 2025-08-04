@@ -10,6 +10,7 @@ import (
 
 type BlgMb struct {
 	serialID string
+	version  string
 }
 
 func (board *BlgMb) IsConnected() bool {
@@ -66,9 +67,14 @@ func (board *BlgMb) GetMetaData() (any, error) {
 }
 
 /*
-Функция получения версии КиберМишки
+Функция получения версии КиберМишки.
+
+Автоматически обновляет поле version.
 */
 func (board *BlgMb) GetVersion() (string, error) {
+	if board.version != "" {
+		return board.version, nil
+	}
 	value, err := board.GetMetaData()
 	if err != nil {
 		return "", err
@@ -85,7 +91,8 @@ func (board *BlgMb) GetVersion() (string, error) {
 		if strings.HasPrefix(line, "art:") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
-				return strings.TrimSpace(parts[1]), nil
+				board.version = strings.TrimSpace(parts[1])
+				return board.version, nil
 			}
 		}
 	}
