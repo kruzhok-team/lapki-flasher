@@ -37,6 +37,13 @@ type MSDeviceMessage struct {
 	PortNames [4]string `json:"portNames,omitempty"`
 }
 
+type BlgMbDeviceMessage struct {
+	ID       string `json:"deviceID"`
+	Name     string `json:"name,omitempty"`
+	SerialID string `json:"serialID,omitempty"`
+	Version  string `json:"version,omitempty"`
+}
+
 // минимальная информация об устройстве
 type SimpleDeviceMessage struct {
 	ID   string `json:"deviceID"`

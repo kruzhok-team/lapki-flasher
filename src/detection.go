@@ -91,6 +91,10 @@ func (d *Detector) Update() (
 			if _, ok := d.dontAddTypes[newBoard.TypeDesc.ID]; ok {
 				notAddedDevices[deviceID] = newBoard
 			} else {
+				switch newBoard.Board.(type) {
+				case *BlgMb:
+					newBoard.Board.(*BlgMb).GetVersion()
+				}
 				d.boards[deviceID] = newBoard
 				d.boardActions.PushBack(ActionWithBoard{board: newBoard, boardID: deviceID, action: ADD})
 			}
