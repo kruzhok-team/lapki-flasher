@@ -1218,7 +1218,10 @@ func GetMsFirmwareStart(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	transmission.set(bytes, msg.BlockSize)
-	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
+	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, MSAddressMessage{
+		ID:      msg.ID,
+		Address: msg.Address,
+	}, false)
 	for {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
@@ -1295,7 +1298,9 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	transmission.set(bytes, msg.BlockSize)
-	c.sendOutgoingEventMessage(GetFirmwareApproveMsg, nil, false)
+	c.sendOutgoingEventMessage(GetFirmwareApproveMsg, DeviceIdMessage{
+		ID: msg.ID,
+	}, false)
 	for {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
