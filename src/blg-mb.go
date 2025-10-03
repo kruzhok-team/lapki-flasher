@@ -102,6 +102,11 @@ func (board *BlgMb) GetVersion() (string, error) {
 	return "", fmt.Errorf("art value not found")
 }
 
+// Извлечение прошивки
+func (board *BlgMb) Extract() ([]byte, error) {
+	return board.CyberBearLoader("-m", "b1", "extract", "--pages", "44")
+}
+
 func (board *BlgMb) GetId() (string, error) {
 	// TODO: унификация кода
 	value, err := board.GetMetaData()
@@ -129,5 +134,5 @@ func (board *BlgMb) GetId() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Serial value not found")
+	return "", fmt.Errorf("serial value not found")
 }
