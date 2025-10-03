@@ -272,7 +272,7 @@ const (
 	// Одобрение на запрос выгрузки прошивки
 	MSGetFirmwareApproveMsg = "ms-get-firmware-approve"
 	// Запрос от клиента на получение блока с бинарными данными
-	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block" // TODO: переименовать
+	MSGetFirmwareNextBlockMsg = "get-firmware-next-block"
 	// Отчёт о завершении процесса выгрузки прошивки
 	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
 	// Одобрение на запрос выгрузки прошивки
