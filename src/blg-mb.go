@@ -44,7 +44,7 @@ func (board *BlgMb) CyberBearLoader(args ...string) ([]byte, error) {
 }
 
 func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
-	stdout, err := board.CyberBearLoader("-m", "b1", "load", "-f", filePath)
+	stdout, err := board.CyberBearLoader("load", "-f", filePath, "-b")
 	msg := handleFlashResult(string(stdout), err)
 	return msg, err
 }
