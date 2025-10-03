@@ -34,8 +34,10 @@ var ms1Type = map[string]string{
 	"47af73c71f3930ce": "mtrx-a3",
 	"da047a039c8acff1": "btn-a2",
 	"58e2581437a30762": "btn-a2",
+	"56362c3fd8737be6": "btn-a4",
 	"c4ef6036603a600f": "lmp-a2",
 	"274b36772c9ea32a": "lmp-a4",
+	"c02ab0bb5a0f286a": "lmp-a5",
 	"5027e18c66ac2bc3": "lmp8-a1",
 }
 
