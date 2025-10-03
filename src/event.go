@@ -297,6 +297,8 @@ const (
 	resetMsg = "reset"
 	// результат операции reset
 	resetResultMsg = "reset-result"
+	// сигнал клиенту перед началом передачи бинарных данных
+	prepareForBinary = "ready-for-binary"
 )
 
 // отправить клиенту список всех устройств
@@ -1203,6 +1205,11 @@ func GetMsFirmwareStart(event Event, c *WebSocketConnection) error {
 		transmission.Clear()
 	}()
 
+	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, MSAddressMessage{
+		ID:      msg.ID,
+		Address: msg.Address,
+	}, false)
+
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
@@ -1218,10 +1225,7 @@ func GetMsFirmwareStart(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	transmission.set(bytes, msg.BlockSize)
-	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, MSAddressMessage{
-		ID:      msg.ID,
-		Address: msg.Address,
-	}, false)
+	c.sendOutgoingEventMessage(prepareForBinary, nil, false)
 	for {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
@@ -1291,6 +1295,10 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		transmission.Clear()
 	}()
 
+	c.sendOutgoingEventMessage(GetFirmwareApproveMsg, DeviceIdMessage{
+		ID: msg.ID,
+	}, false)
+
 	board := dev.Board.(*BlgMb)
 	bytes, err := board.Extract()
 	if err != nil {
@@ -1298,9 +1306,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	transmission.set(bytes, msg.BlockSize)
-	c.sendOutgoingEventMessage(GetFirmwareApproveMsg, DeviceIdMessage{
-		ID: msg.ID,
-	}, false)
+	c.sendOutgoingEventMessage(prepareForBinary, nil, false)
 	for {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
