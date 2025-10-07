@@ -60,7 +60,8 @@ func (m *WebSocketManager) setupEventHandlers() {
 	m.handlers[MSResetMsg] = MSReset
 	m.handlers[MSGetMetaDataMsg] = MSGetMetaData
 	m.handlers[MSGetAddressAndMetaMsg] = MSGetAddressAndMeta
-	m.handlers[MSGetFirmwareMsg] = GetFirmwareStart
+	m.handlers[MSGetFirmwareMsg] = GetMsFirmwareStart
+	m.handlers[GetFirmwareMsg] = GetFirmwareStart
 	m.handlers[MSGetFirmwareNextBlockMsg] = GetFirmwareNextBlock
 	m.handlers[MSGetConnectedBoardsMsg] = MSGetConnectedBoards
 	m.handlers[requestPackMsg] = RequestPack

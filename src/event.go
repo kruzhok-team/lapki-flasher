@@ -171,6 +171,11 @@ type MSGetFirmwareMessage struct {
 	RefBlChip string `json:"RefBlChip"` // не обязательный параметр, помагает установить кол-во фреймов в МК
 }
 
+type GetFirmwareMessage struct {
+	ID        string `json:"deviceID"`
+	BlockSize int    `json:"blockSize"`
+}
+
 type MSAddressesMessage struct {
 	ID        string   `json:"deviceID"`
 	Addresses []string `json:"addresses"`
@@ -262,12 +267,18 @@ const (
 	MSAddressAndMetaMsg = "ms-address-and-meta"
 	// Запрос от клиента на выгрузку прошивки из платы МС-ТЮК
 	MSGetFirmwareMsg = "ms-get-firmware"
+	// Запрос от клиента на выгрузку прошивки из платы
+	GetFirmwareMsg = "get-firmware"
 	// Одобрение на запрос выгрузки прошивки
 	MSGetFirmwareApproveMsg = "ms-get-firmware-approve"
 	// Запрос от клиента на получение блока с бинарными данными
-	MSGetFirmwareNextBlockMsg = "ms-get-firmware-next-block"
+	MSGetFirmwareNextBlockMsg = "get-firmware-next-block"
 	// Отчёт о завершении процесса выгрузки прошивки
 	MSGetFirmwareFinishMsg = "ms-get-firmware-finish"
+	// Одобрение на запрос выгрузки прошивки
+	GetFirmwareApproveMsg = "get-firmware-approve"
+	// Отчёт о завершении процесса выгрузки прошивки
+	GetFirmwareFinishMsg = "get-firmware-finish"
 	// Запрос от клиента на получение адресов, подключенных плат МС-ТЮК
 	MSGetConnectedBoardsMsg = "ms-get-connected-boards"
 	// Сообщение с подключенными адресами плат МС-ТЮК
@@ -286,6 +297,8 @@ const (
 	resetMsg = "reset"
 	// результат операции reset
 	resetResultMsg = "reset-result"
+	// сигнал клиенту перед началом передачи бинарных данных
+	prepareForBinary = "ready-for-binary"
 )
 
 // отправить клиенту список всех устройств
@@ -1109,8 +1122,8 @@ func MSGetFirmwareFinish(msg MSOperationReportMessage, c *WebSocketConnection) {
 	c.sendOutgoingEventMessage(MSGetFirmwareFinishMsg, msg, false)
 }
 
-// обработка запроса на выгрузку прошивки из устройства
-func GetFirmwareStart(event Event, c *WebSocketConnection) error {
+// обработка запроса на выгрузку прошивки из устройства (МС-ТЮК)
+func GetMsFirmwareStart(event Event, c *WebSocketConnection) error {
 	var msg MSGetFirmwareMessage
 	err := json.Unmarshal(event.Payload, &msg)
 	if err != nil {
@@ -1192,6 +1205,11 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		transmission.Clear()
 	}()
 
+	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, MSAddressMessage{
+		ID:      msg.ID,
+		Address: msg.Address,
+	}, false)
+
 	board := dev.Board.(*MS1)
 	logger := make(chan any)
 	go LogSend(c, logger)
@@ -1207,7 +1225,7 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 		return err
 	}
 	transmission.set(bytes, msg.BlockSize)
-	c.sendOutgoingEventMessage(MSGetFirmwareApproveMsg, nil, false)
+	c.sendOutgoingEventMessage(prepareForBinary, nil, false)
 	for {
 		if transmission.isFinish() {
 			c.binDataChan <- []byte{}
@@ -1216,6 +1234,83 @@ func GetFirmwareStart(event Event, c *WebSocketConnection) error {
 				Address: msg.Address,
 				Code:    GET_FIRMWARE_DONE,
 			}, c)
+			return nil
+		}
+		c.binDataChan <- transmission.popBlock()
+	}
+}
+
+// обработка запроса на выгрузку прошивки из устройства
+func GetFirmwareStart(event Event, c *WebSocketConnection) error {
+	var msg GetFirmwareMessage
+	err := json.Unmarshal(event.Payload, &msg)
+	if err != nil {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_ERROR, err.Error(), c)
+		return err
+	}
+	if c.IsBinChanBusySync() {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_CLIENT_BUSY, "", c)
+		return nil
+	}
+	if msg.BlockSize < 1 {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_INCORRECT_BLOCK_SIZE, "", c)
+		return nil
+	}
+	dev, exists := detector.GetBoardSync(msg.ID)
+	if !exists {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_NO_DEV, "", c)
+		return nil
+	}
+	// плата блокируется!!!
+	// не нужно использовать sync функции внутри блока
+	dev.Mu.Lock()
+	defer dev.Mu.Unlock()
+	updated := dev.Board.Update()
+	if updated {
+		if dev.Board.IsConnected() {
+			// TODO
+		} else {
+			detector.DeleteBoard(msg.ID)
+			DeviceUpdateDelete(msg.ID, c)
+			DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_NO_DEV, "", c)
+			return nil
+		}
+	}
+	if dev.IsFlashBlocked() {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_DEVICE_BUSY, "", c)
+		return nil
+	}
+	// блокировка устройства и клиента для выгрузки, необходимо разблокировать после завершения выгрузки
+	c.SetFlashingBoard(dev, msg.ID)
+	c.FlashingBoard.SetLock(true)
+	transmission := newDataTransmission()
+	defer func() {
+		if c.GetFlashingBoardSync() != nil {
+			c.FlashingBoard.SetLock(false)
+		} else {
+			// Сообщение для дебага, если это сообщение появилось, то значит, что-то пошло не так
+			println("WARNING! FlashingBoard is nil")
+		}
+		c.SetFlashingBoard(nil, "")
+		transmission.Clear()
+	}()
+
+	c.sendOutgoingEventMessage(GetFirmwareApproveMsg, DeviceIdMessage{
+		ID: msg.ID,
+	}, false)
+
+	board := dev.Board.(*BlgMb)
+	bytes, err := board.Extract()
+	if err != nil {
+		DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_ERROR, err.Error(), c)
+		return err
+	}
+	transmission.set(bytes, msg.BlockSize)
+	c.sendOutgoingEventMessage(prepareForBinary, nil, false)
+	for {
+		if transmission.isFinish() {
+			c.binDataChan <- []byte{}
+			DeviceCommentCode(GetFirmwareFinishMsg, msg.ID, GET_FIRMWARE_DONE, "", c)
 			return nil
 		}
 		c.binDataChan <- transmission.popBlock()

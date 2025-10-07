@@ -101,3 +101,38 @@ func (board *BlgMb) GetVersion() (string, error) {
 
 	return "", fmt.Errorf("art value not found")
 }
+
+// Извлечение прошивки
+func (board *BlgMb) Extract() ([]byte, error) {
+	return board.CyberBearLoader("-m", "b1", "extract", "--pages", "44")
+}
+
+func (board *BlgMb) GetId() (string, error) {
+	// TODO: унификация кода
+	value, err := board.GetMetaData()
+	if err != nil {
+		return "", err
+	}
+	meta, ok := value.(string)
+	if !ok {
+		return "", errors.New("ошибка преобразования данных при попытке получить версию КиберМишки")
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(meta))
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		printLog("scan", line)
+		if strings.HasPrefix(line, "Serial:") {
+			parts := strings.SplitN(line, ":", 2)
+			printLog(parts, len(parts))
+			if len(parts) == 2 {
+				board.serialID = strings.TrimSpace(parts[1])
+				printLog("serial id", board.serialID)
+				return board.serialID, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("serial value not found")
+}

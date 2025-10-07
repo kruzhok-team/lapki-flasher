@@ -85,6 +85,14 @@ func (d *Detector) Update() (
 					oldArduino.portName = newArduino.portName
 					d.boardActions.PushBack(ActionWithBoard{board: oldBoard, boardID: deviceID, action: PORT_UPDATE})
 				}
+			case *BlgMb:
+				blgBoard := oldBoard.Board.(*BlgMb)
+				if blgBoard.version == "" {
+					blgBoard.GetVersion()
+				}
+				if blgBoard.serialID == "" {
+					blgBoard.GetId()
+				}
 			}
 			oldBoard.Mu.Unlock()
 		} else {
@@ -93,7 +101,11 @@ func (d *Detector) Update() (
 			} else {
 				switch newBoard.Board.(type) {
 				case *BlgMb:
-					newBoard.Board.(*BlgMb).GetVersion()
+					blgBoard := newBoard.Board.(*BlgMb)
+					blgBoard.GetVersion()
+					if blgBoard.serialID == "" {
+						blgBoard.GetId()
+					}
 				}
 				d.boards[deviceID] = newBoard
 				d.boardActions.PushBack(ActionWithBoard{board: newBoard, boardID: deviceID, action: ADD})
