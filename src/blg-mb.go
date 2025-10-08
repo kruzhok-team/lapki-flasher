@@ -44,7 +44,7 @@ func (board *BlgMb) CyberBearLoader(args ...string) ([]byte, error) {
 }
 
 func (board *BlgMb) Flash(filePath string, logger chan any) (string, error) {
-	stdout, err := board.CyberBearLoader("-m", "b1", "load", "-f", filePath)
+	stdout, err := board.CyberBearLoader("load", "-f", filePath, "-b")
 	msg := handleFlashResult(string(stdout), err)
 	return msg, err
 }
@@ -104,7 +104,24 @@ func (board *BlgMb) GetVersion() (string, error) {
 
 // Извлечение прошивки
 func (board *BlgMb) Extract() ([]byte, error) {
-	return board.CyberBearLoader("-m", "b1", "extract", "--pages", "44")
+	_, err := board.CyberBearLoader("reboot", "-b")
+	if err != nil {
+		return []byte{}, err
+	}
+	_, err = board.CyberBearLoader("-m", "b1", "wait", "-t", "5")
+	if err != nil {
+		return []byte{}, err
+	}
+	bytes, err := board.CyberBearLoader("extract", "--pages", "44")
+	if err != nil {
+		return bytes, err
+	}
+	_, err = board.CyberBearLoader("reboot")
+	if err != nil {
+		// Предупреждаем, но не прекращаем работу
+		printLog("Не удалось перезагрузить КиберМишку:", err.Error())
+	}
+	return bytes, nil
 }
 
 func (board *BlgMb) GetId() (string, error) {
