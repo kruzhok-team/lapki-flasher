@@ -39,6 +39,7 @@ var ms1Type = map[string]string{
 	"274b36772c9ea32a": "lmp-a4",
 	"c02ab0bb5a0f286a": "lmp-a5",
 	"5027e18c66ac2bc3": "lmp8-a1",
+	"9cd7735665c44c15": "ard-a1",
 }
 
 func NewMS1(portNames [4]string, ms1OS MS1OS) *MS1 {
