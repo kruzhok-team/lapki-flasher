@@ -90,7 +90,7 @@ func (board *BlgMb) GetVersion() (string, error) {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "art:") {
+		if strings.HasPrefix(line, "Hardware:") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
 				board.version = strings.TrimSpace(parts[1])
@@ -99,7 +99,7 @@ func (board *BlgMb) GetVersion() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("art value not found")
+	return "", fmt.Errorf("Hardware ref value not found")
 }
 
 // Извлечение прошивки
