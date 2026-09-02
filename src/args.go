@@ -29,6 +29,9 @@ var getListCooldownDuration time.Duration
 // количество времени между автоматическими обновлениями
 var updateListTime time.Duration
 
+// время, в течение которого отсутствующее устройство остаётся в списке
+var deviceDisconnectGrace time.Duration
+
 // выводить в консоль подробную информацию
 var verbose bool
 
@@ -69,6 +72,7 @@ func setArgs() {
 	flag.BoolVar(&alwaysUpdate, "alwaysUpdate", false, "всегда искать устройства и обновлять их список, даже когда ни один клиент не подключён (используется для тестирования)")
 	getListCooldownSeconds := flag.Int("listCooldown", 2, "минимальное время (в секундах), через которое клиент может снова запросить список устройств, игнорируется, если количество клиентов меньше чем 2")
 	updateListTimeSeconds := flag.Int("updateList", 15, "количество секунд между автоматическими обновлениями, не может быть меньше единицы, если получено значение меньше единицы, то оно заменяется на 1")
+	disconnectGraceSeconds := flag.Int("deviceDisconnectGrace", 1, "время (в секундах), в течение которого временно исчезнувшее USB-устройство не удаляется из списка; 0 отключает задержку")
 	flag.Parse()
 	if fakeBoardsNum < 0 {
 		fakeBoardsNum = 0
@@ -79,8 +83,12 @@ func setArgs() {
 	if *updateListTimeSeconds < 1 {
 		*updateListTimeSeconds = 1
 	}
+	if *disconnectGraceSeconds < 0 {
+		*disconnectGraceSeconds = 0
+	}
 	getListCooldownDuration = time.Second * time.Duration(*getListCooldownSeconds)
 	updateListTime = time.Second * time.Duration(*updateListTimeSeconds)
+	deviceDisconnectGrace = time.Second * time.Duration(*disconnectGraceSeconds)
 }
 
 // вывод описания всех параметров с их значениями
@@ -91,6 +99,7 @@ func printArgsDesc() {
 	maxThreadsPerClientStr := fmt.Sprintf("максимальное количество потоков (горутин) для обработки запросов на одного клиента: %d", maxThreadsPerClient)
 	getListCooldownDurationStr := fmt.Sprintf("перерыв для запроса списка устройств: %v", getListCooldownDuration)
 	updateListTimeStr := fmt.Sprintf("промежуток времени между автоматическими обновлениями: %v", updateListTime)
+	disconnectGraceStr := fmt.Sprintf("задержка удаления временно отключившегося устройства: %v", deviceDisconnectGrace)
 	verboseStr := fmt.Sprintf("вывод подробной информации в консоль: %v", verbose)
 	alwaysUpdateStr := fmt.Sprintf("постоянное обновление списка устройств: %v", alwaysUpdate)
 	fakeBoardsNumStr := fmt.Sprintf("количество фальшивых устройств: %d", fakeBoardsNum)
@@ -99,13 +108,14 @@ func printArgsDesc() {
 	configPathStr := fmt.Sprintf("путь к файлу конфигурации avrdude: %s", configPath)
 	deviceListPathStr := fmt.Sprintf("путь к файлу со списком устройств (если пусто, то используется встроенный список): %s", deviceListPath)
 	blgMbUploaderPathStr := fmt.Sprintf("путь к программе для прошивки кибермишки: %s", blgMbUploaderPath)
-	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
+	log.Printf("Модуль загрузчика запущен со следующими параметрами:\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
 		webAddressStr,
 		maxFileSizeStr,
 		maxMsgSizeStr,
 		maxThreadsPerClientStr,
 		getListCooldownDurationStr,
 		updateListTimeStr,
+		disconnectGraceStr,
 		verboseStr,
 		alwaysUpdateStr,
 		fakeBoardsNumStr,

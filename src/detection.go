@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 type Detector struct {
@@ -24,6 +25,9 @@ type Detector struct {
 	// Старые устройства, если они не отсоединялись, останутся в списке, даже если их typeID находится в списке
 	dontAddTypes map[int]void
 
+	// Время первого снимка, в котором плата не была обнаружена.
+	missingSince map[string]time.Time
+
 	boardActions *list.List
 }
 
@@ -34,6 +38,7 @@ func NewDetector() *Detector {
 	d.generateFakeBoards()
 	d.initDeviceListErrorHandle(deviceListPath)
 	d.dontAddTypes = make(map[int]void)
+	d.missingSince = make(map[string]time.Time)
 	d.boardActions = list.New()
 	return &d
 }
@@ -74,6 +79,8 @@ func (d *Detector) Update() (
 	notAddedDevices = make(map[string]*Device)
 
 	for deviceID, newBoard := range detectedBoards {
+		// плата вернулась до окончания grace-периода (либо не исчезала).
+		delete(d.missingSince, deviceID)
 		oldBoard, exists := d.boards[deviceID]
 		if exists {
 			oldBoard.Mu.Lock()
@@ -114,11 +121,22 @@ func (d *Detector) Update() (
 	}
 
 	// удаление
+	now := time.Now()
 	for deviceID := range d.boards {
 		board, exists := detectedBoards[deviceID]
 		if !exists {
+			missingAt, alreadyMissing := d.missingSince[deviceID]
+			if !alreadyMissing {
+				d.missingSince[deviceID] = now
+				continue
+			}
+			// краткое исчезновение (например при перезагрузке) не должно удалять устройство
+			if now.Sub(missingAt) < deviceDisconnectGrace {
+				continue
+			}
 			d.boardActions.PushBack(ActionWithBoard{board: board, boardID: deviceID, action: DELETE})
 			delete(d.boards, deviceID)
+			delete(d.missingSince, deviceID)
 		}
 	}
 	devicesInList = d.boards
