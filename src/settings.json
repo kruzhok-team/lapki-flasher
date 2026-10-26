@@ -8,7 +8,7 @@
   "deviceDisconnectGrace": 1,
   "verbose": false,
   "alwaysUpdate": false,
-  "stub": 2,
+  "stub": 0,
   "stubms": 0,
   "avrdudePath": "avrdude",
   "configPath": "",
